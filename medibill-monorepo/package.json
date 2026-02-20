@@ -1,5 +1,5 @@
 {
-  "name": "medifactura-col",
+  "name": "medibill-monorepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",
