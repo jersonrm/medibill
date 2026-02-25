@@ -118,3 +118,83 @@ export async function buscarPacientePorCedula(cedula: string) {
 
   return null; // Paciente nuevo
 }
+
+// ==========================================
+// NUEVO MOTOR RIPS - RESOLUCIÓN 2275
+// ==========================================
+
+interface DatosAuditoriaRips {
+  documentoPaciente: string;
+  diagnosticos: any[];
+  procedimientos: any[];
+}
+
+export async function generarJsonRipsMVP(datos: DatosAuditoriaRips) {
+  const fechaHoy = new Date().toISOString().slice(0, 16).replace('T', ' '); 
+  
+  // Validamos que haya un documento, si no, usamos un genérico
+  const idPaciente = datos.documentoPaciente?.trim() || "000000000";
+  const diagPrincipal = datos.diagnosticos[0]?.codigo_cie10 || "Z000";
+
+  // 1. Mapear todos los procedimientos dinámicamente
+  const procedimientosRips = datos.procedimientos.map((proc) => ({
+    codigoPrestador: "520010000101", // Código simulado Nariño
+    fechaInicioAtencion: fechaHoy,
+    idMIPRES: null,
+    numAutorizacion: null,
+    codigoProcedimiento: proc.codigo_cups, // Ej: 87.41.01 (El TAC)
+    viaIngresoServicioSalud: "02", // Consulta Externa
+    modalidadAtencion: "01", 
+    grupoServicios: "01", 
+    codigoServicio: 100, 
+    finalidadAtencion: "10", 
+    tipoDocumentoIdentificacion: "CC",
+    numDocumentoIdentificacion: idPaciente,
+    codigoDiagnosticoPrincipal: diagPrincipal,
+    codigoDiagnosticoRelacionado: null,
+    codigoComplicacion: null,
+    valorProcedimiento: 0,
+    valorCuotaModeradora: 0,
+    valorNetoPagar: 0
+  }));
+
+  const rips = {
+    prestador: {
+      tipoDocumentoIdentificacion: "CC",
+      numDocumentoIdentificacion: "1085222333", // Médico (sigue fijo por ahora)
+      codigoHabilitacion: "520010000101" 
+    },
+    usuarios: [
+      {
+        tipoDocumentoIdentificacion: "CC",
+        numDocumentoIdentificacion: idPaciente, // 🟢 DINÁMICO: Cédula real
+        tipoUsuario: "01", 
+        fechaNacimiento: "1990-05-15", // Fijo MVP
+        sexoBiologico: "M" // Fijo MVP
+      }
+    ],
+    consultas: [
+      {
+        codigoPrestador: "520010000101",
+        fechaInicioAtencion: fechaHoy,
+        codigoConsulta: "890201", // Código general de "Consulta Médica"
+        modalidadAtencion: "01", 
+        grupoServicios: "01", 
+        codigoServicio: 100, 
+        finalidadAtencion: "10", 
+        causaMotivoAtencion: "15", 
+        codigoDiagnosticoPrincipal: diagPrincipal, // 🟢 DINÁMICO
+        codigoDiagnosticoRelacionado1: datos.diagnosticos[1]?.codigo_cie10 || null, // 🟢 DINÁMICO
+        codigoDiagnosticoRelacionado2: datos.diagnosticos[2]?.codigo_cie10 || null, // 🟢 DINÁMICO
+        tipoDiagnosticoPrincipal: "01", 
+        valorConsulta: 50000,      
+        valorCuotaModeradora: 0,
+        valorNetoPagar: 50000
+      }
+    ],
+    // 🟢 DINÁMICO: Array completo de procedimientos, solo lo incluimos si existen
+    procedimientos: procedimientosRips.length > 0 ? procedimientosRips : undefined 
+  };
+
+  return rips;
+}
