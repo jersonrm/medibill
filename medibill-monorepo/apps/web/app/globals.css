@@ -2,4 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Puedes borrar cualquier otra cosa que haya aquí */
+@layer utilities {
+  /* Ocultar flechas en Chrome, Safari, Edge, Opera */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Ocultar flechas en Firefox */
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+}
