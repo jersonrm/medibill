@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { guardarTarifaUsuario, obtenerTarifasUsuario, eliminarTarifaUsuario } from "../actions";
+import { guardarTarifaUsuario, obtenerTarifasUsuario, eliminarTarifaUsuario } from "@/app/actions";
 
 export default function ConfiguracionPage() {
   const [tarifas, setTarifas] = useState<any[]>([]);

@@ -1,0 +1,9 @@
+# Claude temp files
+tmpclaude-*/
+tmpclaude-*
+
+# Dependencies
+node_modules
+
+# Misc
+nul

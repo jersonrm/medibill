@@ -1,23 +1,28 @@
 'use client'
 
 import { useState } from 'react';
-import { generarJsonRipsMVP } from '../app/actions'; 
-import { validadorRips } from '../lib/validadorRips'; 
+import { generarJsonRipsMVP } from '@/app/actions'; 
+import { validadorRips } from '@/lib/validadorRips'; 
+import type { DatosParaRips } from '@/lib/types/rips';
 
 interface Props {
-  tipoDocumentoPaciente: string;
+  tipoDocumentoPaciente: DatosParaRips["tipoDocumentoPaciente"];
   documentoPaciente: string;
   fechaNacimientoPaciente: string;
-  sexoPaciente: string;
-  tipoUsuarioPaciente: string;
+  sexoPaciente: DatosParaRips["sexoPaciente"];
+  tipoUsuarioPaciente: DatosParaRips["tipoUsuarioPaciente"];
+  codPaisResidencia: string;
+  codMunicipioResidencia: string;
+  codZonaTerritorialResidencia: DatosParaRips["codZonaTerritorialResidencia"];
+  incapacidad: DatosParaRips["incapacidad"];
   diagnosticos: any[];
   procedimientos: any[];
-  // 🟢 Objeto de liquidación sugerido por la IA y validado por el médico
   atencionIA: {
     modalidad: string;
     causa: string;
     finalidad: string;
     tipo_diagnostico: string;
+    tipo_servicio: string;
     valor_consulta: number;
     valor_cuota: number;
   };
@@ -29,6 +34,10 @@ export default function DownloadRipsButton({
   fechaNacimientoPaciente,
   sexoPaciente,
   tipoUsuarioPaciente,
+  codPaisResidencia,
+  codMunicipioResidencia,
+  codZonaTerritorialResidencia,
+  incapacidad,
   diagnosticos, 
   procedimientos,
   atencionIA
@@ -38,24 +47,41 @@ export default function DownloadRipsButton({
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const ripsData = await generarJsonRipsMVP({ 
+      // Pre-validación: campos obligatorios Res. 2275
+      const camposFaltantes: string[] = [];
+      if (!documentoPaciente.trim()) camposFaltantes.push("Documento del paciente");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaNacimientoPaciente)) camposFaltantes.push("Fecha de nacimiento");
+      if (diagnosticos.length === 0) camposFaltantes.push("Al menos un diagnóstico CIE-10");
+
+      if (camposFaltantes.length > 0) {
+        alert("Campos obligatorios faltantes:\n\n- " + camposFaltantes.join("\n- "));
+        setLoading(false);
+        return;
+      }
+
+      const ripsData = await generarJsonRipsMVP({
         tipoDocumentoPaciente,
-        documentoPaciente, 
+        documentoPaciente,
         fechaNacimientoPaciente,
         sexoPaciente,
         tipoUsuarioPaciente,
-        diagnosticos, 
+        codPaisResidencia,
+        codMunicipioResidencia,
+        codZonaTerritorialResidencia,
+        incapacidad,
+        diagnosticos,
         procedimientos,
         atencionIA
       });
-      
+
       const esValido = validadorRips(ripsData);
 
       if (!esValido) {
-        console.error("❌ Error estructura RIPS 2275:", validadorRips.errors);
-        alert("El archivo tiene errores. Revisa la consola para detalles.");
+        const errores = validadorRips.errors?.map(e => `${e.instancePath} ${e.message}`).join("\n") || "Error desconocido";
+        console.error("Error estructura RIPS 2275:", validadorRips.errors);
+        alert("Error de validación RIPS 2275:\n\n" + errores);
         setLoading(false);
-        return; 
+        return;
       }
 
       const jsonString = JSON.stringify(ripsData, null, 2);
