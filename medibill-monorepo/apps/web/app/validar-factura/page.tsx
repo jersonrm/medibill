@@ -7,6 +7,7 @@ import {
   obtenerFacturasPendientesValidacion,
 } from "@/app/actions/glosas";
 import PanelResultados from "@/components/validacion/PanelResultados";
+import ModalRegistrarGlosa from "@/components/glosas/ModalRegistrarGlosa";
 import type {
   ResultadoValidacion,
   FacturaDB,
@@ -41,20 +42,25 @@ export default function ValidarFacturaPage() {
   const [resultado, setResultado] = useState<ResultadoValidacion | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingFacturas, setLoadingFacturas] = useState(true);
+  const [modalGlosaAbierto, setModalGlosaAbierto] = useState(false);
+  const [facturaParaGlosa, setFacturaParaGlosa] = useState<string | undefined>(undefined);
 
   // Cargar facturas pendientes al montar
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await obtenerFacturasPendientesValidacion();
-        setFacturas(data);
-      } catch {
-        setFacturas([]);
-      } finally {
-        setLoadingFacturas(false);
-      }
-    })();
+  const cargarFacturas = useCallback(async () => {
+    setLoadingFacturas(true);
+    try {
+      const data = await obtenerFacturasPendientesValidacion();
+      setFacturas(data);
+    } catch {
+      setFacturas([]);
+    } finally {
+      setLoadingFacturas(false);
+    }
   }, []);
+
+  useEffect(() => {
+    cargarFacturas();
+  }, [cargarFacturas]);
 
   // Seleccionar y validar una factura
   const seleccionarFactura = useCallback(async (facturaId: string) => {
@@ -120,11 +126,20 @@ export default function ValidarFacturaPage() {
             </div>
           </div>
           <Link
-            href="/dashboard-glosas"
+            href="/glosas"
             className="px-3 py-1.5 text-xs font-bold text-medi-light border border-medi-dark rounded-lg hover:bg-medi-dark/50 transition-all"
           >
-            Dashboard Glosas
+            Gestión Glosas
           </Link>
+          <button
+            onClick={() => {
+              setFacturaParaGlosa(undefined);
+              setModalGlosaAbierto(true);
+            }}
+            className="px-3 py-1.5 text-xs font-bold text-orange-300 border border-orange-600 rounded-lg hover:bg-orange-600/20 transition-all"
+          >
+            + Registrar Glosa
+          </button>
         </div>
       </div>
 
@@ -210,6 +225,20 @@ export default function ValidarFacturaPage() {
                           Validando...
                         </div>
                       )}
+                      {/* Botón registrar glosa para facturas radicadas+ */}
+                      {["radicada", "glosada", "respondida"].includes(f.estado) && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFacturaParaGlosa(f.id);
+                            setModalGlosaAbierto(true);
+                          }}
+                          className="mt-2 w-full text-[10px] font-bold text-orange-400 border border-orange-600/40 rounded-lg py-1 px-2 hover:bg-orange-600/10 transition-all"
+                        >
+                          + Registrar glosa recibida
+                        </button>
+                      )}
                     </button>
                   );
                 })}
@@ -227,6 +256,19 @@ export default function ValidarFacturaPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal para registrar glosa recibida */}
+      <ModalRegistrarGlosa
+        abierto={modalGlosaAbierto}
+        onCerrar={() => {
+          setModalGlosaAbierto(false);
+          setFacturaParaGlosa(undefined);
+        }}
+        onGlosaRegistrada={() => {
+          cargarFacturas();
+        }}
+        facturaIdPreseleccionada={facturaParaGlosa}
+      />
     </div>
   );
 }

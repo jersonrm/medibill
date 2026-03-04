@@ -31,10 +31,10 @@ export default function AppHeader({ onNuevaConsulta }: AppHeaderProps) {
             + Nueva Consulta
           </button>
           <Link
-            href="/dashboard-glosas"
+            href="/glosas"
             className="px-4 py-2 text-sm font-bold text-medi-primary border-2 border-medi-light rounded-xl hover:bg-medi-light/50 transition-all"
           >
-            Dashboard Glosas
+            Gestión Glosas
           </Link>
           <Link
             href="/validar-factura"

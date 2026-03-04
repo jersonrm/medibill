@@ -858,35 +858,69 @@ async function limpiarDatosPrueba() {
   const idsFacturas = (facturasPrueba ?? []).map((f) => f.id);
 
   if (idsFacturas.length > 0) {
-    // Eliminar validaciones_pre_radicacion
+    // Eliminar validaciones_factura (tabla activa)
     const { error: e1 } = await supabase
-      .from("validaciones_pre_radicacion")
+      .from("validaciones_factura")
       .delete()
       .in("factura_id", idsFacturas);
-    if (e1) console.warn("   ⚠️  validaciones_pre_radicacion:", e1.message);
-    else console.log(`   ✓ validaciones_pre_radicacion eliminadas`);
+    if (e1) console.warn("   ⚠️  validaciones_factura:", e1.message);
+    else console.log(`   ✓ validaciones_factura eliminadas`);
 
-    // Eliminar auditoria_plazos
-    const { error: e2 } = await supabase
-      .from("auditoria_plazos")
+    // Eliminar validaciones_pre_radicacion (tabla legacy, graceful)
+    try {
+      const { error: e1b } = await supabase
+        .from("validaciones_pre_radicacion")
+        .delete()
+        .in("factura_id", idsFacturas);
+      if (!e1b) console.log(`   ✓ validaciones_pre_radicacion eliminadas (legacy)`);
+    } catch { /* tabla puede no existir */ }
+
+    // Eliminar auditoria_plazos (tabla legacy, graceful)
+    try {
+      const { error: e2 } = await supabase
+        .from("auditoria_plazos")
+        .delete()
+        .in("entidad_id", idsFacturas);
+      if (!e2) console.log(`   ✓ auditoria_plazos eliminadas (legacy)`);
+    } catch { /* tabla puede no existir */ }
+
+    // Eliminar respuestas de glosas recibidas (vía glosas_recibidas)
+    const { data: glosasRecibidasPrueba } = await supabase
+      .from("glosas_recibidas")
+      .select("id")
+      .in("factura_id", idsFacturas);
+    const idsGlosasRecibidas = (glosasRecibidasPrueba ?? []).map((g) => g.id);
+    if (idsGlosasRecibidas.length > 0) {
+      const { error: e3b } = await supabase
+        .from("respuestas_glosas")
+        .delete()
+        .in("glosa_id", idsGlosasRecibidas);
+      if (e3b) console.warn("   ⚠️  respuestas_glosas:", e3b.message);
+      else console.log(`   ✓ respuestas_glosas eliminadas`);
+    }
+
+    // Eliminar glosas_recibidas
+    const { error: e3c } = await supabase
+      .from("glosas_recibidas")
       .delete()
-      .in("entidad_id", idsFacturas);
-    if (e2) console.warn("   ⚠️  auditoria_plazos:", e2.message);
-    else console.log(`   ✓ auditoria_plazos eliminadas`);
+      .in("factura_id", idsFacturas);
+    if (e3c) console.warn("   ⚠️  glosas_recibidas:", e3c.message);
+    else console.log(`   ✓ glosas_recibidas eliminadas`);
 
-    // Eliminar respuestas_glosa (vía glosas)
+    // Eliminar respuestas_glosa legacy (vía glosas)
     const { data: glosasPrueba } = await supabase
       .from("glosas")
       .select("id")
       .in("factura_id", idsFacturas);
     const idsGlosas = (glosasPrueba ?? []).map((g) => g.id);
     if (idsGlosas.length > 0) {
-      const { error: e3 } = await supabase
-        .from("respuestas_glosa")
-        .delete()
-        .in("glosa_id", idsGlosas);
-      if (e3) console.warn("   ⚠️  respuestas_glosa:", e3.message);
-      else console.log(`   ✓ respuestas_glosa eliminadas`);
+      try {
+        const { error: e3 } = await supabase
+          .from("respuestas_glosa")
+          .delete()
+          .in("glosa_id", idsGlosas);
+        if (!e3) console.log(`   ✓ respuestas_glosa eliminadas (legacy)`);
+      } catch { /* tabla legacy puede no existir */ }
     }
 
     // Eliminar glosas

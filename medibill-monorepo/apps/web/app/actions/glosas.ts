@@ -6,305 +6,134 @@ import { devLog } from "@/lib/logger";
 import type { ResultadoValidacion, FacturaResumen, ValidacionPreRadicacionDB } from "@/lib/types/glosas";
 
 // ==========================================
-// DASHBOARD DE GLOSAS — Server Actions
+// MIS PENDIENTES — Vista unificada
 // ==========================================
 
-/** Resumen de facturas agrupadas por estado */
-export async function obtenerFacturasPorEstado() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return {};
-
-  const { data, error } = await supabase
-    .from('facturas')
-    .select('estado, valor_total, valor_glosado')
-    .eq('user_id', user.id);
-
-  if (error || !data) return {};
-
-  const resumen: Record<string, { cantidad: number; valor: number }> = {};
-  for (const f of data) {
-    if (!resumen[f.estado]) resumen[f.estado] = { cantidad: 0, valor: 0 };
-    const entry = resumen[f.estado]!;
-    entry.cantidad++;
-    entry.valor += Number(f.valor_total);
-  }
-  return resumen;
+export interface PendienteItem {
+  id: string;
+  tipo: 'factura_borrador' | 'glosa_pendiente' | 'alerta_radicacion' | 'glosa_irregular';
+  titulo: string;
+  subtitulo: string;
+  valor: number;
+  urgencia: 'normal' | 'urgente' | 'vencida';
+  diasRestantes: number | null;
+  accion: { label: string; href: string };
+  meta?: Record<string, unknown>;
 }
 
-/** KPIs principales del dashboard de glosas */
-export async function obtenerKPIsGlosas() {
+export interface ResumenPendientes {
+  kpis: {
+    totalFacturado: number;
+    totalGlosado: number;
+    tasaGlosas: number;
+    pendientesTotal: number;
+    facturasBorrador: number;
+    glosasRecibidasPendientes: number;
+    glosasRecibidasVencidas: number;
+  };
+  pendientes: PendienteItem[];
+}
+
+/** Vista unificada "Mis Pendientes" — una sola llamada al server */
+export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return { kpis: { totalFacturado: 0, totalGlosado: 0, tasaGlosas: 0, pendientesTotal: 0, facturasBorrador: 0, glosasRecibidasPendientes: 0, glosasRecibidasVencidas: 0 }, pendientes: [] };
 
-  // Total facturas y valores
+  const pendientes: PendienteItem[] = [];
+  const hoy = new Date();
+
+  // ── 1. Facturas ──
   const { data: facturas } = await supabase
     .from('facturas')
-    .select('id, estado, valor_total, valor_glosado')
+    .select('id, num_factura, fecha_expedicion, fecha_limite_rad, valor_total, valor_glosado, estado')
     .eq('user_id', user.id);
 
-  if (!facturas) return null;
+  const allFacturas = facturas || [];
+  const totalFacturado = allFacturas.reduce((s, f) => s + Number(f.valor_total), 0);
+  const totalGlosado = allFacturas.reduce((s, f) => s + Number(f.valor_glosado || 0), 0);
+  const radicadas = allFacturas.filter(f => f.estado !== 'borrador').length;
+  const glosadas = allFacturas.filter(f => f.estado === 'glosada').length;
+  const tasaGlosas = radicadas > 0 ? Math.round((glosadas / radicadas) * 10000) / 100 : 0;
 
-  const totalFacturado = facturas.reduce((s, f) => s + Number(f.valor_total), 0);
-  const totalGlosado = facturas.reduce((s, f) => s + Number(f.valor_glosado), 0);
-  const radicadas = facturas.filter(f => f.estado !== 'borrador').length;
-  const glosadas = facturas.filter(f => f.estado === 'glosada').length;
-  const tasaGlosas = radicadas > 0 ? (glosadas / radicadas) * 100 : 0;
-
-  return {
-    totalFacturas: facturas.length,
-    totalFacturado,
-    totalGlosado,
-    radicadas,
-    glosadas,
-    tasaGlosas: Math.round(tasaGlosas * 100) / 100,
-  };
-}
-
-/** Top 5 causales de glosa más frecuentes */
-export async function obtenerTopCausalesGlosa() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  // Obtener glosas del usuario (via facturas)
-  const { data: glosas } = await supabase
-    .from('glosas')
-    .select(`
-      codigo_causal,
-      valor_glosado,
-      factura_id,
-      facturas!inner(user_id)
-    `)
-    .eq('facturas.user_id', user.id);
-
-  if (!glosas || glosas.length === 0) return [];
-
-  // Agrupar por causal
-  const agrupado: Record<string, { cantidad: number; valor: number }> = {};
-  for (const g of glosas) {
-    if (!agrupado[g.codigo_causal]) agrupado[g.codigo_causal] = { cantidad: 0, valor: 0 };
-    const entry = agrupado[g.codigo_causal]!;
-    entry.cantidad++;
-    entry.valor += Number(g.valor_glosado);
-  }
-
-  // Ordenar y tomar top 5
-  const top5Codigos = Object.entries(agrupado)
-    .sort((a, b) => b[1].cantidad - a[1].cantidad)
-    .slice(0, 5)
-    .map(([codigo, stats]) => ({ codigo, ...stats }));
-
-  // Enriquecer con descripciones del catálogo
-  const codigos = top5Codigos.map(t => t.codigo);
-  const { data: catalogo } = await supabase
-    .from('catalogo_causales_glosa')
-    .select('codigo, descripcion, concepto')
-    .in('codigo', codigos);
-
-  const catalogoMap = new Map((catalogo || []).map(c => [c.codigo, c]));
-
-  return top5Codigos.map(t => ({
-    codigo: t.codigo,
-    descripcion: catalogoMap.get(t.codigo)?.descripcion || t.codigo,
-    concepto: catalogoMap.get(t.codigo)?.concepto || '',
-    cantidad: t.cantidad,
-    valor: t.valor,
-  }));
-}
-
-/** Glosas pendientes de respuesta con días restantes */
-export async function obtenerGlosasPendientes() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const { data } = await supabase
-    .from('glosas')
-    .select(`
-      id,
-      codigo_causal,
-      valor_glosado,
-      fecha_formulacion,
-      fecha_limite_resp,
-      estado,
-      tipo,
-      descripcion_erp,
-      factura_id,
-      facturas!inner(num_factura, user_id)
-    `)
-    .eq('facturas.user_id', user.id)
-    .in('estado', ['pendiente', 'en_revision']);
-
-  if (!data) return [];
-
-  const hoy = new Date();
-  return data.map((g: Record<string, unknown>) => {
-    const limite = g.fecha_limite_resp ? new Date(g.fecha_limite_resp as string) : null;
+  // Facturas borrador → pendientes de validar/radicar
+  const borrador = allFacturas.filter(f => f.estado === 'borrador');
+  for (const f of borrador) {
+    let urgencia: 'normal' | 'urgente' | 'vencida' = 'normal';
     let diasRestantes: number | null = null;
-    let vencida = false;
-
-    if (limite) {
-      // Calcular días hábiles restantes (simple aproximación)
-      let dias = 0;
-      const d = new Date(hoy);
-      while (d < limite) {
-        d.setDate(d.getDate() + 1);
-        const dow = d.getDay();
-        if (dow !== 0 && dow !== 6) dias++;
-      }
-      if (hoy > limite) {
-        dias = -dias;
-        vencida = true;
-      }
-      diasRestantes = dias;
+    if (f.fecha_limite_rad) {
+      const limite = new Date(f.fecha_limite_rad);
+      const diffMs = limite.getTime() - hoy.getTime();
+      diasRestantes = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (diasRestantes < 0) urgencia = 'vencida';
+      else if (diasRestantes <= 5) urgencia = 'urgente';
     }
-
-    const facturas = g.facturas as Record<string, unknown>;
-    return {
-      id: g.id,
-      codigo_causal: g.codigo_causal,
-      valor_glosado: Number(g.valor_glosado),
-      fecha_formulacion: g.fecha_formulacion,
-      fecha_limite_resp: g.fecha_limite_resp,
-      estado: g.estado,
-      tipo: g.tipo,
-      descripcion_erp: g.descripcion_erp,
-      num_factura: facturas?.num_factura || '',
+    pendientes.push({
+      id: f.id,
+      tipo: 'factura_borrador',
+      titulo: `Factura ${f.num_factura || 'sin número'}`,
+      subtitulo: urgencia === 'vencida'
+        ? `Venció hace ${Math.abs(diasRestantes!)}d — Validar y radicar`
+        : diasRestantes !== null
+          ? `${diasRestantes}d para radicar`
+          : 'Sin fecha límite — Validar y radicar',
+      valor: Number(f.valor_total),
+      urgencia,
       diasRestantes,
-      vencida,
-    };
-  }).sort((a: { diasRestantes: number | null }, b: { diasRestantes: number | null }) =>
-    (a.diasRestantes ?? 999) - (b.diasRestantes ?? 999)
-  );
-}
-
-/** Tendencia de glosas por mes (últimos 6 meses) */
-export async function obtenerTendenciaGlosas() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const hace6Meses = new Date();
-  hace6Meses.setMonth(hace6Meses.getMonth() - 6);
-
-  const { data: glosas } = await supabase
-    .from('glosas')
-    .select(`
-      fecha_formulacion,
-      valor_glosado,
-      facturas!inner(user_id)
-    `)
-    .eq('facturas.user_id', user.id)
-    .gte('fecha_formulacion', hace6Meses.toISOString());
-
-  if (!glosas) return [];
-
-  // Agrupar por mes
-  const meses: Record<string, { cantidad: number; valor: number }> = {};
-  for (const g of glosas) {
-    const fecha = new Date(g.fecha_formulacion as string);
-    const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-    if (!meses[key]) meses[key] = { cantidad: 0, valor: 0 };
-    meses[key].cantidad++;
-    meses[key].valor += Number(g.valor_glosado);
-  }
-
-  // Generar array de 6 meses (incluir meses sin datos)
-  const resultado = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const nombreMes = d.toLocaleDateString('es-CO', { month: 'short', year: '2-digit' });
-    resultado.push({
-      mes: nombreMes,
-      cantidad: meses[key]?.cantidad || 0,
-      valor: meses[key]?.valor || 0,
+      accion: { label: 'Validar', href: '/validar-factura' },
     });
   }
 
-  return resultado;
-}
+  // Alertas de radicación: facturas borrador con deadline cercano (ya capturadas arriba)
 
-/** Facturas próximas a vencer plazo de radicación (22 días hábiles) */
-export async function obtenerAlertasRadicacion() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const { data } = await supabase
-    .from('facturas')
-    .select('id, num_factura, fecha_expedicion, fecha_limite_rad, valor_total, estado')
-    .eq('user_id', user.id)
-    .in('estado', ['borrador'])
-    .not('fecha_limite_rad', 'is', null);
-
-  if (!data) return [];
-
-  const hoy = new Date();
-  return data
-    .map(f => {
-      const limite = new Date(f.fecha_limite_rad!);
-      const diffMs = limite.getTime() - hoy.getTime();
-      const diasCalendario = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      return {
-        id: f.id,
-        num_factura: f.num_factura,
-        fecha_expedicion: f.fecha_expedicion,
-        fecha_limite_rad: f.fecha_limite_rad,
-        valor_total: Number(f.valor_total),
-        diasRestantes: diasCalendario,
-        vencida: diasCalendario < 0,
-        urgente: diasCalendario >= 0 && diasCalendario <= 5,
-      };
-    })
-    .filter(f => f.diasRestantes <= 10) // Solo alertas relevantes
-    .sort((a, b) => a.diasRestantes - b.diasRestantes);
-}
-
-/** Detectar glosas extemporáneas o ilegales */
-export async function obtenerGlosasIlegales() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-
-  const { data: glosas } = await supabase
+  // ── 2. Glosas pendientes (tabla glosas) ──
+  const { data: glosasData } = await supabase
     .from('glosas')
     .select(`
-      id,
-      codigo_causal,
-      valor_glosado,
-      fecha_formulacion,
-      fecha_servicio,
-      tipo,
-      estado,
-      descripcion_erp,
-      factura_id,
+      id, codigo_causal, valor_glosado, fecha_formulacion,
+      fecha_limite_resp, estado, tipo, descripcion_erp, factura_id,
       facturas!inner(num_factura, fecha_radicacion, user_id)
     `)
     .eq('facturas.user_id', user.id);
 
-  if (!glosas) return [];
+  const allGlosas = glosasData || [];
 
-  const alertas: Array<{
-    glosa_id: string;
-    num_factura: string;
-    codigo_causal: string;
-    valor_glosado: number;
-    tipo_irregularidad: string;
-    detalle: string;
-  }> = [];
+  // Pendientes de respuesta
+  const glosaPendientes = allGlosas.filter(g => g.estado === 'pendiente' || g.estado === 'en_revision');
+  for (const g of glosaPendientes) {
+    const facturaInfo = g.facturas as unknown as Record<string, unknown>;
+    let urgencia: 'normal' | 'urgente' | 'vencida' = 'normal';
+    let diasRestantes: number | null = null;
+    if (g.fecha_limite_resp) {
+      const limite = new Date(g.fecha_limite_resp as string);
+      const diffMs = limite.getTime() - hoy.getTime();
+      diasRestantes = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (diasRestantes < 0) urgencia = 'vencida';
+      else if (diasRestantes <= 3) urgencia = 'urgente';
+    }
+    pendientes.push({
+      id: g.id as string,
+      tipo: 'glosa_pendiente',
+      titulo: `Glosa ${g.codigo_causal} — Fact. ${facturaInfo?.num_factura || ''}`,
+      subtitulo: g.descripcion_erp
+        ? String(g.descripcion_erp).slice(0, 80)
+        : (g.tipo === 'devolucion' ? 'Devolución' : 'Glosa') + ' pendiente de respuesta',
+      valor: Number(g.valor_glosado),
+      urgencia,
+      diasRestantes,
+      accion: { label: 'Responder', href: '/glosas' },
+      meta: { tipo: g.tipo, codigo_causal: g.codigo_causal },
+    });
+  }
 
-  for (const g of glosas) {
-    const facturas = g.facturas as unknown as Record<string, unknown>;
-    const fechaRadicacion = facturas?.fecha_radicacion
-      ? new Date(facturas.fecha_radicacion as string)
+  // Irregularidades
+  for (const g of allGlosas) {
+    const facturaInfo = g.facturas as unknown as Record<string, unknown>;
+    const fechaRadicacion = facturaInfo?.fecha_radicacion
+      ? new Date(facturaInfo.fecha_radicacion as string)
       : null;
     const fechaFormulacion = new Date(g.fecha_formulacion as string);
 
-    // Glosa extemporánea: formulada más de 20 días hábiles después de radicación
     if (fechaRadicacion) {
       let diasHabiles = 0;
       const d = new Date(fechaRadicacion);
@@ -313,42 +142,65 @@ export async function obtenerGlosasIlegales() {
         const dow = d.getDay();
         if (dow !== 0 && dow !== 6) diasHabiles++;
       }
-      if (diasHabiles > 20) {
-        alertas.push({
-          glosa_id: g.id as string,
-          num_factura: (facturas?.num_factura as string) || '',
-          codigo_causal: g.codigo_causal as string,
-          valor_glosado: Number(g.valor_glosado),
-          tipo_irregularidad: 'Extemporánea',
-          detalle: `Glosa formulada ${diasHabiles} días hábiles después de radicación (máximo legal: 20 días). Aplica silencio administrativo positivo.`,
-        });
-      }
-    }
-
-    // Devolución extemporánea: más de 5 días hábiles
-    if (g.tipo === 'devolucion' && fechaRadicacion) {
-      let diasHabiles = 0;
-      const d = new Date(fechaRadicacion);
-      while (d < fechaFormulacion) {
-        d.setDate(d.getDate() + 1);
-        const dow = d.getDay();
-        if (dow !== 0 && dow !== 6) diasHabiles++;
-      }
-      if (diasHabiles > 5) {
-        alertas.push({
-          glosa_id: g.id as string,
-          num_factura: (facturas?.num_factura as string) || '',
-          codigo_causal: g.codigo_causal as string,
-          valor_glosado: Number(g.valor_glosado),
-          tipo_irregularidad: 'Devolución extemporánea',
-          detalle: `Devolución formulada ${diasHabiles} días hábiles después de radicación (máximo legal: 5 días). Se debe rechazar.`,
+      const esExtemporanea = g.tipo === 'devolucion' ? diasHabiles > 5 : diasHabiles > 20;
+      if (esExtemporanea) {
+        const tipoIrreg = g.tipo === 'devolucion' ? 'Devolución extemporánea' : 'Glosa extemporánea';
+        const maxDias = g.tipo === 'devolucion' ? 5 : 20;
+        pendientes.push({
+          id: `irreg-${g.id}`,
+          tipo: 'glosa_irregular',
+          titulo: `${tipoIrreg} — Fact. ${facturaInfo?.num_factura || ''}`,
+          subtitulo: `${diasHabiles} días hábiles (máx. legal: ${maxDias}). Aplica silencio positivo.`,
+          valor: Number(g.valor_glosado),
+          urgencia: 'urgente',
+          diasRestantes: null,
+          accion: { label: 'Ver detalle', href: '/glosas' },
+          meta: { codigo_causal: g.codigo_causal, diasHabiles },
         });
       }
     }
   }
 
-  return alertas;
+  // ── 3. Glosas recibidas pendientes (Capa 3) ──
+  let glosasRecibidasPendientes = 0;
+  let glosasRecibidasVencidas = 0;
+  try {
+    const { data: glosasRecibidas } = await supabase
+      .from('glosas_recibidas')
+      .select('id, estado, valor_glosado, codigo_glosa, fecha_notificacion, factura_id');
+
+    if (glosasRecibidas) {
+      glosasRecibidasPendientes = glosasRecibidas.filter(g => g.estado === 'pendiente').length;
+      glosasRecibidasVencidas = glosasRecibidas.filter(g => g.estado === 'vencida').length;
+    }
+  } catch {
+    // Tabla puede no existir
+  }
+
+  // ── Ordenar: vencidas primero, luego urgentes, luego normales ──
+  const prioridad = { vencida: 0, urgente: 1, normal: 2 };
+  pendientes.sort((a, b) => {
+    const pa = prioridad[a.urgencia];
+    const pb = prioridad[b.urgencia];
+    if (pa !== pb) return pa - pb;
+    return (a.diasRestantes ?? 999) - (b.diasRestantes ?? 999);
+  });
+
+  return {
+    kpis: {
+      totalFacturado,
+      totalGlosado,
+      tasaGlosas,
+      pendientesTotal: pendientes.length,
+      facturasBorrador: borrador.length,
+      glosasRecibidasPendientes,
+      glosasRecibidasVencidas,
+    },
+    pendientes,
+  };
 }
+
+// Legacy functions removed — all functionality merged into obtenerMisPendientes()
 
 // ==========================================
 // VALIDACIÓN PRE-RADICACIÓN — Server Actions

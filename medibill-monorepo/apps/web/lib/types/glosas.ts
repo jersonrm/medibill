@@ -514,3 +514,150 @@ export interface FacturaResumen {
   estado: EstadoFactura;
   ultima_validacion?: string;
 }
+
+// =====================================================================
+// GLOSA RECIBIDA — Tabla glosas_recibidas (Capa 3)
+// =====================================================================
+
+/** Estado de una glosa recibida de la EPS */
+export type EstadoGlosaRecibida = "pendiente" | "respondida" | "vencida" | "en_conciliacion";
+
+/** Nivel de urgencia calculado por días restantes */
+export type NivelUrgencia = "critica" | "urgente" | "normal" | "vencida";
+
+/** Registro en la tabla `glosas_recibidas` */
+export interface GlosaRecibidaDB {
+  id: string;
+  factura_id: string;
+  num_factura: string;
+  eps_codigo: string;
+  eps_nombre: string;
+  codigo_glosa: string;
+  concepto_general: string;
+  descripcion_glosa: string;
+  valor_glosado: number;
+  valor_factura: number;
+  paciente_nombre: string;
+  paciente_documento: string | null;
+  servicio_descripcion: string | null;
+  consecutivo_servicio: number | null;
+  fecha_radicacion_factura: string;
+  fecha_glosa: string;
+  fecha_limite_respuesta: string;
+  estado: EstadoGlosaRecibida;
+  es_extemporanea: boolean;
+  numero_registro_glosa: string | null;
+  numero_radicacion_factura: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Glosa recibida enriquecida con campos calculados (para UI) */
+export interface GlosaRecibidaEnriquecida extends GlosaRecibidaDB {
+  dias_restantes: number;
+  porcentaje_glosado: number;
+  urgencia: NivelUrgencia;
+}
+
+// =====================================================================
+// RESPUESTA A GLOSA RECIBIDA — Tabla respuestas_glosas (nueva)
+// =====================================================================
+
+/** Registro en la nueva tabla `respuestas_glosas` (Capa 3) */
+export interface RespuestaGlosaNuevaDB {
+  id: string;
+  glosa_id: string;
+  codigo_respuesta: CodigoRespuesta;
+  justificacion: string | null;
+  fundamento_legal: string | null;
+  valor_aceptado: number;
+  valor_controvertido: number;
+  valor_nota_credito: number;
+  soportes: SoporteAdjunto[];
+  origen_respuesta: OrigenRespuesta;
+  numero_registro_respuesta: string | null;
+  fecha_respuesta: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Respuesta con datos de la glosa original */
+export interface RespuestaConGlosa extends RespuestaGlosaNuevaDB {
+  glosa: GlosaRecibidaDB;
+}
+
+/** Soporte documental adjunto a una respuesta */
+export interface SoporteAdjunto {
+  nombre: string;
+  tipo: "historia_clinica" | "autorizacion" | "resultado_lab" | "acuerdo_voluntades" | "epicrisis" | "descripcion_qx" | "otro";
+  url?: string;
+}
+
+/** Configuración de cada código de respuesta RS01-RS05 */
+export interface ConfigRespuestaRS {
+  codigo: CodigoRespuesta;
+  nombre: string;
+  descripcion: string;
+  requiereJustificacion: boolean;
+  requiereSoportes: boolean;
+  generaNotaCredito: boolean;
+  icono: string;
+  color: string;
+}
+
+/** Sugerencia generada por IA */
+export interface SugerenciaRespuestaIA {
+  codigo_recomendado: CodigoRespuesta;
+  justificacion_sugerida: string;
+  fundamento_legal: string;
+  confianza: number;
+  razonamiento: string;
+}
+
+/** Resumen estadístico de glosas recibidas */
+export interface ResumenGlosasRecibidas {
+  total_glosas: number;
+  total_glosado: number;
+  pendientes: number;
+  respondidas: number;
+  vencidas: number;
+  en_conciliacion: number;
+  total_aceptado: number;
+  total_controvertido: number;
+  total_nota_credito: number;
+  tasa_recuperacion: number;
+}
+
+// =====================================================================
+// DICCIONARIOS UI — Respuestas Glosas Recibidas
+// =====================================================================
+
+export const LABELS_ESTADO_GLOSA_RECIBIDA: Record<EstadoGlosaRecibida, string> = {
+  pendiente: "Pendiente",
+  respondida: "Respondida",
+  vencida: "Vencida",
+  en_conciliacion: "En conciliación",
+};
+
+export const COLORES_ESTADO_GLOSA_RECIBIDA: Record<EstadoGlosaRecibida, string> = {
+  pendiente: "bg-yellow-100 text-yellow-800",
+  respondida: "bg-blue-100 text-blue-800",
+  vencida: "bg-gray-100 text-gray-500",
+  en_conciliacion: "bg-purple-100 text-purple-800",
+};
+
+export const LABELS_RESPUESTA_DETALLE: Record<CodigoRespuesta, string> = {
+  RS01: "Aceptación total de la glosa",
+  RS02: "Aceptación parcial (acepta parte del valor glosado)",
+  RS03: "Rechazo total con justificación",
+  RS04: "Rechazo por glosa extemporánea",
+  RS05: "Rechazo por glosa infundada",
+};
+
+export const COLORES_RESPUESTA: Record<CodigoRespuesta, { bg: string; text: string; border: string }> = {
+  RS01: { bg: "bg-red-50", text: "text-red-700", border: "border-red-300" },
+  RS02: { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-300" },
+  RS03: { bg: "bg-green-50", text: "text-green-700", border: "border-green-300" },
+  RS04: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
+  RS05: { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-300" },
+};
