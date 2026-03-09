@@ -30,7 +30,7 @@ export interface Organizacion {
 // PLANES
 // =====================================================================
 
-export type PlanId = "starter" | "profesional" | "clinica";
+export type PlanId = "starter" | "profesional" | "clinica" | "ips";
 
 export type SoporteNivel = "email" | "email_chat" | "prioritario" | "dedicado";
 
