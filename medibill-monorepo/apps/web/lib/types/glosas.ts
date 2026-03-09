@@ -23,6 +23,9 @@ export type CapaMedibill = 1 | 2 | 3;
 /** Estado de una factura en el ciclo de vida */
 export type EstadoFactura =
   | "borrador"
+  | "aprobada"
+  | "descargada"
+  | "anulada"
   | "radicada"
   | "devuelta"
   | "glosada"
@@ -210,7 +213,8 @@ export interface ServicioFactura {
     | "estancia"
     | "urgencia"
     | "traslado"
-    | "terapia";
+    | "terapia"
+    | "odontologia";
 }
 
 /** Soportes documentales disponibles */
@@ -450,6 +454,9 @@ export const LABELS_ESTADO_GLOSA: Record<EstadoGlosa, string> = {
 
 export const LABELS_ESTADO_FACTURA: Record<EstadoFactura, string> = {
   borrador: "Borrador",
+  aprobada: "Aprobada",
+  descargada: "Descargada",
+  anulada: "Anulada",
   radicada: "Radicada",
   devuelta: "Devuelta",
   glosada: "Glosada",

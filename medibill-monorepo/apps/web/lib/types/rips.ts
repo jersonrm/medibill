@@ -57,7 +57,9 @@ export interface UsuarioRips {
   codMunicipioResidencia: string; // DIVIPOLA (ej: "52001" para Pasto)
   codZonaTerritorialResidencia: ZonaTerritorial;
   incapacidad: Incapacidad;
+  codEntidadAdministradora: string; // Código EPS / administradora
   consecutivo: number;
+  servicios: ServiciosRips; // Res. 2275: servicios anidados dentro de cada usuario
 }
 
 // ==========================================
@@ -67,7 +69,7 @@ export interface ConsultaRips {
   codPrestador: string; // Código de habilitación
   fechaInicioAtencion: string; // YYYY-MM-DD HH:MM
   numAutorizacion: string | null;
-  codigoConsulta: string; // CUPS de consulta (ej: 890201)
+  codConsulta: string; // CUPS de consulta (ej: 890201)
   modalidadGrupoServicioTecSal: ModalidadGrupoServicio;
   grupoServicios: string;
   codServicio: number;
@@ -95,7 +97,7 @@ export interface ProcedimientoRips {
   fechaInicioAtencion: string;
   idMIPRES: string | null;
   numAutorizacion: string | null;
-  codigoProcedimiento: string; // CUPS
+  codProcedimiento: string; // CUPS
   viaIngresoServicioSalud: ViaIngresoServicioSalud;
   modalidadGrupoServicioTecSal: ModalidadGrupoServicio;
   grupoServicios: string;
@@ -128,7 +130,7 @@ export interface UrgenciaRips {
   condicionDestinoUsuarioEgreso: "01" | "02" | "03" | "04" | "05" | "06";
   tipoDiagnosticoPrincipal: TipoDiagnosticoPrincipal; // Res. 2275 — aplica también en AU
   fechaEgreso: string; // YYYY-MM-DD HH:MM
-  codigoConsulta: string; // CUPS de consulta
+  codConsulta: string; // CUPS de consulta
   modalidadGrupoServicioTecSal: ModalidadGrupoServicio;
   grupoServicios: string;
   codServicio: number;
@@ -150,7 +152,7 @@ export interface MedicamentoRips {
   numAutorizacion: string | null;
   idMIPRES: string | null;
   fechaDispensAdmon: string; // YYYY-MM-DD HH:MM
-  codigoMedicamento: string; // Código CUM o ATC
+  codMedicamento: string; // Código CUM o ATC
   tipoMedicamento: "01" | "02"; // 01=Pos, 02=No Pos
   nombreGenerico: string;
   formaFarmaceutica: string;
@@ -171,14 +173,88 @@ export interface MedicamentoRips {
 // ==========================================
 // NODO: SERVICIOS (agrupa todas las secciones)
 // ==========================================
+// ==========================================
+// NODO: OTROS SERVICIOS (AT) — Resolución 2275
+// ==========================================
+export interface OtroServicioRips {
+  codPrestador: string;
+  numAutorizacion: string | null;
+  idMIPRES: string | null;
+  fechaSuministroTecnologia: string; // YYYY-MM-DD HH:mm
+  tipoDocumentoIdentificacion: TipoDocumento;
+  numDocumentoIdentificacion: string;
+  nomTecnologiaSalud: string; // Nombre del material/insumo/dispositivo
+  codTecnologiaSalud: string; // Código unificado (CUM, INVIMA, etc.)
+  cantidad: number;
+  vrUnitTecnologia: number;
+  vrServicio: number;
+  conceptoRecaudo: ConceptoRecaudo;
+  valorPagoModerador: number;
+  numFEVPagoModerador: string | null;
+  consecutivo: number;
+}
+
+// ==========================================
+// NODO: HOSPITALIZACIÓN (AH) — Resolución 2275 (stub tipado para futuro)
+// ==========================================
+export interface HospitalizacionRips {
+  codPrestador: string;
+  viaIngresoServicioSalud: ViaIngresoServicioSalud;
+  fechaInicioAtencion: string; // YYYY-MM-DD HH:mm
+  numAutorizacion: string | null;
+  causaMotivoAtencion: CausaMotivoAtencion;
+  codDiagnosticoPrincipal: string;
+  codDiagnosticoRelacionado1: string | null;
+  codDiagnosticoRelacionado2: string | null;
+  codDiagnosticoRelacionado3: string | null;
+  codComplicacion: string | null;
+  codDiagnosticoCausaMuerte: string | null;
+  condicionDestinoUsuarioEgreso: "01" | "02" | "03" | "04" | "05" | "06";
+  fechaEgreso: string; // YYYY-MM-DD HH:mm
+  codDiagnosticoMuerte: string | null;
+  modalidadGrupoServicioTecSal: ModalidadGrupoServicio;
+  grupoServicios: string;
+  codServicio: number;
+  tipoDocumentoIdentificacion: TipoDocumento;
+  numDocumentoIdentificacion: string;
+  vrServicio: number;
+  conceptoRecaudo: ConceptoRecaudo;
+  valorPagoModerador: number;
+  numFEVPagoModerador: string | null;
+  consecutivo: number;
+}
+
+// ==========================================
+// NODO: RECIÉN NACIDOS (AN) — Resolución 2275 (stub tipado para futuro)
+// ==========================================
+export interface RecienNacidoRips {
+  codPrestador: string;
+  fechaNacimiento: string; // YYYY-MM-DD HH:mm
+  edadGestacional: number;
+  numConsultasCPN: number;
+  codSexo: CodSexo;
+  peso: number;
+  codDiagnosticoPrincipal: string;
+  codDiagnosticoRelacionado1: string | null;
+  tipoDocumentoIdentificacion: TipoDocumento;
+  numDocumentoIdentificacion: string;
+  condicionDestinoUsuarioEgreso: "01" | "02" | "03" | "04" | "05" | "06";
+  codDiagnosticoCausaMuerte: string | null;
+  fechaEgreso: string; // YYYY-MM-DD HH:mm
+  consecutivo: number;
+}
+
+// ==========================================
+// NODO: SERVICIOS (agrupa todas las secciones)
+// ==========================================
 export interface ServiciosRips {
   consultas: ConsultaRips[];
   procedimientos: ProcedimientoRips[];
   urgencias: UrgenciaRips[];
-  hospitalizacion: any[]; // Vacío si no aplica
-  recienNacidos: any[]; // Vacío si no aplica
-  medicamentos: MedicamentoRips[]; // Resolución 2275 — sección AM
-  otrosServicios: any[]; // Vacío si no aplica
+  hospitalizacion: HospitalizacionRips[];
+  recienNacidos: RecienNacidoRips[];
+  medicamentos: MedicamentoRips[];
+  otrosServicios: OtroServicioRips[];
 }
 
 // ==========================================
@@ -187,16 +263,52 @@ export interface ServiciosRips {
 export interface FevRips {
   numDocumentoIdObligado: string; // NIT del obligado a reportar (prestador o EPS)
   numFactura: string; // Número de factura electrónica
+  numObligacion: string; // Número de la obligación (contrato/póliza)
   tipoNota: string | null; // null si no es nota crédito/débito
   numNota: string | null; // null si no es nota
   usuarios: UsuarioRips[];
-  servicios: ServiciosRips;
+}
+
+// ==========================================
+// INTERFACE PARA LOS DATOS DE ENTRADA (del formulario al servidor)
+// ==========================================
+// ==========================================
+// INTERFACES DE ENTRADA PARA MEDICAMENTOS Y MATERIALES
+// ==========================================
+
+/** Input de medicamento desde el formulario (UI → RIPS) */
+export interface MedicamentoInput {
+  codMedicamento: string;
+  tipoMedicamento: "01" | "02"; // 01=POS, 02=No POS
+  nombreGenerico: string;
+  formaFarmaceutica: string;
+  concentracion: string;
+  unidadMedida: string;
+  cantidadDispensada: number;
+  diasTratamiento: number;
+  vrUnitMedicamento: number;
+  numAutorizacion?: string;
+  idMIPRES?: string;
+}
+
+/** Input de material/insumo/dispositivo desde el formulario (UI → RIPS) */
+export interface OtroServicioInput {
+  codTecnologiaSalud: string;
+  nomTecnologiaSalud: string;
+  cantidad: number;
+  vrUnitTecnologia: number;
+  numAutorizacion?: string;
+  idMIPRES?: string;
 }
 
 // ==========================================
 // INTERFACE PARA LOS DATOS DE ENTRADA (del formulario al servidor)
 // ==========================================
 export interface DatosParaRips {
+  // Datos de la factura
+  numFactura: string; // Número real de factura (prefijo+consecutivo DIAN)
+  numObligacion?: string; // Número del contrato/póliza con la EPS
+
   // Datos del paciente
   tipoDocumentoPaciente: TipoDocumento;
   documentoPaciente: string;
@@ -207,10 +319,15 @@ export interface DatosParaRips {
   codMunicipioResidencia: string;
   codZonaTerritorialResidencia: ZonaTerritorial;
   incapacidad: Incapacidad;
+  codEntidadAdministradora: string; // Código EPS
 
   // Datos clínicos de la IA (ya validados contra DB)
   diagnosticos: DiagnosticoIA[];
   procedimientos: ProcedimientoIA[];
+
+  // Medicamentos y materiales (input manual)
+  medicamentos?: MedicamentoInput[];
+  otrosServicios?: OtroServicioInput[];
 
   // Liquidación sugerida por la IA y editada por el médico
   atencionIA: {
@@ -222,5 +339,7 @@ export interface DatosParaRips {
     valor_consulta: number;
     valor_cuota: number;
     condicion_egreso?: string;
+    codConsultaCups?: string; // CUPS de consulta (890201 general, 890301 pediatría, 890381 ortopedia, etc.)
+    numAutorizacion?: string; // Autorización de la consulta o urgencia
   };
 }

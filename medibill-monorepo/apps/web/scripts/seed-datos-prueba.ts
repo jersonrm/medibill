@@ -216,6 +216,7 @@ function crearUsuarioRips(p: Paciente): any {
     codMunicipioResidencia: "52001", // Pasto
     codZonaTerritorialResidencia: "U",
     incapacidad: "NO",
+    codEntidadAdministradora: "",
     consecutivo: 1,
   };
 }
@@ -233,7 +234,7 @@ function crearConsultaRips(opts: {
     codPrestador: PRESTADOR.cod_habilitacion,
     fechaInicioAtencion: opts.fecha ?? fechaHoraRips(new Date()),
     numAutorizacion: opts.autorizacion ?? null,
-    codigoConsulta: opts.cups,
+    codConsulta: opts.cups,
     modalidadGrupoServicioTecSal: "01",
     grupoServicios: "01",
     codServicio: 1,
@@ -268,7 +269,7 @@ function crearProcedimientoRips(opts: {
     fechaInicioAtencion: opts.fecha ?? fechaHoraRips(new Date()),
     idMIPRES: null,
     numAutorizacion: opts.autorizacion ?? null,
-    codigoProcedimiento: opts.cups,
+    codProcedimiento: opts.cups,
     viaIngresoServicioSalud: "01",
     modalidadGrupoServicioTecSal: "01",
     grupoServicios: "01",
@@ -296,18 +297,21 @@ function crearFevRips(opts: {
   return {
     numDocumentoIdObligado: PRESTADOR.nit,
     numFactura: opts.numFactura,
+    numObligacion: "",
     tipoNota: null,
     numNota: null,
-    usuarios: opts.usuarios,
-    servicios: {
-      consultas: opts.consultas ?? [],
-      procedimientos: opts.procedimientos ?? [],
-      urgencias: [],
-      hospitalizacion: [],
-      recienNacidos: [],
-      medicamentos: [],
-      otrosServicios: [],
-    },
+    usuarios: opts.usuarios.map((u: any) => ({
+      ...u,
+      servicios: {
+        consultas: opts.consultas ?? [],
+        procedimientos: opts.procedimientos ?? [],
+        urgencias: [],
+        hospitalizacion: [],
+        recienNacidos: [],
+        medicamentos: [],
+        otrosServicios: [],
+      },
+    })),
   };
 }
 

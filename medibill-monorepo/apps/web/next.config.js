@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredBy: false,
@@ -35,11 +37,11 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL || ""} https://generativelanguage.googleapis.com`,
+              `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL || ""} https://generativelanguage.googleapis.com https://*.ingest.us.sentry.io`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
@@ -51,4 +53,10 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  disableLogger: true,
+});

@@ -10,16 +10,36 @@ import type { DiagnosticoIA, ProcedimientoIA } from "@/lib/types/validacion";
 export function anonimizarTextoMedico(texto: string, nombre?: string, documento?: string): string {
   let textoSeguro = texto;
 
+  // 1. Reemplazar documento del paciente (si se proporciona explícitamente)
   if (documento && documento.trim() !== "") {
     const regexDoc = new RegExp(documento.trim(), 'gi');
     textoSeguro = textoSeguro.replace(regexDoc, '[DOCUMENTO_PACIENTE]');
   }
 
+  // 2. Reemplazar nombre del paciente (si se proporciona)
   if (nombre && nombre.trim() !== "") {
     const nombreLimpio = nombre.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regexNombre = new RegExp(nombreLimpio, 'gi');
     textoSeguro = textoSeguro.replace(regexNombre, '[NOMBRE_PACIENTE]');
   }
+
+  // 3. Teléfonos colombianos (celulares 3XX XXX XXXX)
+  textoSeguro = textoSeguro.replace(/\b3\d{2}[\s.-]?\d{3}[\s.-]?\d{4}\b/g, '[TELEFONO]');
+
+  // 4. Emails
+  textoSeguro = textoSeguro.replace(/\b[\w.-]+@[\w.-]+\.\w{2,}\b/gi, '[EMAIL]');
+
+  // 5. Cédulas en contexto (precedidas por CC, cédula, TI, etc.) — no afecta códigos CUPS/CIE-10
+  textoSeguro = textoSeguro.replace(
+    /(?:CC|C\.C\.|cédula|cedula|documento|identificación|identificacion|TI|T\.I\.|RC|R\.C\.)\s*(?:No\.?\s*)?(\d{6,10})\b/gi,
+    (match, digits: string) => match.replace(digits, '[DOCUMENTO]')
+  );
+
+  // 6. Direcciones colombianas
+  textoSeguro = textoSeguro.replace(
+    /\b(?:calle|carrera|cra|cl|kr|transversal|diagonal|av|avenida)\s+\d+(?:\s*(?:#|no\.?|n°)\s*\d+(?:\s*-\s*\d+)?)?/gi,
+    '[DIRECCION]'
+  );
 
   return textoSeguro;
 }

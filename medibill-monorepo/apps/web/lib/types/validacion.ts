@@ -51,6 +51,8 @@ export interface ProcedimientoIA {
   alternativas?: { codigo: string; descripcion: string }[];
   /** Tarifa personalizada del médico */
   valor_procedimiento?: number;
+  /** Número de autorización de la EPS para este procedimiento */
+  numAutorizacion?: string;
 }
 
 export interface ServicioFactura {
@@ -61,6 +63,6 @@ export interface ServicioFactura {
   valor_total: number;
   fecha_prestacion: string;
   diagnostico_principal: string;
-  tipo_servicio: 'consulta' | 'apoyo_dx' | 'procedimiento_qx' | 'procedimiento_no_qx' | 'medicamento' | 'dispositivo' | 'estancia' | 'urgencia' | 'traslado' | 'terapia';
+  tipo_servicio: 'consulta' | 'apoyo_dx' | 'procedimiento_qx' | 'procedimiento_no_qx' | 'medicamento' | 'dispositivo' | 'estancia' | 'urgencia' | 'traslado' | 'terapia' | 'odontologia';
   numero_autorizacion?: string | null;
 }

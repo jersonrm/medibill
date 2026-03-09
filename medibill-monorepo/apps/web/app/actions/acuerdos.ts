@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
+import { devError } from "@/lib/logger";
+import { registrarAuditLog } from "@/lib/audit-log";
 
 // ==========================================
 // ACUERDOS DE VOLUNTADES — Server Actions
@@ -19,7 +21,7 @@ export async function obtenerAcuerdos() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    console.error("Error obteniendo acuerdos:", error);
+    devError("Error obteniendo acuerdos", error);
     return [];
   }
   return data ?? [];
@@ -86,6 +88,7 @@ export async function guardarAcuerdo(datos: {
       .eq('id', datos.id)
       .eq('prestador_id', user.id);
     if (error) return { exito: false, error: error.message };
+    registrarAuditLog({ accion: "actualizar_acuerdo", tabla: "acuerdos_voluntades", registroId: datos.id, metadata: { eps_codigo: datos.eps_codigo } });
     return { exito: true, id: datos.id };
   } else {
     const { data, error } = await supabase
@@ -94,6 +97,7 @@ export async function guardarAcuerdo(datos: {
       .select('id')
       .single();
     if (error) return { exito: false, error: error.message };
+    registrarAuditLog({ accion: "crear_acuerdo", tabla: "acuerdos_voluntades", registroId: data?.id, metadata: { eps_codigo: datos.eps_codigo } });
     return { exito: true, id: data?.id };
   }
 }
@@ -167,5 +171,6 @@ export async function eliminarAcuerdo(acuerdoId: string) {
     .eq('prestador_id', user.id);
 
   if (error) return { exito: false, error: error.message };
+  registrarAuditLog({ accion: "eliminar_acuerdo", tabla: "acuerdos_voluntades", registroId: acuerdoId });
   return { exito: true };
 }

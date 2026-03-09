@@ -51,7 +51,8 @@ export default function ValidarFacturaPage() {
     try {
       const data = await obtenerFacturasPendientesValidacion();
       setFacturas(data);
-    } catch {
+    } catch (e) {
+      console.error("Error cargando facturas pendientes:", e);
       setFacturas([]);
     } finally {
       setLoadingFacturas(false);
@@ -96,7 +97,8 @@ export default function ValidarFacturaPage() {
           });
         }
       }
-    } catch {
+    } catch (e) {
+      console.error("Error validando factura:", e);
       setResultado(null);
     } finally {
       setLoading(false);

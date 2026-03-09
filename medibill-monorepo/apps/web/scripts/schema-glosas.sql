@@ -112,9 +112,20 @@ CREATE TABLE IF NOT EXISTS facturas (
   valor_aceptado      NUMERIC(18,2) NOT NULL DEFAULT 0,
   estado              TEXT NOT NULL DEFAULT 'borrador'
                         CHECK (estado IN (
-                          'borrador','radicada','devuelta',
+                          'borrador','aprobada','descargada','anulada',
+                          'radicada','devuelta',
                           'glosada','respondida','conciliada','pagada'
                         )),
+  -- Datos financieros MVP
+  subtotal            NUMERIC(18,2) DEFAULT 0,
+  copago              NUMERIC(18,2) DEFAULT 0,
+  cuota_moderadora    NUMERIC(18,2) DEFAULT 0,
+  descuentos          NUMERIC(18,2) DEFAULT 0,
+  diagnosticos        JSONB DEFAULT '[]',
+  procedimientos      JSONB DEFAULT '[]',
+  paciente_id         UUID,
+  resolucion_id       UUID,
+  perfil_prestador_snapshot JSONB,
   -- JSON completo del FEV-RIPS (Res. 2275)
   fev_rips_json       JSONB,
   metadata            JSONB DEFAULT '{}',
@@ -357,49 +368,63 @@ CREATE POLICY "Usuarios ven validaciones de sus facturas"
     EXISTS (SELECT 1 FROM facturas f WHERE f.id = validaciones_pre_radicacion.factura_id AND f.user_id = auth.uid())
   );
 
--- Auditoría de plazos: lectura libre (datos no sensibles)
+-- Auditoría de plazos: solo lectura de registros vinculados a facturas del usuario
 DROP POLICY IF EXISTS "Lectura publica plazos" ON auditoria_plazos;
-CREATE POLICY "Lectura publica plazos"
-  ON auditoria_plazos FOR SELECT USING (true);
+CREATE POLICY "Usuarios ven plazos de sus glosas"
+  ON auditoria_plazos FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM glosas_recibidas g
+      JOIN facturas f ON f.id = g.factura_id
+      WHERE g.id = auditoria_plazos.glosa_id
+        AND f.user_id = auth.uid()
+    )
+  );
 
 -- Acuerdos de voluntades: el usuario solo ve los de su prestador
 DROP POLICY IF EXISTS "Usuarios ven sus acuerdos" ON acuerdos_voluntades;
 CREATE POLICY "Usuarios ven sus acuerdos"
   ON acuerdos_voluntades FOR SELECT USING (
-    EXISTS (SELECT 1 FROM facturas f WHERE f.nit_prestador = acuerdos_voluntades.eps_codigo AND f.user_id = auth.uid())
-    OR true -- TODO: restringir a prestador_id del usuario
+    auth.uid() = prestador_id
   );
 
 -- Tarifas de acuerdos: lectura si puede ver el acuerdo padre
 DROP POLICY IF EXISTS "Usuarios ven tarifas de sus acuerdos" ON acuerdo_tarifas;
 CREATE POLICY "Usuarios ven tarifas de sus acuerdos"
-  ON acuerdo_tarifas FOR SELECT USING (true);
+  ON acuerdo_tarifas FOR SELECT USING (
+    EXISTS (SELECT 1 FROM acuerdos_voluntades a WHERE a.id = acuerdo_tarifas.acuerdo_id AND a.prestador_id = auth.uid())
+  );
 
 -- Acuerdos: INSERT/UPDATE/DELETE (necesarios para ConfiguracionAcuerdo)
 DROP POLICY IF EXISTS "Usuarios insertan acuerdos" ON acuerdos_voluntades;
 CREATE POLICY "Usuarios insertan acuerdos"
-  ON acuerdos_voluntades FOR INSERT WITH CHECK (true);
+  ON acuerdos_voluntades FOR INSERT WITH CHECK (auth.uid() = prestador_id);
 
 DROP POLICY IF EXISTS "Usuarios actualizan acuerdos" ON acuerdos_voluntades;
 CREATE POLICY "Usuarios actualizan acuerdos"
-  ON acuerdos_voluntades FOR UPDATE USING (true);
+  ON acuerdos_voluntades FOR UPDATE USING (auth.uid() = prestador_id);
 
 DROP POLICY IF EXISTS "Usuarios eliminan acuerdos" ON acuerdos_voluntades;
 CREATE POLICY "Usuarios eliminan acuerdos"
-  ON acuerdos_voluntades FOR DELETE USING (true);
+  ON acuerdos_voluntades FOR DELETE USING (auth.uid() = prestador_id);
 
 -- Tarifas: INSERT/UPDATE/DELETE
 DROP POLICY IF EXISTS "Usuarios insertan tarifas" ON acuerdo_tarifas;
 CREATE POLICY "Usuarios insertan tarifas"
-  ON acuerdo_tarifas FOR INSERT WITH CHECK (true);
+  ON acuerdo_tarifas FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM acuerdos_voluntades a WHERE a.id = acuerdo_tarifas.acuerdo_id AND a.prestador_id = auth.uid())
+  );
 
 DROP POLICY IF EXISTS "Usuarios actualizan tarifas" ON acuerdo_tarifas;
 CREATE POLICY "Usuarios actualizan tarifas"
-  ON acuerdo_tarifas FOR UPDATE USING (true);
+  ON acuerdo_tarifas FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM acuerdos_voluntades a WHERE a.id = acuerdo_tarifas.acuerdo_id AND a.prestador_id = auth.uid())
+  );
 
 DROP POLICY IF EXISTS "Usuarios eliminan tarifas" ON acuerdo_tarifas;
 CREATE POLICY "Usuarios eliminan tarifas"
-  ON acuerdo_tarifas FOR DELETE USING (true);
+  ON acuerdo_tarifas FOR DELETE USING (
+    EXISTS (SELECT 1 FROM acuerdos_voluntades a WHERE a.id = acuerdo_tarifas.acuerdo_id AND a.prestador_id = auth.uid())
+  );
 
 -- Catálogo: lectura pública (datos normativos públicos)
 -- No RLS en catalogo_causales_glosa → es referencia pública

@@ -332,7 +332,8 @@ export default function ConfiguracionAcuerdo() {
       limpiarForm();
       setModo("lista");
       cargar();
-    } catch {
+    } catch (e) {
+      console.error("Error guardando acuerdo:", e);
       setMensaje({ tipo: "error", texto: "Error inesperado" });
     } finally {
       setSaving(false);

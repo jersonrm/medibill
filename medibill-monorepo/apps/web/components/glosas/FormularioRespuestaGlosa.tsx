@@ -15,6 +15,7 @@ import {
   registrarRespuestaGlosa,
   sugerirRespuestaParaGlosa,
   obtenerFacturaDeGlosa,
+  subirSoporteGlosa,
 } from "@/app/actions/respuesta-glosas";
 
 interface FormularioRespuestaGlosaProps {
@@ -42,8 +43,7 @@ export default function FormularioRespuestaGlosa({
   const [fundamentoLegal, setFundamentoLegal] = useState("");
   const [valorAceptado, setValorAceptado] = useState(0);
   const [soportes, setSoportes] = useState<SoporteAdjunto[]>([]);
-  const [nuevoSoporte, setNuevoSoporte] = useState("");
-  const [tipoSoporte, setTipoSoporte] = useState<SoporteAdjunto["tipo"]>("otro");
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState(false);
@@ -106,22 +106,46 @@ export default function FormularioRespuestaGlosa({
       } else {
         setError(result.error || "Error generando sugerencia");
       }
-    } catch {
+    } catch (e) {
+      console.error("Error AI sugerencia:", e);
       setError("Error de conexión con el asistente AI");
     } finally {
       setCargandoIA(false);
     }
   }, [glosa.id]);
 
-  // Agregar soporte
-  const handleAgregarSoporte = useCallback(() => {
-    if (!nuevoSoporte.trim()) return;
-    setSoportes((prev) => [
-      ...prev,
-      { nombre: nuevoSoporte.trim(), tipo: tipoSoporte },
-    ]);
-    setNuevoSoporte("");
-  }, [nuevoSoporte, tipoSoporte]);
+  // Subir soporte (archivo real)
+  const handleSubirSoporte = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("El archivo no puede superar 10 MB");
+      e.target.value = "";
+      return;
+    }
+    setSubiendoArchivo(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("glosa_id", glosa.id);
+      const resultado = await subirSoporteGlosa(formData);
+      if (!resultado.success) {
+        setError(resultado.error || "Error al subir archivo");
+        return;
+      }
+      setSoportes((prev) => [
+        ...prev,
+        { nombre: resultado.nombre!, tipo: "otro", url: resultado.url },
+      ]);
+    } catch (e) {
+      console.error("Error subida archivo:", e);
+      setError("Error de conexión al subir archivo");
+    } finally {
+      setSubiendoArchivo(false);
+      e.target.value = "";
+    }
+  }, [glosa.id]);
 
   // Remover soporte
   const handleRemoverSoporte = useCallback((index: number) => {
@@ -430,35 +454,21 @@ export default function FormularioRespuestaGlosa({
             <label className="text-sm font-semibold text-gray-700">
               Soportes adjuntos
             </label>
-            <div className="flex gap-2">
-              <select
-                value={tipoSoporte}
-                onChange={(e) => setTipoSoporte(e.target.value as SoporteAdjunto["tipo"])}
-                className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-300 outline-none"
-              >
-                <option value="historia_clinica">Historia clínica</option>
-                <option value="autorizacion">Autorización</option>
-                <option value="resultado_lab">Resultado laboratorio</option>
-                <option value="acuerdo_voluntades">Acuerdo de voluntades</option>
-                <option value="epicrisis">Epicrisis</option>
-                <option value="descripcion_qx">Descripción quirúrgica</option>
-                <option value="otro">Otro</option>
-              </select>
-              <input
-                type="text"
-                value={nuevoSoporte}
-                onChange={(e) => setNuevoSoporte(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAgregarSoporte())}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-300 outline-none"
-                placeholder="Nombre del soporte..."
-              />
-              <button
-                type="button"
-                onClick={handleAgregarSoporte}
-                className="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-xl text-sm font-semibold hover:bg-indigo-200 transition-colors"
-              >
-                + Agregar
-              </button>
+            <div className="flex items-center gap-2">
+              <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl text-sm cursor-pointer transition-colors ${subiendoArchivo ? "border-gray-200 bg-gray-50 text-gray-400 cursor-wait" : "border-indigo-300 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"}`}>
+                {subiendoArchivo ? (
+                  <>⏳ Subiendo archivo...</>
+                ) : (
+                  <>📎 Seleccionar archivo (PDF, JPG, PNG — máx 10 MB)</>
+                )}
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleSubirSoporte}
+                  disabled={subiendoArchivo}
+                  className="hidden"
+                />
+              </label>
             </div>
 
             {/* Lista de soportes */}

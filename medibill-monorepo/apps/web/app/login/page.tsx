@@ -1,6 +1,25 @@
 import { iniciarSesion, registrarCuenta } from './actions'
 
-export default function LoginPage() {
+const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL || "https://medibill.co";
+
+/** Mensajes permitidos — evita XSS reflejado vía query params */
+const MENSAJES_PERMITIDOS: Record<string, string> = {
+  email_no_confirmado: "Debes confirmar tu correo electrónico antes de acceder. Revisa tu bandeja de entrada.",
+  registro_ok: "Registro exitoso. Revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión.",
+  sesion_expirada: "Tu sesión ha expirado. Inicia sesión nuevamente.",
+  error_credenciales: "Correo electrónico o contraseña incorrectos.",
+  cuenta_no_encontrada: "No se encontró una cuenta con ese correo electrónico.",
+  consentimiento_requerido: "Debes aceptar los Términos y la Política de Privacidad para registrarte.",
+};
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mensaje?: string }>
+}) {
+  const { mensaje } = await searchParams
+  const mensajeSeguro = mensaje ? MENSAJES_PERMITIDOS[mensaje] ?? null : null;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-medi-light">
       <div className="w-full max-w-md bg-white p-10 rounded-3xl shadow-xl border border-medi-soft">
@@ -15,6 +34,13 @@ export default function LoginPage() {
           <h1 className="text-3xl font-black text-medi-deep">Medibill</h1>
           <p className="text-sm font-bold text-medi-muted uppercase tracking-widest mt-1">Acceso a Profesionales</p>
         </div>
+
+        {/* Mensaje informativo */}
+        {mensajeSeguro && (
+          <div className="mb-5 p-4 bg-medi-light/50 border border-medi-soft rounded-xl text-sm text-medi-dark text-center font-medium">
+            {mensajeSeguro}
+          </div>
+        )}
 
         {/* Formulario */}
         <form className="flex flex-col gap-5">
@@ -47,6 +73,21 @@ export default function LoginPage() {
           </div>
 
           <div className="flex flex-col gap-3 mt-4">
+            {/* Consentimiento — visible solo al registrar, validado server-side */}
+            <label className="flex items-start gap-2 text-xs text-medi-dark/70">
+              <input type="checkbox" name="consentimiento" value="1" className="mt-0.5 accent-medi-deep" />
+              <span>
+                Al registrarme acepto los{" "}
+                <a href={`${LANDING_URL}/terminos`} target="_blank" rel="noopener noreferrer" className="underline text-medi-deep">
+                  Términos de Servicio
+                </a>{" "}
+                y la{" "}
+                <a href={`${LANDING_URL}/privacidad`} target="_blank" rel="noopener noreferrer" className="underline text-medi-deep">
+                  Política de Privacidad
+                </a>.
+              </span>
+            </label>
+
             <button 
               formAction={iniciarSesion} 
               className="w-full bg-medi-deep hover:bg-medi-dark text-white font-black text-lg py-4 rounded-xl shadow-md transition-all active:scale-[0.98]"
@@ -61,6 +102,15 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+
+        <div className="mt-6 text-center">
+          <a
+            href={LANDING_URL}
+            className="text-sm text-medi-dark/60 hover:text-medi-deep transition-colors"
+          >
+            ← Volver al inicio
+          </a>
+        </div>
 
       </div>
     </div>

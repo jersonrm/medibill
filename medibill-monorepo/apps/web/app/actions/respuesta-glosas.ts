@@ -10,11 +10,12 @@
  *  - obtenerHistorialRespuestas: join con glosa original
  *  - obtenerResumenGlosasRecibidas: estadísticas para panel
  *  - sugerirRespuestaIA: híbrido RS04/RS05 auto + Gemini
+ *  - subirSoporteGlosa: upload de archivo a Supabase Storage
  */
 
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
-import { devLog } from "@/lib/logger";
+import { devLog, devError } from "@/lib/logger";
 import type {
   CodigoRespuesta,
   GlosaRecibidaEnriquecida,
@@ -56,6 +57,7 @@ export async function obtenerGlosasRecibidas(filtro?: {
     await supabase
       .from("glosas_recibidas")
       .update({ estado: "vencida", updated_at: new Date().toISOString() })
+      .eq("user_id", user.id)
       .eq("estado", "pendiente")
       .lt("fecha_limite_respuesta", hoy);
 
@@ -63,6 +65,7 @@ export async function obtenerGlosasRecibidas(filtro?: {
     let query = supabase
       .from("glosas_recibidas")
       .select("*")
+      .eq("user_id", user.id)
       .order("fecha_limite_respuesta", { ascending: true });
 
     if (filtro?.estado) query = query.eq("estado", filtro.estado);
@@ -88,7 +91,7 @@ export async function obtenerGlosasRecibidas(filtro?: {
       };
     });
   } catch (err) {
-    devLog("[obtenerGlosasRecibidas]", "Error inesperado", err);
+    devError("[obtenerGlosasRecibidas]", "Error inesperado", err);
     return [];
   }
 }
@@ -112,6 +115,7 @@ export async function obtenerGlosaPorId(
       .from("glosas_recibidas")
       .select("*")
       .eq("id", glosaId)
+      .eq("user_id", user.id)
       .single();
 
     if (error || !data) return null;
@@ -127,7 +131,7 @@ export async function obtenerGlosaPorId(
       urgencia: calcularUrgencia(dias),
     };
   } catch (err) {
-    devLog("[obtenerGlosaPorId]", "Error inesperado", err);
+    devError("[obtenerGlosaPorId]", "Error inesperado", err);
     return null;
   }
 }
@@ -237,6 +241,7 @@ export async function registrarRespuestaGlosa(respuesta: {
     const { data, error } = await supabase
       .from("respuestas_glosas")
       .insert({
+        user_id: user.id,
         glosa_id: respuesta.glosa_id,
         codigo_respuesta: respuesta.codigo_respuesta,
         justificacion: respuesta.justificacion || null,
@@ -260,12 +265,13 @@ export async function registrarRespuestaGlosa(respuesta: {
     await supabase
       .from("glosas_recibidas")
       .update({ estado: "respondida", updated_at: new Date().toISOString() })
-      .eq("id", respuesta.glosa_id);
+      .eq("id", respuesta.glosa_id)
+      .eq("user_id", user.id);
 
     revalidatePath("/glosas");
     return { success: true, respuestaId: data.id };
   } catch (err) {
-    devLog("[registrarRespuestaGlosa]", "Error inesperado", err);
+    devError("[registrarRespuestaGlosa]", "Error inesperado", err);
     return { success: false, error: "Error interno del servidor" };
   }
 }
@@ -286,6 +292,7 @@ export async function obtenerHistorialRespuestas(): Promise<RespuestaConGlosa[]>
     const { data, error } = await supabase
       .from("respuestas_glosas")
       .select("*, glosa:glosas_recibidas(*)")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -295,7 +302,7 @@ export async function obtenerHistorialRespuestas(): Promise<RespuestaConGlosa[]>
 
     return (data || []) as unknown as RespuestaConGlosa[];
   } catch (err) {
-    devLog("[obtenerHistorialRespuestas]", "Error inesperado", err);
+    devError("[obtenerHistorialRespuestas]", "Error inesperado", err);
     return [];
   }
 }
@@ -327,11 +334,13 @@ export async function obtenerResumenGlosasRecibidas(): Promise<ResumenGlosasReci
   try {
     const { data: glosas } = await supabase
       .from("glosas_recibidas")
-      .select("estado, valor_glosado");
+      .select("estado, valor_glosado")
+      .eq("user_id", user.id);
 
     const { data: respuestas } = await supabase
       .from("respuestas_glosas")
-      .select("valor_aceptado, valor_controvertido, valor_nota_credito");
+      .select("valor_aceptado, valor_controvertido, valor_nota_credito")
+      .eq("user_id", user.id);
 
     const todas = glosas || [];
     const resps = respuestas || [];
@@ -363,7 +372,7 @@ export async function obtenerResumenGlosasRecibidas(): Promise<ResumenGlosasReci
           : 0,
     };
   } catch (err) {
-    devLog("[obtenerResumenGlosasRecibidas]", "Error inesperado", err);
+    devError("[obtenerResumenGlosasRecibidas]", "Error inesperado", err);
     return defaultResumen;
   }
 }
@@ -404,7 +413,7 @@ export async function sugerirRespuestaParaGlosa(
 
     return { success: true, sugerencia };
   } catch (err) {
-    devLog("[sugerirRespuestaParaGlosa]", "Error inesperado", err);
+    devError("[sugerirRespuestaParaGlosa]", "Error inesperado", err);
     return { success: false, error: "Error generando sugerencia" };
   }
 }
@@ -490,14 +499,15 @@ export async function registrarGlosaRecibida(datos: {
         .limit(1)
         .single();
       if (acuerdo?.nombre_eps) epsNombre = acuerdo.nombre_eps;
-    } catch {
-      // Graceful: usar NIT como nombre
+    } catch (e) {
+      devError("[registrarGlosaRecibida]", "Error buscando nombre EPS (usando NIT como fallback)", e);
     }
 
     // 7. Insertar en glosas_recibidas
     const { data: glosaInsertada, error: errorInsert } = await supabase
       .from("glosas_recibidas")
       .insert({
+        user_id: user.id,
         factura_id: factura.id,
         num_factura: factura.num_factura,
         eps_codigo: factura.nit_erp,
@@ -543,10 +553,11 @@ export async function registrarGlosaRecibida(datos: {
         capa_medibill: 3,
         prevenible: false,
       });
-    } catch {
-      devLog(
+    } catch (e) {
+      devError(
         "[registrarGlosaRecibida]",
-        "No se pudo sincronizar con tabla glosas (no crítico)"
+        "No se pudo sincronizar con tabla glosas (no crítico)",
+        e
       );
     }
 
@@ -567,7 +578,7 @@ export async function registrarGlosaRecibida(datos: {
 
     return { success: true, glosaId: glosaInsertada.id };
   } catch (err) {
-    devLog("[registrarGlosaRecibida]", "Error inesperado", err);
+    devError("[registrarGlosaRecibida]", "Error inesperado", err);
     return { success: false, error: "Error interno del servidor" };
   }
 }
@@ -611,14 +622,11 @@ export async function obtenerFacturaDeGlosa(
 
     if (error || !data) return null;
     return data;
-  } catch {
+  } catch (e) {
+    devError("[obtenerFacturaPorIdParaGlosa]", "Error inesperado", e);
     return null;
   }
 }
-
-// =====================================================================
-// OBTENER FACTURAS RADICADAS (Para registrar glosas desde UI)
-// =====================================================================
 
 /**
  * Lista facturas del usuario en estados que pueden recibir glosas
@@ -651,7 +659,61 @@ export async function obtenerFacturasParaGlosas(): Promise<
 
     if (error || !data) return [];
     return data.map((f) => ({ ...f, valor_total: Number(f.valor_total) }));
-  } catch {
+  } catch (e) {
+    devError("[obtenerFacturasParaGlosas]", "Error inesperado", e);
     return [];
   }
+}
+
+// =====================================================================
+// SUBIR SOPORTE A SUPABASE STORAGE
+// =====================================================================
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+
+/**
+ * Sube un archivo soporte de glosa a Supabase Storage bucket `soportes-glosas`.
+ * Path: {user_id}/{glosa_id}/{filename}
+ * Retorna la URL pública o un error.
+ */
+export async function subirSoporteGlosa(
+  formData: FormData
+): Promise<{ success: boolean; url?: string; nombre?: string; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "No autenticado" };
+
+  const file = formData.get("file") as File | null;
+  const glosaId = formData.get("glosa_id") as string | null;
+
+  if (!file) return { success: false, error: "No se recibió archivo" };
+  if (!glosaId) return { success: false, error: "Falta glosa_id" };
+
+  if (file.size > MAX_FILE_SIZE) {
+    return { success: false, error: `El archivo excede el límite de 10 MB (${(file.size / 1024 / 1024).toFixed(1)} MB)` };
+  }
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return { success: false, error: `Tipo de archivo no permitido: ${file.type}. Aceptados: PDF, JPG, PNG` };
+  }
+
+  // Sanitize filename
+  const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `${user.id}/${glosaId}/${Date.now()}_${sanitized}`;
+
+  const { error } = await supabase.storage
+    .from("soportes-glosas")
+    .upload(path, file, { contentType: file.type, upsert: false });
+
+  if (error) {
+    devLog("[subirSoporteGlosa]", "Error subiendo archivo", error);
+    return { success: false, error: `Error subiendo archivo: ${error.message}` };
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("soportes-glosas")
+    .getPublicUrl(path);
+
+  return { success: true, url: urlData.publicUrl, nombre: file.name };
 }

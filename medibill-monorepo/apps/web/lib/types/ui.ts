@@ -27,11 +27,16 @@ export interface DiagnosticoUI {
   descripcion: string;
   rol: RolDiagnostico;
   alternativas: AlternativaIA[];
+  /** Indica si fue agregado manualmente por el médico */
+  manual?: boolean;
 }
 
 // ==========================================
 // PROCEDIMIENTOS
 // ==========================================
+
+/** Fuente de donde proviene la tarifa del procedimiento */
+export type FuenteTarifa = "pactada" | "propia" | "manual";
 
 /** Procedimiento CUPS tal como lo devuelve el análisis IA */
 export interface ProcedimientoUI {
@@ -43,6 +48,14 @@ export interface ProcedimientoUI {
   diagnostico_asociado?: string;
   /** Valor personalizado del procedimiento (cruce con tarifas del médico) */
   valor_procedimiento?: number;
+  /** Indica si fue agregado manualmente por el médico */
+  manual?: boolean;
+  /** Valor unitario para facturación */
+  valor_unitario?: number;
+  /** Origen de la tarifa aplicada */
+  fuente_tarifa?: FuenteTarifa;
+  /** Número de autorización de la EPS para este procedimiento */
+  numAutorizacion?: string;
 }
 
 // ==========================================
@@ -58,6 +71,9 @@ export interface AtencionUI {
   tipo_servicio: string;
   valor_consulta: number;
   valor_cuota: number;
+  condicion_egreso?: string;
+  codConsultaCups?: string;
+  numAutorizacion?: string;
 }
 
 // ==========================================
@@ -103,6 +119,11 @@ export interface DatosPaciente {
   codMunicipioResidencia: string;
   codZonaTerritorial: string;
   incapacidad: string;
+  epsNombre: string;
+  epsCodigo: string;
+  telefono: string;
+  email: string;
+  direccion: string;
 }
 
 // ==========================================
@@ -142,6 +163,9 @@ export const DICCIONARIO_MODALIDAD: Record<string, string> = {
 export const DICCIONARIO_TIPO_SERVICIO: Record<string, string> = {
   "consulta": "Consulta Externa",
   "urgencias": "Urgencias",
+  "cirugia_ambulatoria": "Cirugía Ambulatoria",
+  "procedimiento_menor": "Procedimiento Menor",
+  "odontologia": "Odontología",
 };
 
 /** Valores por defecto para una atención nueva */
@@ -168,4 +192,9 @@ export const DATOS_PACIENTE_DEFAULT: DatosPaciente = {
   codMunicipioResidencia: "",
   codZonaTerritorial: "U",
   incapacidad: "NO",
+  epsNombre: "",
+  epsCodigo: "",
+  telefono: "",
+  email: "",
+  direccion: "",
 };

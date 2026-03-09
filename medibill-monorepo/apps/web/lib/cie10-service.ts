@@ -58,14 +58,14 @@ export async function buscarCie10Hibrido(
     return buscarCie10PorTexto(termino, limite);
   }
 
-  return (data ?? []).map((r: any) => ({
-    codigo: r.codigo,
-    descripcion: r.descripcion,
-    codigo_3: r.codigo_3,
-    descripcion_3: r.descripcion_3,
-    capitulo: r.capitulo,
-    nombre_capitulo: r.nombre_capitulo,
-    relevancia: r.relevancia_hibrida ?? r.relevancia ?? 0,
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    codigo: r.codigo as string,
+    descripcion: r.descripcion as string,
+    codigo_3: r.codigo_3 as string,
+    descripcion_3: r.descripcion_3 as string,
+    capitulo: r.capitulo as number,
+    nombre_capitulo: r.nombre_capitulo as string,
+    relevancia: (r.relevancia_hibrida ?? r.relevancia ?? 0) as number,
   })) as Cie10Resultado[];
 }
 

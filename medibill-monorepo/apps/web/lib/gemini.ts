@@ -1,13 +1,15 @@
-import { GoogleGenerativeAI, SchemaType, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, Schema, type GenerativeModel } from "@google/generative-ai";
 
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-if (!apiKey) {
-  throw new Error(
-    "GOOGLE_GENERATIVE_AI_API_KEY no está configurada. Revisa tu archivo .env.local"
-  );
-}
 
-const genAI = new GoogleGenerativeAI(apiKey);
+function getGenAI(): GoogleGenerativeAI {
+  if (!apiKey) {
+    throw new Error(
+      "GOOGLE_GENERATIVE_AI_API_KEY no está configurada. Revisa tu archivo .env.local"
+    );
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
 
 // 1. Esquema reutilizable para las alternativas (CIE-10 y CUPS)
 const alternativasSchema: Schema = {
@@ -75,8 +77,8 @@ const schema: Schema = {
         tipo_servicio: {
           type: SchemaType.STRING,
           format: "enum",
-          description: "Tipo de atención prestada: 'consulta' para consulta externa programada o prioritaria, 'urgencias' para atención de urgencias",
-          enum: ["consulta", "urgencias"],
+          description: "Tipo de atención prestada: 'consulta' para consulta externa, 'urgencias' para urgencias, 'cirugia_ambulatoria' para cirugía ambulatoria (se va el mismo día), 'procedimiento_menor' para procedimiento diagnóstico o terapéutico menor, 'odontologia' para atención odontológica",
+          enum: ["consulta", "urgencias", "cirugia_ambulatoria", "procedimiento_menor", "odontologia"],
         },
         valor_consulta: { type: SchemaType.NUMBER, description: "Precio sugerido de la consulta (Min: 50000, Max: 350000)" },
         valor_cuota: { type: SchemaType.NUMBER, description: "Valor de la cuota moderadora o copago" },
@@ -86,8 +88,18 @@ const schema: Schema = {
           description: "Condición de destino del usuario al egreso: '01' Alta médica (si se va a casa), '02' Remisión/referencia a otro prestador, '03' Hospitalización (si se ordena internación/observación), '05' Fallecido",
           enum: ["01", "02", "03", "05"],
         },
+        codConsultaCups: {
+          type: SchemaType.STRING,
+          description: "Código CUPS de la consulta según la especialidad que atiende. DEBE reflejar la especialidad real, NO usar 890201 si es otra especialidad. Catálogo: 890201 Medicina General, 890241 Cardiología, 890261 Urología, 890271 Neumología, 890281 Ginecología/Obstetricia, 890291 Dermatología, 890301 Pediatría, 890311 Oftalmología, 890321 Otorrinolaringología, 890331 Neurología, 890341 Cirugía General, 890351 Medicina Interna, 890361 Anestesiología, 890371 Psiquiatría, 890381 Ortopedia/Traumatología, 890391 Fisiatría/Rehabilitación, 890411 Gastroenterología, 890421 Endocrinología, 890431 Nefrología, 890441 Reumatología, 890451 Cirugía Plástica, 890461 Neurocirugía, 890471 Cirugía Cardiovascular, 890481 Oncología, 890491 Hematología, 890501 Infectología, 890701 Odontología General, 890702 Ortodoncia, 890703 Endodoncia, 890704 Periodoncia, 890705 Cirugía Oral. Si es urgencias, usar el código de la especialidad que atiende.",
+        },
+        incapacidad: {
+          type: SchemaType.STRING,
+          format: "enum",
+          description: "SI si la nota clínica menciona incapacidad laboral, reposo, días de incapacidad, licencia médica. NO en caso contrario.",
+          enum: ["SI", "NO"],
+        },
       },
-      required: ["modalidad", "causa", "finalidad", "tipo_diagnostico", "tipo_servicio", "valor_consulta", "valor_cuota", "condicion_egreso"],
+      required: ["modalidad", "causa", "finalidad", "tipo_diagnostico", "tipo_servicio", "valor_consulta", "valor_cuota", "condicion_egreso", "codConsultaCups", "incapacidad"],
     },
   },
   required: ["diagnosticos", "procedimientos", "atencion"],
@@ -95,7 +107,10 @@ const schema: Schema = {
 
 // Modelo liviano para extracción de términos médicos (NO genera códigos CUPS)
 // Los códigos CUPS se buscan en la tabla cups_maestro (Resolución 2706 de 2025)
-export const helperAI = genAI.getGenerativeModel({
+let _helperAI: GenerativeModel | null = null;
+export function getHelperAI(): GenerativeModel {
+  if (!_helperAI) {
+    _helperAI = getGenAI().getGenerativeModel({
   model: "gemini-2.5-flash",
   generationConfig: {
     responseMimeType: "application/json",
@@ -127,7 +142,10 @@ REGLAS:
 4. Devuelve máximo 5 términos, ordenados del más específico al más general.
 5. Los términos deben ser en español, sin tildes (para compatibilidad con búsqueda full-text).
 6. Si el texto no contiene procedimientos médicos identificables, devuelve un arreglo vacío.`,
-});
+  });
+  }
+  return _helperAI;
+}
 
 // ==========================================
 // RAG EXTRACTOR: Extrae TODOS los términos clínicos (procedimientos + diagnósticos)
@@ -147,14 +165,18 @@ const ragExtractorSchema: Schema = {
             type: SchemaType.STRING,
             format: "enum",
             description: "Categoría CUPS del procedimiento para filtrado por prefijo",
-            enum: ["laboratorio", "imagen", "cirugia_piel", "inmovilizacion", "inyeccion", "otro"],
+            enum: ["laboratorio", "imagen", "cirugia_piel", "inmovilizacion", "inyeccion", "odontologia", "otro"],
           },
           negado: {
             type: SchemaType.BOOLEAN,
             description: "true si la nota clínica NIEGA explícitamente este procedimiento (ej: 'NO se sutura', 'no se solicitan imágenes', 'se descarta radiografía'). false si el procedimiento SÍ se realizó o solicitó.",
           },
+          futuro: {
+            type: SchemaType.BOOLEAN,
+            description: "true si el procedimiento fue ORDENADO/PROGRAMADO pero NO realizado en esta atención (ej: 'se remite para osteosíntesis', 'se programa cirugía', 'se solicita valoración por', 'pendiente RMN'). false si el procedimiento SÍ se realizó en este encuentro.",
+          },
         },
-        required: ["termino", "categoria", "negado"],
+        required: ["termino", "categoria", "negado", "futuro"],
       },
     },
     terminos_diagnosticos: {
@@ -166,7 +188,10 @@ const ragExtractorSchema: Schema = {
   required: ["terminos_procedimientos", "terminos_diagnosticos"],
 };
 
-export const ragExtractorAI = genAI.getGenerativeModel({
+let _ragExtractorAI: GenerativeModel | null = null;
+export function getRagExtractorAI(): GenerativeModel {
+  if (!_ragExtractorAI) {
+    _ragExtractorAI = getGenAI().getGenerativeModel({
   model: "gemini-2.5-flash",
   generationConfig: {
     responseMimeType: "application/json",
@@ -182,6 +207,7 @@ CATEGORÍAS (obligatorio asignar una por término):
   - "cirugia_piel" → procedimientos TERAPÉUTICOS en piel/tejidos: lavado quirúrgico, desbridamiento, sutura, cierre de herida, curación, drenaje de absceso, fistulectomía, injerto. Códigos CUPS 860xxx-869xxx.
   - "inmovilizacion" → yesos, férulas, vendajes, inmovilizadores, ortesis. Códigos CUPS 935xxx.
   - "inyeccion" → vacunas, toxoide, inyecciones terapéuticas/profilácticas. Códigos CUPS 99xxxx.
+  - "odontologia" → procedimientos dentales: exodoncia, pulpotomía, detartraje, obturación, drenaje intraoral, radiografía periapical, endodoncia, periodoncia. Códigos CUPS 23xxxx-29xxxx.
   - "otro" → cualquier procedimiento que no encaje arriba: consultas, terapias, endoscopias, reducción fracturas.
 
 EJEMPLOS:
@@ -200,6 +226,12 @@ EJEMPLOS:
   - "toxoide tetánico" → {termino: "toxoide tetanico", categoria: "inyeccion"}
   - "vacuna antirrábica" → {termino: "vacuna antirrabica", categoria: "inyeccion"}
   - "suero antirrábico / inmunoglobulina antirrábica" → {termino: "inmunoglobulina antirrabica", categoria: "inyeccion"}
+  - "exodoncia" → {termino: "exodoncia", categoria: "odontologia"}
+  - "pulpotomía" → {termino: "pulpotomia", categoria: "odontologia"}
+  - "detartraje / profilaxis dental" → {termino: "detartraje", categoria: "odontologia"}
+  - "obturación con resina" → {termino: "obturacion resina", categoria: "odontologia"}
+  - "drenaje intraoral" → {termino: "drenaje intraoral", categoria: "odontologia"}
+  - "radiografía periapical" → {termino: "radiografia periapical", categoria: "odontologia"}
   - "curación de herida" → {termino: "curacion herida", categoria: "cirugia_piel"}
   - "curación de arañazo/lesión/piel" → {termino: "curacion herida piel", categoria: "cirugia_piel"}
 
@@ -269,10 +301,39 @@ POLARIDAD (campo 'negado') — REGLA CRÍTICA:
   - "se aplica toxoide tetánico" → {termino: "toxoide tetanico", categoria: "inyeccion", negado: false}
 
   IMPORTANTE: Incluye procedimientos negados en la lista (con negado=true) para que
-  el sistema sepa qué códigos EXCLUIR. Esto es tan importante como incluir los que sí se hicieron.`,
-});
+  el sistema sepa qué códigos EXCLUIR. Esto es tan importante como incluir los que sí se hicieron.
 
-export const medibillAI = genAI.getGenerativeModel({
+TEMPORALIDAD (campo 'futuro') — REGLA CRÍTICA:
+  Detecta si un procedimiento fue ORDENADO/PROGRAMADO pero NO realizado en esta atención.
+  Solo se debe facturar lo que se hizo HOY, no lo que se va a hacer después.
+
+  EJEMPLOS DE FUTURO (futuro=true):
+  - "se remite a ortopedia para programar osteosíntesis" → futuro: true
+  - "se solicita valoración por hematología" → futuro: true
+  - "pendiente RMN de rodilla" → futuro: true
+  - "se programa cirugía para la próxima semana" → futuro: true
+  - "se ordena terapia física ambulatoria" → futuro: true
+  - "control en 8 días" → futuro: true
+  - "cita de control con especialista" → futuro: true
+
+  EJEMPLOS DE REALIZADO (futuro=false):
+  - "se realiza sutura de herida" → futuro: false
+  - "se toma radiografía de tórax" → futuro: false
+  - "se aplica yeso" → futuro: false
+  - "se solicita hemograma" (laboratorio ordenado y tomado en urgencias) → futuro: false
+  - "se administra toxoide tetánico" → futuro: false
+
+  REGLA: Si la nota dice "se remite", "se programa", "pendiente", "se ordena para",
+  "valoración por [especialidad]", "control en X días", el procedimiento es FUTURO.`,
+    });
+  }
+  return _ragExtractorAI;
+}
+
+let _medibillAI: GenerativeModel | null = null;
+export function getMedibillAI(): GenerativeModel {
+  if (!_medibillAI) {
+    _medibillAI = getGenAI().getGenerativeModel({
   model: "gemini-2.5-flash", 
   generationConfig: {
     temperature: 0.1,
@@ -427,6 +488,23 @@ PRINCIPIO #6 — TIPO DE SERVICIO
 ═══════════════════════════════════════════════════
   "urgencias/servicio de urgencias/consulta de urgencias" → tipo_servicio: "urgencias"
   "consulta/control/cita programada/consulta externa" → tipo_servicio: "consulta"
+  "odontología/limpieza dental/exodoncia/endodoncia/obturación" → tipo_servicio: "odontologia"
+
+REGLA codConsultaCups (CRÍTICA — evita glosa):
+  codConsultaCups DEBE reflejar la ESPECIALIDAD que atiende al paciente.
+  NO usar 890201 (general) si es otra especialidad.
+  - Ortopedista → 890381
+  - Psiquiatra → 890371
+  - Odontólogo → 890701
+  - Pediatra → 890301
+  - Cardiólogo → 890241
+  - Internista → 890351
+  Infiere la especialidad del contexto de la nota clínica.
+
+REGLA DE INCAPACIDAD:
+  Si la nota clínica menciona "incapacidad X días", "reposo laboral", 
+  "licencia médica", "días de incapacidad" → incapacidad: "SI"
+  Si no menciona nada de incapacidad → incapacidad: "NO"
 
 DIFERENCIA CONSULTA vs INTERCONSULTA:
 890201 = Consulta de primera vez por medicina general → cuando el paciente viene directamente
@@ -632,4 +710,7 @@ NOTA: "Paciente que consulta a urgencias por dolor en muñeca izquierda tras ca�
 Nota la completitud: 2 acciones descritas (Rx + inmovilización) = 2 procedimientos CUPS generados.
 Si la nota hubiera descrito 8 acciones, se deben generar 8 procedimientos.
 NO es correcto generar solo 2-3 procedimientos cuando la nota describe 8.`,
-});
+    });
+  }
+  return _medibillAI;
+}

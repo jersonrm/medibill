@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
+import { devError } from "@/lib/logger";
 
 // ==========================================
 // TARIFAS PERSONALIZADAS — Server Actions
@@ -15,14 +16,14 @@ export async function guardarTarifaUsuario(codigo: string, descripcion: string, 
   const { error } = await supabase
     .from('servicios_medico')
     .insert({
-      usuario_id: user.id,
+      user_id: user.id,
       codigo_cups: codigo,
       descripcion: descripcion,
       tarifa: valor
     });
 
   if (error) {
-    console.error("Error guardando tarifa:", error);
+    devError("Error guardando tarifa", error);
     return { exito: false, error: error.message };
   }
   return { exito: true };
@@ -41,7 +42,7 @@ export async function obtenerTarifasUsuario() {
     .order('creado_en', { ascending: false });
 
   if (error) {
-    console.error("Error obteniendo tarifas:", error);
+    devError("Error obteniendo tarifas", error);
     return [];
   }
   return data;
@@ -49,10 +50,15 @@ export async function obtenerTarifasUsuario() {
 
 export async function eliminarTarifaUsuario(id: string) {
   const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { exito: false, error: "Usuario no autenticado" };
+
   const { error } = await supabase
     .from('servicios_medico')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('user_id', user.id);
 
   if (error) return { exito: false, error: error.message };
   return { exito: true };
@@ -70,4 +76,37 @@ export async function buscarCupsParaTarifa(termino: string) {
     codigo: c.codigo,
     descripcion: c.descripcion,
   }));
+}
+
+/** Busca tarifa de un procedimiento: primero en acuerdos, luego en tarifas propias */
+export async function buscarTarifaProcedimiento(cupsCodigo: string, epsNit?: string): Promise<{
+  valor: number | null;
+  fuente: "pactada" | "propia" | null;
+}> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { valor: null, fuente: null };
+
+  // 1. Buscar en acuerdo_tarifas si hay EPS
+  if (epsNit) {
+    const { data: pactada } = await supabase
+      .from("acuerdo_tarifas")
+      .select("valor")
+      .eq("user_id", user.id)
+      .eq("codigo_cups", cupsCodigo)
+      .eq("eps_nit", epsNit)
+      .single();
+    if (pactada) return { valor: pactada.valor, fuente: "pactada" };
+  }
+
+  // 2. Buscar en servicios_medico (tarifas propias)
+  const { data: propia } = await supabase
+    .from("servicios_medico")
+    .select("tarifa")
+    .eq("user_id", user.id)
+    .eq("codigo_cups", cupsCodigo)
+    .single();
+  if (propia) return { valor: propia.tarifa, fuente: "propia" };
+
+  return { valor: null, fuente: null };
 }

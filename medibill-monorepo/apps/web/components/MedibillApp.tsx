@@ -1,15 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { clasificarTextoMedico, obtenerHistorialAuditorias, buscarPacientePorCedula } from "@/app/actions";
+import { clasificarTextoMedico, obtenerHistorialAuditorias, buscarPacientePorCedula, obtenerSiguienteNumeroFactura } from "@/app/actions";
 import type {
   DatosPaciente,
   ResultadoAnalisis,
   AuditoriaHistorial,
 } from "@/lib/types/ui";
 import { DATOS_PACIENTE_DEFAULT, ATENCION_DEFAULT } from "@/lib/types/ui";
-import { exportarExcel } from "@/lib/exportExcel";
-import AppHeader from "@/components/AppHeader";
+
 import PatientForm from "@/components/PatientForm";
 import ClinicalNoteInput from "@/components/ClinicalNoteInput";
 import PatientHistory from "@/components/PatientHistory";
@@ -24,6 +23,7 @@ export default function MedibillApp() {
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
   const [historial, setHistorial] = useState<AuditoriaHistorial[]>([]);
+  const [numFactura, setNumFactura] = useState("");
 
   // Debounce de la nota para no recalcular validación en cada keystroke
   const notaDebounced = useDebouncedValue(nota, 500);
@@ -62,6 +62,7 @@ export default function MedibillApp() {
     setNota("");
     setDatosPaciente(DATOS_PACIENTE_DEFAULT);
     setResultado(null);
+    setNumFactura("");
     await cargarHistorial();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -70,7 +71,14 @@ export default function MedibillApp() {
     if (!nota.trim()) return;
     setCargando(true);
     setResultado(null);
-    const resp = await clasificarTextoMedico(nota, datosPaciente.nombrePaciente, datosPaciente.cedulaPaciente);
+    const [resp, facturaInfo] = await Promise.all([
+      clasificarTextoMedico(nota, datosPaciente.nombrePaciente, datosPaciente.cedulaPaciente),
+      obtenerSiguienteNumeroFactura(),
+    ]);
+    if (facturaInfo.error) {
+      alert("⚠️ " + facturaInfo.error);
+    }
+    setNumFactura(facturaInfo.numero);
     if (resp.exito) {
       const d = { ...resp.datos } as ResultadoAnalisis;
       if (!d.atencion) d.atencion = { ...ATENCION_DEFAULT };
@@ -99,14 +107,8 @@ export default function MedibillApp() {
     setDatosPaciente((prev) => ({ ...prev, [campo]: valor }));
   };
 
-  const handleExportarExcel = () => {
-    if (resultado) exportarExcel(resultado, datosPaciente);
-  };
-
   return (
     <div className="min-h-screen bg-medi-light/30 text-medi-deep font-sans pb-20">
-      <AppHeader onNuevaConsulta={nuevaConsulta} />
-
       <main className="max-w-[1600px] mx-auto p-8 grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* Left: Form */}
         <section className="flex flex-col gap-8">
@@ -128,7 +130,7 @@ export default function MedibillApp() {
 
         {/* Right: Results */}
         <section className="flex flex-col gap-8">
-          <AnalysisResults resultado={resultado} datosPaciente={datosPaciente} onResultadoChange={setResultado} onExportarExcel={handleExportarExcel} />
+          <AnalysisResults resultado={resultado} datosPaciente={datosPaciente} numFactura={numFactura} onResultadoChange={setResultado} nota={nota} />
         </section>
       </main>
     </div>

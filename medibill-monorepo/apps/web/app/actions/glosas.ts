@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase-server";
 import { validarFactura } from "@/lib/validador-glosas";
-import { devLog } from "@/lib/logger";
+import { tieneFeature } from "@/lib/suscripcion";
+import { devLog, devError } from "@/lib/logger";
 import type { ResultadoValidacion, FacturaResumen, ValidacionPreRadicacionDB } from "@/lib/types/glosas";
 
 // ==========================================
@@ -34,20 +35,46 @@ export interface ResumenPendientes {
   pendientes: PendienteItem[];
 }
 
-/** Vista unificada "Mis Pendientes" — una sola llamada al server */
-export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
+/** Vista unificada "Mis Pendientes" — una sola llamada al server
+ *  TODO: Considerar crear vista SQL `v_pendientes_usuario` en Supabase para mover
+ *  la lógica de KPIs y urgencia al DB y reducir las 3 queries a 1.
+ */
+export async function obtenerMisPendientes(
+  opciones?: { limite?: number; mesesAtras?: number }
+): Promise<ResumenPendientes> {
+  const limite = opciones?.limite ?? 100;
+  const mesesAtras = opciones?.mesesAtras ?? 12;
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { kpis: { totalFacturado: 0, totalGlosado: 0, tasaGlosas: 0, pendientesTotal: 0, facturasBorrador: 0, glosasRecibidasPendientes: 0, glosasRecibidasVencidas: 0 }, pendientes: [] };
+  const emptyResult: ResumenPendientes = { kpis: { totalFacturado: 0, totalGlosado: 0, tasaGlosas: 0, pendientesTotal: 0, facturasBorrador: 0, glosasRecibidasPendientes: 0, glosasRecibidasVencidas: 0 }, pendientes: [] };
+  if (!user) return emptyResult;
+
+  // Feature gate: requiere ia_sugerencias_glosas
+  const { data: memb } = await supabase
+    .from("usuarios_organizacion")
+    .select("organizacion_id")
+    .eq("user_id", user.id)
+    .eq("activo", true)
+    .limit(1)
+    .single();
+  if (!memb || !await tieneFeature(memb.organizacion_id, "ia_sugerencias_glosas")) {
+    return emptyResult;
+  }
 
   const pendientes: PendienteItem[] = [];
   const hoy = new Date();
+  const fechaLimite = new Date(hoy);
+  fechaLimite.setMonth(fechaLimite.getMonth() - mesesAtras);
+  const fechaLimiteISO = fechaLimite.toISOString().slice(0, 10);
 
-  // ── 1. Facturas ──
+  // ── 1. Facturas (últimos N meses, máx 100) ──
   const { data: facturas } = await supabase
     .from('facturas')
     .select('id, num_factura, fecha_expedicion, fecha_limite_rad, valor_total, valor_glosado, estado')
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    .gte('fecha_expedicion', fechaLimiteISO)
+    .limit(100);
 
   const allFacturas = facturas || [];
   const totalFacturado = allFacturas.reduce((s, f) => s + Number(f.valor_total), 0);
@@ -86,7 +113,7 @@ export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
 
   // Alertas de radicación: facturas borrador con deadline cercano (ya capturadas arriba)
 
-  // ── 2. Glosas pendientes (tabla glosas) ──
+  // ── 2. Glosas pendientes (tabla glosas — últimos N meses, máx 100) ──
   const { data: glosasData } = await supabase
     .from('glosas')
     .select(`
@@ -94,7 +121,9 @@ export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
       fecha_limite_resp, estado, tipo, descripcion_erp, factura_id,
       facturas!inner(num_factura, fecha_radicacion, user_id)
     `)
-    .eq('facturas.user_id', user.id);
+    .eq('facturas.user_id', user.id)
+    .gte('fecha_formulacion', fechaLimiteISO)
+    .limit(100);
 
   const allGlosas = glosasData || [];
 
@@ -161,20 +190,22 @@ export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
     }
   }
 
-  // ── 3. Glosas recibidas pendientes (Capa 3) ──
+  // ── 3. Glosas recibidas pendientes (Capa 3 — filtrada por usuario, máx 100) ──
   let glosasRecibidasPendientes = 0;
   let glosasRecibidasVencidas = 0;
   try {
     const { data: glosasRecibidas } = await supabase
       .from('glosas_recibidas')
-      .select('id, estado, valor_glosado, codigo_glosa, fecha_notificacion, factura_id');
+      .select('id, estado, valor_glosado, codigo_glosa, fecha_notificacion, factura_id')
+      .eq('user_id', user.id)
+      .limit(100);
 
     if (glosasRecibidas) {
       glosasRecibidasPendientes = glosasRecibidas.filter(g => g.estado === 'pendiente').length;
       glosasRecibidasVencidas = glosasRecibidas.filter(g => g.estado === 'vencida').length;
     }
-  } catch {
-    // Tabla puede no existir
+  } catch (e) {
+    devError("[obtenerInventarioGlosas]", "Error consultando glosas_recibidas", e);
   }
 
   // ── Ordenar: vencidas primero, luego urgentes, luego normales ──
@@ -186,6 +217,9 @@ export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
     return (a.diasRestantes ?? 999) - (b.diasRestantes ?? 999);
   });
 
+  // Aplicar límite al listado de pendientes
+  const pendientesLimitados = pendientes.slice(0, limite);
+
   return {
     kpis: {
       totalFacturado,
@@ -196,7 +230,7 @@ export async function obtenerMisPendientes(): Promise<ResumenPendientes> {
       glosasRecibidasPendientes,
       glosasRecibidasVencidas,
     },
-    pendientes,
+    pendientes: pendientesLimitados,
   };
 }
 
@@ -264,8 +298,8 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
           tarifas: tarifas ?? [],
         };
       }
-    } catch {
-      devLog('[validarFacturaPorId]', 'Tabla acuerdos_voluntades no disponible');
+    } catch (e) {
+      devError('[validarFacturaPorId]', 'Tabla acuerdos_voluntades no disponible', e);
     }
 
     // 4. Obtener reglas de coherencia (graceful si tabla no existe)
@@ -276,8 +310,8 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
         .select('*')
         .eq('activo', true);
       reglasCoherencia = reglas ?? undefined;
-    } catch {
-      devLog('[validarFacturaPorId]', 'Tabla reglas_coherencia no disponible');
+    } catch (e) {
+      devError('[validarFacturaPorId]', 'Tabla reglas_coherencia no disponible', e);
     }
 
     // 5. Obtener facturas existentes para detección de duplicados
@@ -311,13 +345,13 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
           puede_radicar: resultado.puede_radicar,
           created_at: new Date().toISOString(),
         });
-    } catch {
-      devLog('[validarFacturaPorId]', 'Tabla validaciones_factura no disponible — resultado no persistido');
+    } catch (e) {
+      devError('[validarFacturaPorId]', 'Tabla validaciones_factura no disponible — resultado no persistido', e);
     }
 
     return resultado;
   } catch (error) {
-    devLog('[validarFacturaPorId]', 'Error inesperado:', error);
+    devError('[validarFacturaPorId]', 'Error inesperado:', error);
     return null;
   }
 }
@@ -363,8 +397,8 @@ export async function obtenerFacturasPendientesValidacion(): Promise<FacturaResu
           }
         }
       }
-    } catch {
-      devLog('[obtenerFacturasPendientesValidacion]', 'Tabla validaciones_factura no disponible');
+    } catch (e) {
+      devError('[obtenerFacturasPendientesValidacion]', 'Tabla validaciones_factura no disponible', e);
       validacionesMap = new Map();
     }
 
@@ -378,7 +412,7 @@ export async function obtenerFacturasPendientesValidacion(): Promise<FacturaResu
       ultima_validacion: validacionesMap.get(f.id),
     }));
   } catch (error) {
-    devLog('[obtenerFacturasPendientesValidacion]', 'Error inesperado:', error);
+    devError('[obtenerFacturasPendientesValidacion]', 'Error inesperado:', error);
     return [];
   }
 }
@@ -430,12 +464,12 @@ export async function obtenerHistorialValidaciones(facturaId: string): Promise<V
         resuelta_por: null,
         created_at: v.created_at as string,
       }));
-    } catch {
-      devLog('[obtenerHistorialValidaciones]', 'Tabla validaciones_factura no disponible');
+    } catch (e) {
+      devError('[obtenerHistorialValidaciones]', 'Tabla validaciones_factura no disponible', e);
       return [];
     }
   } catch (error) {
-    devLog('[obtenerHistorialValidaciones]', 'Error inesperado:', error);
+    devError('[obtenerHistorialValidaciones]', 'Error inesperado:', error);
     return [];
   }
 }

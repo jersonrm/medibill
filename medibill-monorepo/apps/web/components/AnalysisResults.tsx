@@ -8,23 +8,27 @@ import type {
   AlternativaIA,
   AtencionUI,
   DatosPaciente,
+  FuenteTarifa,
 } from "@/lib/types/ui";
 import DiagnosticsList from "@/components/DiagnosticsList";
 import ProceduresList from "@/components/ProceduresList";
 import PreInvoiceCard from "@/components/PreInvoiceCard";
+import PanelAprobacion from "@/components/PanelAprobacion";
 
 interface AnalysisResultsProps {
   resultado: ResultadoAnalisis | null;
   datosPaciente: DatosPaciente;
+  numFactura: string;
   onResultadoChange: (resultado: ResultadoAnalisis) => void;
-  onExportarExcel: () => void;
+  nota?: string;
 }
 
 export default function AnalysisResults({
   resultado,
   datosPaciente,
+  numFactura,
   onResultadoChange,
-  onExportarExcel,
+  nota = "",
 }: AnalysisResultsProps) {
   // Cerrar todos los <details> cuando cambia el resultado
   useEffect(() => {
@@ -101,6 +105,15 @@ export default function AnalysisResults({
     onResultadoChange(nuevoResultado);
   };
 
+  const handleActualizarTarifa = (index: number, valor: number, fuente: FuenteTarifa) => {
+    const nuevoResultado = structuredClone(resultado);
+    const proc = nuevoResultado.procedimientos[index];
+    if (!proc) return;
+    proc.valor_unitario = valor;
+    proc.fuente_tarifa = fuente;
+    onResultadoChange(nuevoResultado);
+  };
+
   const handleActualizarAtencion = (campo: keyof AtencionUI, valor: string | number) => {
     const nuevoResultado = structuredClone(resultado);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,8 +126,8 @@ export default function AnalysisResults({
       <PreInvoiceCard
         atencion={resultado.atencion}
         datosPaciente={datosPaciente}
+        numFactura={numFactura}
         onActualizarAtencion={handleActualizarAtencion}
-        onExportarExcel={onExportarExcel}
         diagnosticos={resultado.diagnosticos}
         procedimientos={resultado.procedimientos}
       />
@@ -132,6 +145,13 @@ export default function AnalysisResults({
         onCambiar={handleCambiarProcedimiento}
         onEliminar={handleEliminarProcedimiento}
         onAgregar={handleAgregarProcedimiento}
+        onActualizarTarifa={handleActualizarTarifa}
+      />
+
+      <PanelAprobacion
+        resultado={resultado}
+        datosPaciente={datosPaciente}
+        nota={nota}
       />
     </div>
   );

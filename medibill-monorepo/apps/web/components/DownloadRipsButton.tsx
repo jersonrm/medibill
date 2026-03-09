@@ -2,78 +2,21 @@
 
 import { useState } from 'react';
 import { generarJsonRipsMVP } from '@/app/actions'; 
-import { validadorRips } from '@/lib/validadorRips'; 
-import type { DatosParaRips } from '@/lib/types/rips';
+import { getValidadorRips } from '@/lib/validadorRips'; 
 
 interface Props {
-  tipoDocumentoPaciente: DatosParaRips["tipoDocumentoPaciente"];
-  documentoPaciente: string;
-  fechaNacimientoPaciente: string;
-  sexoPaciente: DatosParaRips["sexoPaciente"];
-  tipoUsuarioPaciente: DatosParaRips["tipoUsuarioPaciente"];
-  codPaisResidencia: string;
-  codMunicipioResidencia: string;
-  codZonaTerritorialResidencia: DatosParaRips["codZonaTerritorialResidencia"];
-  incapacidad: DatosParaRips["incapacidad"];
-  diagnosticos: any[];
-  procedimientos: any[];
-  atencionIA: {
-    modalidad: string;
-    causa: string;
-    finalidad: string;
-    tipo_diagnostico: string;
-    tipo_servicio: string;
-    valor_consulta: number;
-    valor_cuota: number;
-  };
+  facturaId: string;
 }
 
-export default function DownloadRipsButton({ 
-  tipoDocumentoPaciente,
-  documentoPaciente, 
-  fechaNacimientoPaciente,
-  sexoPaciente,
-  tipoUsuarioPaciente,
-  codPaisResidencia,
-  codMunicipioResidencia,
-  codZonaTerritorialResidencia,
-  incapacidad,
-  diagnosticos, 
-  procedimientos,
-  atencionIA
-}: Props) {
+export default function DownloadRipsButton({ facturaId }: Props) {
   const [loading, setLoading] = useState(false);
 
   const handleDownload = async () => {
     setLoading(true);
     try {
-      // Pre-validación: campos obligatorios Res. 2275
-      const camposFaltantes: string[] = [];
-      if (!documentoPaciente.trim()) camposFaltantes.push("Documento del paciente");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaNacimientoPaciente)) camposFaltantes.push("Fecha de nacimiento");
-      if (diagnosticos.length === 0) camposFaltantes.push("Al menos un diagnóstico CIE-10");
+      const ripsData = await generarJsonRipsMVP(facturaId);
 
-      if (camposFaltantes.length > 0) {
-        alert("Campos obligatorios faltantes:\n\n- " + camposFaltantes.join("\n- "));
-        setLoading(false);
-        return;
-      }
-
-      const ripsData = await generarJsonRipsMVP({
-        tipoDocumentoPaciente,
-        documentoPaciente,
-        fechaNacimientoPaciente,
-        sexoPaciente,
-        tipoUsuarioPaciente,
-        codPaisResidencia,
-        codMunicipioResidencia,
-        codZonaTerritorialResidencia,
-        incapacidad,
-        diagnosticos,
-        procedimientos,
-        atencionIA
-      });
-
+      const validadorRips = getValidadorRips();
       const esValido = validadorRips(ripsData);
 
       if (!esValido) {

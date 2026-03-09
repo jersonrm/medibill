@@ -1,5 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { devWarn } from "@/lib/logger";
+import type { User } from "@supabase/supabase-js";
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -17,11 +19,22 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch {
-            // Se ignora si se llama desde un componente de servidor
+          } catch (e) {
+            devWarn("Cookie set failed (expected in RSC)", e);
           }
         },
       },
     }
   );
+}
+
+/**
+ * Verifica autenticación y retorna el usuario o lanza un error.
+ * Uso: `const { user, supabase } = await requireUser();`
+ */
+export async function requireUser(): Promise<{ user: User; supabase: Awaited<ReturnType<typeof createClient>> }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("No autenticado");
+  return { user, supabase };
 }

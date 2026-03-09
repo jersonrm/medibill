@@ -12,7 +12,8 @@
  * Fuente legal: Resolución 2284/2023, Circular 007/2025, Resolución 2275/2023
  */
 
-import type { FevRips, ConsultaRips, ProcedimientoRips } from "@/lib/types/rips";
+import type { FevRips, ConsultaRips, ProcedimientoRips, ServiciosRips } from "@/lib/types/rips";
+import { esDiaHabil } from "@/lib/dias-habiles";
 import type {
   FacturaDB,
   ValidacionPreRadicacionDB,
@@ -67,66 +68,14 @@ export interface ContextoValidacion {
   datosFactura?: DatosFactura;
   /** Reglas de coherencia diagnóstico-procedimiento-sexo-edad */
   reglasCoherencia?: ReglaCoherenciaDB[];
+  /** Autorizaciones registradas para cruzar vigencia */
+  autorizaciones?: { numero_autorizacion: string; fecha_desde: string; fecha_hasta: string }[];
   /** Fecha de referencia para validaciones temporales (default: new Date()) */
   fechaReferencia?: Date;
 }
 
 // =====================================================================
-// FESTIVOS COLOMBIANOS 2025-2026 (Ley 51 de 1983)
-// =====================================================================
-
-const FESTIVOS_COLOMBIA: Set<string> = new Set([
-  // 2025
-  "2025-01-01", // Año Nuevo
-  "2025-01-06", // Reyes Magos
-  "2025-03-24", // San José (trasladado)
-  "2025-04-17", // Jueves Santo
-  "2025-04-18", // Viernes Santo
-  "2025-05-01", // Día del Trabajo
-  "2025-06-02", // Ascensión del Señor (trasladado)
-  "2025-06-23", // Corpus Christi (trasladado)
-  "2025-06-30", // Sagrado Corazón (trasladado)
-  "2025-07-20", // Independencia
-  "2025-08-07", // Batalla de Boyacá
-  "2025-08-18", // Asunción de la Virgen (trasladado)
-  "2025-10-13", // Día de la Raza (trasladado)
-  "2025-11-03", // Todos los Santos (trasladado)
-  "2025-11-17", // Independencia de Cartagena (trasladado)
-  "2025-12-08", // Inmaculada Concepción
-  "2025-12-25", // Navidad
-  // 2026
-  "2026-01-01", // Año Nuevo
-  "2026-01-12", // Reyes Magos (trasladado)
-  "2026-03-23", // San José (trasladado)
-  "2026-04-02", // Jueves Santo
-  "2026-04-03", // Viernes Santo
-  "2026-05-01", // Día del Trabajo
-  "2026-05-18", // Ascensión del Señor (trasladado)
-  "2026-06-08", // Corpus Christi (trasladado)
-  "2026-06-15", // Sagrado Corazón (trasladado)
-  "2026-07-20", // Independencia
-  "2026-08-07", // Batalla de Boyacá
-  "2026-08-17", // Asunción de la Virgen (trasladado)
-  "2026-10-12", // Día de la Raza
-  "2026-11-02", // Todos los Santos (trasladado)
-  "2026-11-16", // Independencia de Cartagena (trasladado)
-  "2026-12-08", // Inmaculada Concepción
-  "2026-12-25", // Navidad
-]);
-
-/** Verifica si una fecha es festivo colombiano */
-function esFestivo(fecha: Date): boolean {
-  return FESTIVOS_COLOMBIA.has(fecha.toISOString().slice(0, 10));
-}
-
-/** Verifica si una fecha es día hábil (lun-vie, no festivo) */
-function esDiaHabil(fecha: Date): boolean {
-  const dow = fecha.getDay();
-  return dow !== 0 && dow !== 6 && !esFestivo(fecha);
-}
-
-// =====================================================================
-// UTILIDADES DE FECHA
+// UTILIDADES DE FECHA (usa esDiaHabil de @/lib/dias-habiles)
 // =====================================================================
 
 /** Suma N días hábiles (lun-vie, excluye festivos colombianos) a una fecha */
@@ -165,6 +114,14 @@ export class ValidadorPreRadicacion {
     this.fechaRef = ctx.fechaReferencia ?? new Date();
   }
 
+  /** Acceso conveniente a servicios del primer usuario (Res. 2275: anidados en usuarios[]) */
+  private get serviciosRips(): ServiciosRips {
+    return this.ctx.fevRips.usuarios[0]?.servicios ?? {
+      consultas: [], procedimientos: [], urgencias: [],
+      hospitalizacion: [], recienNacidos: [], medicamentos: [], otrosServicios: [],
+    };
+  }
+
   // -------------------------------------------------------------------
   // MÉTODO PRINCIPAL
   // -------------------------------------------------------------------
@@ -198,6 +155,12 @@ export class ValidadorPreRadicacion {
     this.validarCoherenciaEdad();
     this.validarReglasCoherenciaBD();
     this.validarPertinenciaEstancia();
+
+    // Capa 4: Facturación y aritmética
+    this.validarTotalesFactura();
+    this.validarAritmeticaServicios();
+    this.validarFormatoNumeroFactura();
+    this.validarFrecuenciaProcedimientos();
 
     // Construir resultado
     const errores = this.hallazgos.filter((h) => h.severidad === "error").length;
@@ -401,7 +364,7 @@ export class ValidadorPreRadicacion {
    * Verifica que las cantidades facturadas coincidan con los registros RIPS.
    */
   private validarConsistenciaCantidades(): void {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     // Consultas: verificar que cada consulta tenga diagnóstico principal
@@ -411,7 +374,7 @@ export class ValidadorPreRadicacion {
         this.emit({
           codigo_causal: "FA0201",
           severidad: "error",
-          mensaje: `Consulta[${i}] (CUPS: ${c.codigoConsulta}): falta diagnóstico principal CIE-10.`,
+          mensaje: `Consulta[${i}] (CUPS: ${c.codConsulta}): falta diagnóstico principal CIE-10.`,
           campo_afectado: `fevRips.servicios.consultas[${i}].codDiagnosticoPrincipal`,
         });
       }
@@ -419,7 +382,7 @@ export class ValidadorPreRadicacion {
         this.emit({
           codigo_causal: "FA0201",
           severidad: "error",
-          mensaje: `Consulta[${i}] (CUPS: ${c.codigoConsulta}): valor del servicio es 0 o negativo.`,
+          mensaje: `Consulta[${i}] (CUPS: ${c.codConsulta}): valor del servicio es 0 o negativo.`,
           campo_afectado: `fevRips.servicios.consultas[${i}].vrServicio`,
           valor_encontrado: String(c.vrServicio),
           valor_esperado: "> 0",
@@ -430,19 +393,19 @@ export class ValidadorPreRadicacion {
     // Procedimientos: verificar código y valor
     for (let i = 0; i < (servicios.procedimientos?.length ?? 0); i++) {
       const p = servicios.procedimientos![i]!;
-      if (!p.codigoProcedimiento) {
+      if (!p.codProcedimiento) {
         this.emit({
           codigo_causal: "FA5801",
           severidad: "error",
           mensaje: `Procedimiento[${i}]: falta código CUPS.`,
-          campo_afectado: `fevRips.servicios.procedimientos[${i}].codigoProcedimiento`,
+          campo_afectado: `fevRips.servicios.procedimientos[${i}].codProcedimiento`,
         });
       }
       if (!p.codDiagnosticoPrincipal) {
         this.emit({
           codigo_causal: "SO0301",
           severidad: "error",
-          mensaje: `Procedimiento[${i}] (CUPS: ${p.codigoProcedimiento}): falta diagnóstico principal.`,
+          mensaje: `Procedimiento[${i}] (CUPS: ${p.codProcedimiento}): falta diagnóstico principal.`,
           campo_afectado: `fevRips.servicios.procedimientos[${i}].codDiagnosticoPrincipal`,
         });
       }
@@ -451,19 +414,19 @@ export class ValidadorPreRadicacion {
     // Medicamentos
     for (let i = 0; i < (servicios.medicamentos?.length ?? 0); i++) {
       const m = servicios.medicamentos![i]!;
-      if (!m.codigoMedicamento) {
+      if (!m.codMedicamento) {
         this.emit({
           codigo_causal: "FA0701",
           severidad: "error",
           mensaje: `Medicamento[${i}]: falta código CUM/ATC.`,
-          campo_afectado: `fevRips.servicios.medicamentos[${i}].codigoMedicamento`,
+          campo_afectado: `fevRips.servicios.medicamentos[${i}].codMedicamento`,
         });
       }
       if (m.cantidadDispensada <= 0) {
         this.emit({
           codigo_causal: "FA0701",
           severidad: "advertencia",
-          mensaje: `Medicamento[${i}] (${m.nombreGenerico || m.codigoMedicamento}): cantidad dispensada es 0 o negativa.`,
+          mensaje: `Medicamento[${i}] (${m.nombreGenerico || m.codMedicamento}): cantidad dispensada es 0 o negativa.`,
           campo_afectado: `fevRips.servicios.medicamentos[${i}].cantidadDispensada`,
           valor_encontrado: String(m.cantidadDispensada),
         });
@@ -476,19 +439,19 @@ export class ValidadorPreRadicacion {
    * Mismo paciente + mismo CUPS + misma fecha = posible duplicado.
    */
   private validarDuplicadoServicios(): void {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     const claves = new Set<string>();
     const todos = [
       ...(servicios.consultas ?? []).map((c: ConsultaRips) => ({
-        cups: c.codigoConsulta,
+        cups: c.codConsulta,
         doc: c.numDocumentoIdentificacion,
         fecha: c.fechaInicioAtencion,
         tipo: "consulta",
       })),
       ...(servicios.procedimientos ?? []).map((p: ProcedimientoRips) => ({
-        cups: p.codigoProcedimiento,
+        cups: p.codProcedimiento,
         doc: p.numDocumentoIdentificacion,
         fecha: p.fechaInicioAtencion,
         tipo: "procedimiento",
@@ -515,7 +478,7 @@ export class ValidadorPreRadicacion {
    * Verifica que campos de autorización estén presentes cuando aplique.
    */
   private validarSoportesMinimos(): void {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     const requiereAuth = this.ctx.acuerdo?.requiere_autorizacion ?? true;
@@ -528,7 +491,7 @@ export class ValidadorPreRadicacion {
           this.emit({
             codigo_causal: "AU0101",
             severidad: "advertencia",
-            mensaje: `Consulta[${i}] (CUPS: ${c.codigoConsulta}): falta número de autorización. El acuerdo de voluntades lo requiere.`,
+            mensaje: `Consulta[${i}] (CUPS: ${c.codConsulta}): falta número de autorización. El acuerdo de voluntades lo requiere.`,
             campo_afectado: `fevRips.servicios.consultas[${i}].numAutorizacion`,
           });
         }
@@ -539,7 +502,7 @@ export class ValidadorPreRadicacion {
           this.emit({
             codigo_causal: "AU0101",
             severidad: "advertencia",
-            mensaje: `Procedimiento[${i}] (CUPS: ${p.codigoProcedimiento}): falta autorización. Riesgo de glosa AU01.`,
+            mensaje: `Procedimiento[${i}] (CUPS: ${p.codProcedimiento}): falta autorización. Riesgo de glosa AU01.`,
             campo_afectado: `fevRips.servicios.procedimientos[${i}].numAutorizacion`,
           });
         }
@@ -620,20 +583,20 @@ export class ValidadorPreRadicacion {
    * Helper: verifica si un CUPS tiene autorización vacía en el JSON RIPS.
    */
   private verificarAuthEnRips(cupsCodigo: string): boolean {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return false;
 
     // Buscar en consultas
     for (const c of servicios.consultas ?? []) {
-      if (c.codigoConsulta === cupsCodigo && !c.numAutorizacion) return true;
+      if (c.codConsulta === cupsCodigo && !c.numAutorizacion) return true;
     }
     // Buscar en procedimientos
     for (const p of servicios.procedimientos ?? []) {
-      if (p.codigoProcedimiento === cupsCodigo && !p.numAutorizacion) return true;
+      if (p.codProcedimiento === cupsCodigo && !p.numAutorizacion) return true;
     }
     // Buscar en medicamentos
     for (const m of servicios.medicamentos ?? []) {
-      if (m.codigoMedicamento === cupsCodigo && !(m as unknown as Record<string, unknown>).numAutorizacion) return true;
+      if (m.codMedicamento === cupsCodigo && !(m as unknown as Record<string, unknown>).numAutorizacion) return true;
     }
     return false;
   }
@@ -644,7 +607,7 @@ export class ValidadorPreRadicacion {
    * Compara copago_recaudado vs copago_calculado si ambos están disponibles.
    */
   private validarCopagos(): void {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     for (let i = 0; i < (servicios.consultas?.length ?? 0); i++) {
@@ -853,30 +816,71 @@ export class ValidadorPreRadicacion {
    * AU02 / AU0201 — Vigencia de la autorización.
    * Si el servicio tiene autorización, verifica que la fecha de prestación
    * esté dentro de la vigencia de dicha autorización.
-   * Nota: En producción se cruzaría con BD de autorizaciones de la EPS.
+   * Cruza con tabla `autorizaciones` si está disponible en el contexto.
    */
   private validarVigenciaAutorizacion(): void {
-    // Placeholder: requiere tabla de autorizaciones con fecha_desde/fecha_hasta.
-    // En esta versión, alertamos si hay autorización pero sin poder verificar
-    // vigencia sin datos externos.
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
-    // Alerta informativa si se detectan autorizaciones (para que el usuario verifique)
     const todosConAuth = [
       ...(servicios.consultas ?? []).filter((c: ConsultaRips) => c.numAutorizacion),
       ...(servicios.procedimientos ?? []).filter((p: ProcedimientoRips) => p.numAutorizacion),
     ];
 
-    if (todosConAuth.length > 0 && !this.ctx.acuerdo) {
-      this.emit({
-        codigo_causal: "AU0201",
-        severidad: "info",
-        mensaje: `${todosConAuth.length} servicio(s) con autorización. Verifique que las fechas de prestación estén dentro de la vigencia de cada autorización.`,
-        campo_afectado: "servicios.*.numAutorizacion",
-        como_resolver: "Confirme que cada autorización estaba vigente en la fecha de prestación del servicio.",
-        norma_legal: "Res. 2284/2023, Anexo Técnico 3, concepto AU02 — Vigencia de autorización.",
-      });
+    if (todosConAuth.length === 0) return;
+
+    const autorizacionesDB = this.ctx.autorizaciones ?? [];
+    const fechaPrestacion = this.fechaRef;
+
+    if (autorizacionesDB.length === 0) {
+      // Sin datos de autorizaciones: alerta informativa
+      if (!this.ctx.acuerdo) {
+        this.emit({
+          codigo_causal: "AU0201",
+          severidad: "info",
+          mensaje: `${todosConAuth.length} servicio(s) con autorización. Verifique que las fechas de prestación estén dentro de la vigencia de cada autorización.`,
+          campo_afectado: "servicios.*.numAutorizacion",
+          como_resolver: "Registre las autorizaciones en Configuración > Autorizaciones para validación automática de vigencia.",
+          norma_legal: "Res. 2284/2023, Anexo Técnico 3, concepto AU02 — Vigencia de autorización.",
+        });
+      }
+      return;
+    }
+
+    // Cruzar cada servicio con sus autorizaciones registradas
+    for (const srv of todosConAuth) {
+      const numAuth = (srv as { numAutorizacion?: string }).numAutorizacion;
+      if (!numAuth) continue;
+
+      const auth = autorizacionesDB.find(a => a.numero_autorizacion === numAuth);
+      if (!auth) {
+        this.emit({
+          codigo_causal: "AU0201",
+          severidad: "advertencia",
+          mensaje: `Autorización ${numAuth} no encontrada en los registros. No se pudo verificar vigencia.`,
+          campo_afectado: "servicios.*.numAutorizacion",
+          valor_encontrado: numAuth,
+          como_resolver: "Registre esta autorización en el módulo de autorizaciones para verificar su vigencia automáticamente.",
+          norma_legal: "Res. 2284/2023, Anexo Técnico 3, concepto AU02.",
+        });
+        continue;
+      }
+
+      const desde = new Date(auth.fecha_desde);
+      const hasta = new Date(auth.fecha_hasta);
+
+      if (fechaPrestacion < desde || fechaPrestacion > hasta) {
+        this.emit({
+          codigo_causal: "AU0201",
+          severidad: "error",
+          mensaje: `Autorización ${numAuth} vencida o no vigente en la fecha de prestación. Vigencia: ${auth.fecha_desde} a ${auth.fecha_hasta}.`,
+          campo_afectado: "servicios.*.numAutorizacion",
+          valor_encontrado: numAuth,
+          valor_esperado: `Vigente entre ${auth.fecha_desde} y ${auth.fecha_hasta}`,
+          como_resolver: "Solicite una nueva autorización vigente a la EPS o ajuste la fecha de prestación.",
+          norma_legal: "Res. 2284/2023, Anexo Técnico 3, concepto AU02 — Vigencia de autorización.",
+        });
+      }
     }
   }
 
@@ -930,13 +934,13 @@ export class ValidadorPreRadicacion {
   private validarTarifas(): void {
     if (!this.ctx.acuerdo?.tarifas) return;
     const tarifas = this.ctx.acuerdo.tarifas;
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     // Consultas → TA0201 o TA2901
     for (let i = 0; i < (servicios.consultas?.length ?? 0); i++) {
       const c = servicios.consultas![i]!;
-      const pactado = tarifas[c.codigoConsulta];
+      const pactado = tarifas[c.codConsulta];
       if (pactado !== undefined && c.vrServicio !== pactado) {
         const diff = Math.abs(c.vrServicio - pactado);
         if (diff <= 100) continue; // Tolerancia de $100
@@ -946,8 +950,8 @@ export class ValidadorPreRadicacion {
           codigo_causal: esRecargo ? "TA2901" : "TA0201",
           severidad: "advertencia",
           mensaje: esRecargo
-            ? `Consulta[${i}] CUPS ${c.codigoConsulta}: posible recargo no pactado. Facturado: $${c.vrServicio.toLocaleString()}, pactado: $${pactado.toLocaleString()} (diferencia: +$${diff.toLocaleString()}).`
-            : `Consulta[${i}] CUPS ${c.codigoConsulta}: valor facturado ($${c.vrServicio.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
+            ? `Consulta[${i}] CUPS ${c.codConsulta}: posible recargo no pactado. Facturado: $${c.vrServicio.toLocaleString()}, pactado: $${pactado.toLocaleString()} (diferencia: +$${diff.toLocaleString()}).`
+            : `Consulta[${i}] CUPS ${c.codConsulta}: valor facturado ($${c.vrServicio.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
           campo_afectado: `fevRips.servicios.consultas[${i}].vrServicio`,
           valor_encontrado: String(c.vrServicio),
           valor_esperado: String(pactado),
@@ -964,22 +968,22 @@ export class ValidadorPreRadicacion {
     // Procedimientos → TA0801/TA5801 o TA2901
     for (let i = 0; i < (servicios.procedimientos?.length ?? 0); i++) {
       const p = servicios.procedimientos![i]!;
-      const pactado = tarifas[p.codigoProcedimiento];
+      const pactado = tarifas[p.codProcedimiento];
       if (pactado !== undefined && p.vrServicio !== pactado) {
         const diff = Math.abs(p.vrServicio - pactado);
         if (diff <= 100) continue; // Tolerancia de $100
 
         const esRecargo = p.vrServicio > pactado && diff > pactado * 0.10;
         // Determinar si es Qx (TA5801) o no (TA0801)
-        const esProcQx = this.esProcedimientoQuirurgico(p.codigoProcedimiento);
+        const esProcQx = this.esProcedimientoQuirurgico(p.codProcedimiento);
         const codigoTarifa = esRecargo ? "TA2901" : (esProcQx ? "TA5801" : "TA0801");
 
         this.emit({
           codigo_causal: codigoTarifa,
           severidad: "advertencia",
           mensaje: esRecargo
-            ? `Procedimiento[${i}] CUPS ${p.codigoProcedimiento}: posible recargo no pactado. Facturado: $${p.vrServicio.toLocaleString()}, pactado: $${pactado.toLocaleString()} (diferencia: +$${diff.toLocaleString()}).`
-            : `Procedimiento[${i}] CUPS ${p.codigoProcedimiento}: valor facturado ($${p.vrServicio.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
+            ? `Procedimiento[${i}] CUPS ${p.codProcedimiento}: posible recargo no pactado. Facturado: $${p.vrServicio.toLocaleString()}, pactado: $${pactado.toLocaleString()} (diferencia: +$${diff.toLocaleString()}).`
+            : `Procedimiento[${i}] CUPS ${p.codProcedimiento}: valor facturado ($${p.vrServicio.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
           campo_afectado: `fevRips.servicios.procedimientos[${i}].vrServicio`,
           valor_encontrado: String(p.vrServicio),
           valor_esperado: String(pactado),
@@ -996,7 +1000,7 @@ export class ValidadorPreRadicacion {
     // Medicamentos → TA0701 o TA2901
     for (let i = 0; i < (servicios.medicamentos?.length ?? 0); i++) {
       const m = servicios.medicamentos![i]!;
-      const pactado = tarifas[m.codigoMedicamento];
+      const pactado = tarifas[m.codMedicamento];
       if (pactado !== undefined) {
         const valorMed = (m as unknown as Record<string, unknown>).vrServicio as number | undefined;
         if (valorMed !== undefined && valorMed !== pactado) {
@@ -1008,8 +1012,8 @@ export class ValidadorPreRadicacion {
             codigo_causal: esRecargo ? "TA2901" : "TA0701",
             severidad: "advertencia",
             mensaje: esRecargo
-              ? `Medicamento[${i}] ${m.codigoMedicamento}: posible recargo no pactado. Facturado: $${valorMed.toLocaleString()}, pactado: $${pactado.toLocaleString()}.`
-              : `Medicamento[${i}] ${m.codigoMedicamento}: valor facturado ($${valorMed.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
+              ? `Medicamento[${i}] ${m.codMedicamento}: posible recargo no pactado. Facturado: $${valorMed.toLocaleString()}, pactado: $${pactado.toLocaleString()}.`
+              : `Medicamento[${i}] ${m.codMedicamento}: valor facturado ($${valorMed.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
             campo_afectado: `fevRips.servicios.medicamentos[${i}].vrServicio`,
             valor_encontrado: String(valorMed),
             valor_esperado: String(pactado),
@@ -1041,17 +1045,17 @@ export class ValidadorPreRadicacion {
   private validarPaquetesAgrupados(): void {
     if (!this.ctx.acuerdo?.paquetes || this.ctx.acuerdo.paquetes.length === 0) return;
     const paquetes = new Set(this.ctx.acuerdo.paquetes);
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     for (let i = 0; i < (servicios.procedimientos?.length ?? 0); i++) {
       const p = servicios.procedimientos![i]!;
-      if (paquetes.has(p.codigoProcedimiento)) {
+      if (paquetes.has(p.codProcedimiento)) {
         this.emit({
           codigo_causal: "FA5803",
           severidad: "advertencia",
-          mensaje: `Procedimiento[${i}] CUPS ${p.codigoProcedimiento} está incluido en un paquete/atención agrupada. ¿Se está facturando aparte?`,
-          campo_afectado: `fevRips.servicios.procedimientos[${i}].codigoProcedimiento`,
+          mensaje: `Procedimiento[${i}] CUPS ${p.codProcedimiento} está incluido en un paquete/atención agrupada. ¿Se está facturando aparte?`,
+          campo_afectado: `fevRips.servicios.procedimientos[${i}].codProcedimiento`,
         });
       }
     }
@@ -1064,20 +1068,20 @@ export class ValidadorPreRadicacion {
     if (!this.ctx.acuerdo?.descuentos) return;
     const descuentos = this.ctx.acuerdo.descuentos;
     const tarifas = this.ctx.acuerdo.tarifas ?? {};
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     for (let i = 0; i < (servicios.procedimientos?.length ?? 0); i++) {
       const p = servicios.procedimientos![i]!;
-      const desc = descuentos[p.codigoProcedimiento];
-      const base = tarifas[p.codigoProcedimiento];
+      const desc = descuentos[p.codProcedimiento];
+      const base = tarifas[p.codProcedimiento];
       if (desc !== undefined && base !== undefined) {
         const esperado = Math.round(base * (1 - desc / 100));
         if (p.vrServicio > esperado) {
           this.emit({
             codigo_causal: "FA1905",
             severidad: "advertencia",
-            mensaje: `Procedimiento[${i}] CUPS ${p.codigoProcedimiento}: descuento pactado ${desc}% no aplicado. ` +
+            mensaje: `Procedimiento[${i}] CUPS ${p.codProcedimiento}: descuento pactado ${desc}% no aplicado. ` +
               `Valor facturado: $${p.vrServicio.toLocaleString()}, esperado con descuento: $${esperado.toLocaleString()}.`,
             campo_afectado: `fevRips.servicios.procedimientos[${i}].vrServicio`,
             valor_encontrado: String(p.vrServicio),
@@ -1123,6 +1127,40 @@ export class ValidadorPreRadicacion {
       });
     }
 
+    // Cruce tipo_usuario ↔ tipo_afiliado (coherencia)
+    if (df.paciente?.tipo_afiliado && df.tipo_usuario) {
+      const mapTipoUsuarioAfiliado: Record<string, string[]> = {
+        "01": ["cotizante", "beneficiario"],       // Contributivo
+        "02": ["subsidiado"],                       // Subsidiado
+        "04": [],                                    // Particular: no requiere afiliado
+      };
+      const esperados = mapTipoUsuarioAfiliado[df.tipo_usuario];
+      if (esperados && esperados.length > 0 && !esperados.includes(df.paciente.tipo_afiliado.toLowerCase())) {
+        this.emit({
+          codigo_causal: "DE1602",
+          severidad: "advertencia",
+          mensaje: `Incoherencia: tipo_usuario=${df.tipo_usuario} (${df.tipo_usuario === "01" ? "contributivo" : "subsidiado"}) pero tipo_afiliado='${df.paciente.tipo_afiliado}'.`,
+          campo_afectado: "datosFactura.paciente.tipo_afiliado",
+          valor_encontrado: df.paciente.tipo_afiliado,
+          valor_esperado: esperados.join(" | "),
+          como_resolver: "Verifique que el tipo de usuario y el tipo de afiliación sean coherentes.",
+          norma_legal: "Res. 2284/2023, Anexo Técnico 3, DE16.",
+        });
+      }
+    }
+
+    // Validar eps_codigo presente si paciente no es particular (tipo_usuario ≠ "04")
+    if (df.tipo_usuario && df.tipo_usuario !== "04" && !df.eps_codigo) {
+      this.emit({
+        codigo_causal: "DE1603",
+        severidad: "advertencia",
+        mensaje: "El paciente no es particular pero no tiene código EPS asignado. Verifique la información de aseguramiento.",
+        campo_afectado: "datosFactura.eps_codigo",
+        como_resolver: "Ingrese el código de la EPS responsable del pago o cambie el tipo de usuario a '04 - Particular'.",
+        norma_legal: "Res. 2284/2023, Anexo Técnico 3, DE16. Dcto 780/2016.",
+      });
+    }
+
     // TODO: En producción, consultar API ADRES/BDUA para verificar:
     //  - Paciente afiliado a la EPS de destino
     //  - Estado de afiliación activo
@@ -1138,7 +1176,7 @@ export class ValidadorPreRadicacion {
    * Verifica que cada procedimiento tenga un diagnóstico relacionado válido.
    */
   private validarCoherenciaDiagnosticoProcedimiento(): void {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios) return;
 
     const diagnosticosConsultas = new Set(
@@ -1153,7 +1191,7 @@ export class ValidadorPreRadicacion {
         this.emit({
           codigo_causal: "PE0101",
           severidad: "info",
-          mensaje: `Procedimiento[${i}] CUPS ${p.codigoProcedimiento}: su diagnóstico CIE-10 (${p.codDiagnosticoPrincipal}) no aparece en ninguna consulta de esta factura. Verificar pertinencia.`,
+          mensaje: `Procedimiento[${i}] CUPS ${p.codProcedimiento}: su diagnóstico CIE-10 (${p.codDiagnosticoPrincipal}) no aparece en ninguna consulta de esta factura. Verificar pertinencia.`,
           campo_afectado: `fevRips.servicios.procedimientos[${i}].codDiagnosticoPrincipal`,
           como_resolver: "Verifique que el diagnóstico del procedimiento es coherente con la consulta asociada.",
           norma_legal: "Res. 2284/2023, Anexo Técnico 3, concepto PE01 — Pertinencia.",
@@ -1268,7 +1306,7 @@ export class ValidadorPreRadicacion {
     if (!reglas || reglas.length === 0) return;
 
     const df = this.ctx.datosFactura;
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios && !df) return;
 
     for (const regla of reglas) {
@@ -1282,7 +1320,7 @@ export class ValidadorPreRadicacion {
       ].filter(Boolean);
 
       const procedimientos = [
-        ...(servicios?.procedimientos ?? []).map((p: ProcedimientoRips) => p.codigoProcedimiento),
+        ...(servicios?.procedimientos ?? []).map((p: ProcedimientoRips) => p.codProcedimiento),
         ...(df?.servicios ?? []).map((s) => s.cups_codigo),
       ].filter(Boolean);
 
@@ -1341,7 +1379,7 @@ export class ValidadorPreRadicacion {
    * Alerta si urgencias tienen estancia > 72h (informativo).
    */
   private validarPertinenciaEstancia(): void {
-    const servicios = this.ctx.fevRips.servicios;
+    const servicios = this.serviciosRips;
     if (!servicios?.urgencias) return;
 
     for (let i = 0; i < servicios.urgencias.length; i++) {
@@ -1360,6 +1398,126 @@ export class ValidadorPreRadicacion {
             valor_esperado: "≤ 72h (referencial)",
           });
         }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // FA23 — TOTAL FACTURA ≠ SUMA SERVICIOS
+  // -------------------------------------------------------------------
+  private validarTotalesFactura(): void {
+    const servicios = this.ctx.datosFactura?.servicios;
+    if (!servicios || servicios.length === 0) return;
+
+    const sumaServicios = servicios.reduce((acc, s) => acc + (s.valor_total || 0), 0);
+
+    // Validar contra subtotal (campo explícito de la factura, no valor_total genérico)
+    const factura = this.ctx.factura as unknown as Record<string, unknown>;
+    const subtotal = factura.subtotal as number | undefined;
+    if (subtotal != null && Math.abs(subtotal - sumaServicios) > 1) {
+      this.emit({
+        codigo_causal: "FA2301",
+        severidad: "error",
+        mensaje: `Subtotal de factura ($${subtotal.toLocaleString()}) no coincide con la suma de servicios ($${sumaServicios.toLocaleString()})`,
+        campo_afectado: "subtotal",
+        valor_encontrado: String(subtotal),
+        valor_esperado: String(sumaServicios),
+        como_resolver: "Verifique que el total de la factura sea exactamente la suma de todos los servicios facturados.",
+        norma_legal: "Res. 2284/2023, Causal FA23",
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // FA03 — ERROR ARITMÉTICO (cantidad × valor_unitario ≠ valor_total)
+  // -------------------------------------------------------------------
+  private validarAritmeticaServicios(): void {
+    const servicios = this.ctx.datosFactura?.servicios;
+    if (!servicios) return;
+
+    for (const s of servicios) {
+      if (s.cantidad && s.valor_unitario && s.valor_total) {
+        const calculado = s.cantidad * s.valor_unitario;
+        if (Math.abs(calculado - s.valor_total) > 1) {
+          this.emit({
+            codigo_causal: "FA0301",
+            severidad: "error",
+            mensaje: `Error aritmético en ${s.cups_codigo}: ${s.cantidad} × $${s.valor_unitario.toLocaleString()} = $${calculado.toLocaleString()}, pero se factura $${s.valor_total.toLocaleString()}`,
+            campo_afectado: "valor_total",
+            valor_encontrado: String(s.valor_total),
+            valor_esperado: String(calculado),
+            servicio_afectado: s.cups_codigo,
+            como_resolver: "Corrija el cálculo: valor_total debe ser igual a cantidad × valor_unitario.",
+            norma_legal: "Res. 2284/2023, Causal FA03",
+          });
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // FA54/DE54 — FORMATO NÚMERO DE FACTURA (DIAN)
+  // -------------------------------------------------------------------
+  private validarFormatoNumeroFactura(): void {
+    const numFactura = this.ctx.factura.num_factura;
+    if (!numFactura) {
+      this.emit({
+        codigo_causal: "DE5401",
+        severidad: "error",
+        mensaje: "Factura sin número de factura asignado",
+        campo_afectado: "num_factura",
+        como_resolver: "Asigne un número de factura válido desde la resolución DIAN configurada en el onboarding.",
+        norma_legal: "Res. 2284/2023, Causal DE54 / Estatuto Tributario Art. 617",
+      });
+      return;
+    }
+
+    // Formato esperado: prefijo alfanumérico + consecutivo numérico (ej: SETP1, MDB123)
+    // No debe ser el placeholder MDB-timestamp
+    if (/^MDB-\d{13,}$/.test(numFactura)) {
+      this.emit({
+        codigo_causal: "FA5401",
+        severidad: "advertencia",
+        mensaje: `Número de factura "${numFactura}" parece ser un placeholder temporal, no un consecutivo DIAN válido`,
+        campo_afectado: "num_factura",
+        valor_encontrado: numFactura,
+        como_resolver: "Configure la resolución de facturación DIAN en Configuración > Resolución para generar números válidos.",
+        norma_legal: "Res. 2284/2023, Causal FA54 / Estatuto Tributario Art. 617",
+      });
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // PE0201 — FRECUENCIA DE PROCEDIMIENTOS (mismo CUPS repetido muchas veces)
+  // -------------------------------------------------------------------
+  private validarFrecuenciaProcedimientos(): void {
+    const servicios = this.ctx.datosFactura?.servicios;
+    if (!servicios) return;
+
+    // Contar frecuencia de cada CUPS
+    const frecuencia: Record<string, { count: number; desc: string }> = {};
+    for (const s of servicios) {
+      if (!s.cups_codigo) continue;
+      if (!frecuencia[s.cups_codigo]) {
+        frecuencia[s.cups_codigo] = { count: 0, desc: s.descripcion };
+      }
+      frecuencia[s.cups_codigo]!.count += s.cantidad || 1;
+    }
+
+    // Alertar si un procedimiento aparece más de 3 veces en la misma factura
+    for (const [cups, info] of Object.entries(frecuencia)) {
+      if (info.count > 3) {
+        this.emit({
+          codigo_causal: "PE0201",
+          severidad: "advertencia",
+          mensaje: `Procedimiento ${cups} (${info.desc}) aparece ${info.count} veces — posible pertinencia cuestionable`,
+          campo_afectado: "cantidad",
+          valor_encontrado: String(info.count),
+          valor_esperado: "≤ 3",
+          servicio_afectado: cups,
+          como_resolver: "Verifique que la frecuencia del procedimiento está médicamente justificada. Incluya soporte clínico.",
+          norma_legal: "Res. 2284/2023, Causal PE02",
+        });
       }
     }
   }

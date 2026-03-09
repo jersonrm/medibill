@@ -29,7 +29,7 @@ async function buscarEnCupsAlias(
     if (error || !data || data.length === 0) return [];
 
     // Obtener descripciones completas de cups_maestro para los códigos encontrados
-    const codigos = [...new Set(data.map((r: any) => r.cups_codigo))];
+    const codigos = [...new Set(data.map((r: { cups_codigo: string }) => r.cups_codigo))];
     const { data: maestroData, error: maestroError } = await supabase
       .from("cups_maestro")
       .select("codigo, descripcion, seccion, seccion_nombre")
@@ -38,7 +38,7 @@ async function buscarEnCupsAlias(
 
     if (maestroError || !maestroData) return [];
 
-    const maestroMap = new Map<string, any>();
+    const maestroMap = new Map<string, { codigo: string; descripcion: string; seccion: string; seccion_nombre: string }>();
     for (const m of maestroData) {
       maestroMap.set(m.codigo, m);
     }
@@ -46,8 +46,8 @@ async function buscarEnCupsAlias(
     // Calcular relevancia básica: coincidencia más exacta = mayor score
     const termNorm = termino.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return data
-      .filter((r: any) => maestroMap.has(r.cups_codigo))
-      .map((r: any) => {
+      .filter((r: { cups_codigo: string; alias: string }) => maestroMap.has(r.cups_codigo))
+      .map((r: { cups_codigo: string; alias: string }) => {
         const m = maestroMap.get(r.cups_codigo)!;
         const aliasNorm = (r.alias as string).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         // Score: 1.0 si exacto, menor según diferencia de longitud
@@ -147,12 +147,12 @@ export async function buscarCupsHibrido(
     return buscarCupsPorTexto(termino, limite);
   }
 
-  const resultadosMaestro = (data ?? []).map((r: any) => ({
-    codigo: r.codigo,
-    descripcion: r.descripcion,
-    seccion: r.seccion,
-    seccion_nombre: r.seccion_nombre,
-    relevancia: r.relevancia_hibrida ?? r.relevancia ?? 0,
+  const resultadosMaestro = (data ?? []).map((r: Record<string, unknown>) => ({
+    codigo: r.codigo as string,
+    descripcion: r.descripcion as string,
+    seccion: r.seccion as string,
+    seccion_nombre: r.seccion_nombre as string,
+    relevancia: (r.relevancia_hibrida ?? r.relevancia ?? 0) as number,
   })) as CupsResultado[];
 
   // Complementar con búsqueda en cups_alias

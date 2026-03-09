@@ -1,35 +1,31 @@
-import { helperAI } from "@/lib/gemini";
+import { getHelperAI } from "@/lib/gemini";
 import { buscarCupsPorTexto, buscarCupsPorCodigo } from "@/lib/cups-service";
 import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
+import { createRateLimiter } from "@/lib/rate-limit";
+import { logAudit } from "@/lib/logger";
 
-// --- Rate limiter in-memory ---
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 60_000;
+// --- Filtro de prompt injection (defensa en profundidad) ---
+const INJECTION_PATTERNS = [
+  /ignore\s+(all\s+)?previous/i,
+  /ignora\s+(todas?\s+)?(las\s+)?instrucciones/i,
+  /olvida\s+todo/i,
+  /system\s*:/i,
+  /devuelve.*api.?key/i,
+  /act\s+as/i,
+  /you\s+are\s+now/i,
+  /forget\s+(your\s+)?instructions/i,
+  /nuevo\s+rol/i,
+  /\bDAN\b/,
+  /do\s+anything\s+now/i,
+];
 
-function isRateLimited(userId: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(userId);
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-
-  entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
+function esPromptInjection(prompt: string): boolean {
+  return INJECTION_PATTERNS.some((pattern) => pattern.test(prompt));
 }
 
-if (typeof globalThis !== "undefined") {
-  const CLEANUP_INTERVAL = 5 * 60_000;
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, val] of rateLimitMap) {
-      if (now > val.resetAt) rateLimitMap.delete(key);
-    }
-  }, CLEANUP_INTERVAL).unref?.();
-}
+// --- Rate limiter: 10 requests/min por usuario ---
+const limiter = createRateLimiter({ max: 10, windowMs: 60_000 });
 
 // --- Estrategia 1: Búsqueda directa en DB (sin IA, sin costo) ---
 async function busquedaDirecta(prompt: string) {
@@ -63,18 +59,9 @@ async function busquedaDirecta(prompt: string) {
 
 // --- Estrategia 2: IA extrae términos médicos → busca en DB ---
 async function busquedaConIA(prompt: string) {
-  const result = await helperAI.generateContent(
-    `Del siguiente texto médico colombiano, extrae los términos clave de procedimientos, exámenes de laboratorio o servicios de salud.
-Descompón términos compuestos en variantes de búsqueda. Por ejemplo:
-- "hemograma completo" → ["hemograma", "hemograma completo"]
-- "radiografía de tórax" → ["radiografia torax", "radiografia", "torax"]
-- "consulta medicina general" → ["consulta medicina general", "consulta general"]
-
-Responde ÚNICAMENTE con JSON válido: {"terminos": ["término 1", "término 2", "término 3"]}
-No inventes códigos CUPS. Solo extrae términos de búsqueda.
-
-Texto: "${prompt}"`
-  );
+  const result = await getHelperAI().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+  });
 
   const response = result.response;
   const text = response
@@ -97,11 +84,14 @@ Texto: "${prompt}"`
   }
 
   // Buscar cada término en la DB y acumular resultados únicos
-  const todasLasOpciones: { codigo: string; desc: string }[] = [];
   const codigosVistos = new Set<string>();
 
-  for (const termino of terminos.slice(0, 5)) {
-    const resultados = await buscarCupsPorTexto(termino, 5);
+  const resultadosPorTermino = await Promise.all(
+    terminos.slice(0, 5).map((termino) => buscarCupsPorTexto(termino, 5))
+  );
+
+  const todasLasOpciones: { codigo: string; desc: string }[] = [];
+  for (const resultados of resultadosPorTermino) {
     for (const r of resultados) {
       if (!codigosVistos.has(r.codigo)) {
         codigosVistos.add(r.codigo);
@@ -129,7 +119,8 @@ export async function POST(req: Request) {
     }
 
     // --- Rate limiting ---
-    if (isRateLimited(user.id)) {
+    if (await limiter.isLimited(user.id, supabase)) {
+      logAudit(supabase, { action: "rate_limit_exceeded", user_id: user.id, metadata: { route: "ai-helper" } });
       return NextResponse.json(
         { error: "Demasiadas solicitudes. Intenta en un momento." },
         { status: 429 }
@@ -144,6 +135,14 @@ export async function POST(req: Request) {
     if (!prompt || prompt.length > 500) {
       return NextResponse.json(
         { error: "Prompt inválido (máx. 500 caracteres)" },
+        { status: 400 }
+      );
+    }
+
+    // --- Filtro de prompt injection ---
+    if (esPromptInjection(prompt)) {
+      return NextResponse.json(
+        { error: "Prompt no permitido" },
         { status: 400 }
       );
     }
@@ -163,7 +162,8 @@ export async function POST(req: Request) {
       opciones: conIA.opciones,
       fuente: conIA.fuente,
     });
-  } catch {
+  } catch (e) {
+    devError("ai-helper", e);
     return NextResponse.json({ opciones: [], fuente: "error" }, { status: 500 });
   }
 }

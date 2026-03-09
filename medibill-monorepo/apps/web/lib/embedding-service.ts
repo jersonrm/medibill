@@ -1,7 +1,4 @@
 const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-if (!apiKey) {
-  throw new Error("GOOGLE_GENERATIVE_AI_API_KEY no está configurada");
-}
 
 import { createClient } from "@/lib/supabase-server";
 
@@ -42,6 +39,9 @@ export async function generarEmbedding(
   texto: string,
   taskType: TaskType = TaskType.RETRIEVAL_QUERY
 ): Promise<number[]> {
+  if (!apiKey) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY no está configurada");
+  }
   const textoNorm = texto.toLowerCase().trim();
   const cacheKey = `${taskType}:${textoNorm}`;
 
@@ -49,11 +49,11 @@ export async function generarEmbedding(
   const cached = embeddingCache.get(cacheKey);
   if (cached) return cached;
 
-  const url = `${GEMINI_BASE_URL}/models/${EMBEDDING_MODEL}:embedContent?key=${apiKey}`;
+  const url = `${GEMINI_BASE_URL}/models/${EMBEDDING_MODEL}:embedContent`;
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       model: `models/${EMBEDDING_MODEL}`,
       content: { parts: [{ text: textoNorm }] },
@@ -91,11 +91,14 @@ export async function generarEmbeddingsBatch(
   textos: string[],
   taskType: TaskType = TaskType.RETRIEVAL_DOCUMENT
 ): Promise<number[][]> {
-  const url = `${GEMINI_BASE_URL}/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`;
+  if (!apiKey) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY no está configurada");
+  }
+  const url = `${GEMINI_BASE_URL}/models/${EMBEDDING_MODEL}:batchEmbedContents`;
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       requests: textos.map((text) => ({
         model: `models/${EMBEDDING_MODEL}`,
@@ -165,7 +168,7 @@ export async function searchByText(
   }
 
   // 3. Devolver resultados (ya vienen ordenados por similitud desde la función SQL)
-  return (data ?? []).map((r: any) => ({
+  return (data ?? []).map((r: Record<string, unknown>) => ({
     codigo: String(r.codigo),
     descripcion: String(r.descripcion),
     similitud: Number(r.similitud),

@@ -1,6 +1,7 @@
 import { buscarCupsPorTexto, buscarCupsHibrido, type CupsResultado } from "@/lib/cups-service";
 import { buscarCie10PorTexto, buscarCie10Hibrido, type Cie10Resultado } from "@/lib/cie10-service";
 import { generarEmbedding, searchByText } from "@/lib/embedding-service";
+import { devWarn } from "@/lib/logger";
 
 // Flag para habilitar búsqueda híbrida (activar después de correr generar-embeddings.ts)
 const USAR_BUSQUEDA_HIBRIDA = process.env.ENABLE_HYBRID_SEARCH === "true";
@@ -13,15 +14,17 @@ export interface ContextoRAG {
   candidatosCups: { codigo: string; descripcion: string; contexto_jerarquico?: string | null }[];
   candidatosCie10: { codigo: string; descripcion: string }[];
   procedimientosNegados: string[];
+  procedimientosFuturos: string[];
 }
 
 /** Categoría asignada por ragExtractorAI a cada término de procedimiento */
-export type CategoriaTermino = "laboratorio" | "imagen" | "cirugia_piel" | "inmovilizacion" | "inyeccion" | "otro";
+export type CategoriaTermino = "laboratorio" | "imagen" | "cirugia_piel" | "inmovilizacion" | "inyeccion" | "odontologia" | "otro";
 
 export interface TerminoProcedimiento {
   termino: string;
   categoria: CategoriaTermino;
   negado?: boolean;
+  futuro?: boolean;
 }
 
 const MAX_CANDIDATOS = 20;
@@ -37,8 +40,7 @@ const PALABRAS_JERARQUIA_POR_CATEGORIA: Record<CategoriaTermino, RegExp | null> 
   imagen:         /im[aá]gen|radiolog[ií]a|diagn[oó]stic|radiograf[ií]a|ecograf[ií]a|tomograf[ií]a|resonancia/i,
   cirugia_piel:   /piel|tejido|subcutáneo|subcutaneo|mama|excisi[oó]n|sutura|desbridamiento/i,
   inmovilizacion: /rehabilitaci[oó]n|inmoviliz|f[eé]rula|yeso|vendaje|ort[eé]sis/i,
-  inyeccion:      /inyecci[oó]n|vacuna|inmunizaci[oó]n|infusi[oó]n|toxoide|inmunoglobulina/i,
-  otro:           null,
+  inyeccion:      /inyecci[oó]n|vacuna|inmunizaci[oó]n|infusi[oó]n|toxoide|inmunoglobulina/i,  odontologia:    /dental|diente|molar|pulp|endodon|periodon|encia|gingiv|oral|odontolog/i,  otro:           null,
 };
 
 /**
@@ -96,6 +98,7 @@ const PREFIJOS_POR_CATEGORIA: Record<CategoriaTermino, string[]> = {
   cirugia_piel:   ["86", "85"],               // 86xxxx: piel/tejido subcutáneo, 85xxxx: mama
   inmovilizacion: ["93"],                     // 93xxxx: rehabilitación, inmovilizaciones, yesos
   inyeccion:      ["99"],                     // 99xxxx: inyecciones, vacunas, infusiones
+  odontologia:    ["23","24","25","26","27","28","29"], // 23xxxx-29xxxx: odontología
   otro:           [],                         // Sin filtro — acepta cualquier prefijo
 };
 
@@ -227,16 +230,21 @@ export async function buscarContextoRAG(
   terminosProcedimientos: TerminoProcedimiento[],
   terminosDiagnosticos: string[]
 ): Promise<ContextoRAG> {
-  // Separar términos negados de los positivos
-  const terminosPositivos = terminosProcedimientos.filter(t => !t.negado);
+  // Separar términos negados y futuros de los realizados
+  const terminosPositivos = terminosProcedimientos.filter(t => !t.negado && !t.futuro);
   const terminosNegados = terminosProcedimientos.filter(t => t.negado);
+  const terminosFuturos = terminosProcedimientos.filter(t => t.futuro && !t.negado);
   const procedimientosNegados = terminosNegados.map(t => t.termino);
+  const procedimientosFuturos = terminosFuturos.map(t => t.termino);
 
   if (terminosNegados.length > 0) {
     console.log(`🚫 RAG — Procedimientos NEGADOS detectados: ${procedimientosNegados.join(", ")}`);
   }
+  if (terminosFuturos.length > 0) {
+    console.log(`🕐 RAG — Procedimientos FUTUROS detectados (no facturar): ${procedimientosFuturos.join(", ")}`);
+  }
 
-  // Lanzar todas las búsquedas en paralelo (SOLO términos positivos)
+  // Lanzar todas las búsquedas en paralelo (SOLO términos realizados)
   const [resultadosCups, resultadosCie10] = await Promise.all([
     Promise.all(
       terminosPositivos.map(async ({ termino, categoria }) => {
@@ -246,7 +254,8 @@ export async function buscarContextoRAG(
           try {
             const embedding = await generarEmbedding(termino);
             resultadosBrutos = await buscarCupsHibrido(termino, embedding, RESULTADOS_POR_TERMINO);
-          } catch {
+          } catch (e) {
+            devWarn(`Embedding fallback CUPS para "${termino}":`, e);
             resultadosBrutos = await buscarCupsPorTexto(termino, RESULTADOS_POR_TERMINO);
           }
         } else {
@@ -271,7 +280,7 @@ export async function buscarContextoRAG(
               }
             }
           } catch (e) {
-            console.warn(`⚠️  Búsqueda semántica CUPS para "${termino}" falló:`, e);
+            devWarn(`Búsqueda semántica CUPS para "${termino}" falló:`, e);
           }
         }
         
@@ -306,7 +315,8 @@ export async function buscarContextoRAG(
           try {
             const embedding = await generarEmbedding(t);
             resultadosBrutos = await buscarCie10Hibrido(t, embedding, RESULTADOS_POR_TERMINO);
-          } catch {
+          } catch (e) {
+            devWarn(`Embedding fallback CIE-10 para "${t}":`, e);
             resultadosBrutos = await buscarCie10PorTexto(t, RESULTADOS_POR_TERMINO);
           }
         } else {
@@ -332,7 +342,7 @@ export async function buscarContextoRAG(
               }
             }
           } catch (e) {
-            console.warn(`⚠️  Búsqueda semántica CIE-10 para "${t}" falló:`, e);
+            devWarn(`Búsqueda semántica CIE-10 para "${t}" falló:`, e);
           }
         }
 
@@ -379,7 +389,7 @@ export async function buscarContextoRAG(
     .slice(0, MAX_CANDIDATOS)
     .map(({ codigo, descripcion }) => ({ codigo, descripcion }));
 
-  return { candidatosCups, candidatosCie10, procedimientosNegados };
+  return { candidatosCups, candidatosCie10, procedimientosNegados, procedimientosFuturos };
 }
 
 /**
@@ -434,6 +444,10 @@ export function formatearCandidatosParaPrompt(contexto: ContextoRAG): string {
     ? `\n\n⛔ PROCEDIMIENTOS NEGADOS (NO generar CUPS para estos):\n${contexto.procedimientosNegados.map(t => `  ❌ ${t}`).join("\n")}\n  La nota clínica indica EXPLÍCITAMENTE que estos procedimientos NO se realizaron.\n  NO incluyas NINGÚN código CUPS relacionado con estos procedimientos.`
     : "";
 
+  const futurosSection = contexto.procedimientosFuturos.length > 0
+    ? `\n\n🕐 PROCEDIMIENTOS FUTUROS/PROGRAMADOS (NO facturar en esta atención):\n${contexto.procedimientosFuturos.map(t => `  ⏳ ${t}`).join("\n")}\n  Estos procedimientos fueron ORDENADOS o PROGRAMADOS pero NO realizados en este encuentro.\n  NO incluyas NINGÚN código CUPS para estos — se facturarán cuando se realicen.`
+    : "";
+
   return `
 ═══════════════════════════════════════════════════
 CÓDIGOS CANDIDATOS OFICIALES (BASE DE DATOS)
@@ -453,5 +467,5 @@ CUPS (Procedimientos):
 ${cupsLines}
 CIE-10 (Diagnósticos):
 ${cie10Lines || "  (sin candidatos)"}
-═══════════════════════════════════════════════════${negadosSection}`;
+═══════════════════════════════════════════════════${negadosSection}${futurosSection}`;
 }

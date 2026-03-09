@@ -1,6 +1,7 @@
 import React from "react";
 import "./globals.css";
 import type { Metadata } from "next";
+import LayoutShell from "@/components/LayoutShell";
 
 export const metadata: Metadata = {
   title: "Medibill | IA Clínica",
@@ -11,10 +12,12 @@ export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}): React.JSX.Element { // <-- Aquí está la magia que silencia el error
+}): React.JSX.Element {
   return (
     <html lang="es">
-      <body className="bg-slate-50 antialiased">{children}</body>
+      <body className="bg-slate-50 antialiased">
+        <LayoutShell>{children}</LayoutShell>
+      </body>
     </html>
   );
 }

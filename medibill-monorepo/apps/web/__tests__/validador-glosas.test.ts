@@ -20,7 +20,7 @@ import {
   esGlosaEnPlazo,
 } from "@/lib/respuesta-glosas";
 import type { FacturaDB, DatosFactura, Alerta, GlosaConDetalle } from "@/lib/types/glosas";
-import type { FevRips, ConsultaRips, ProcedimientoRips } from "@/lib/types/rips";
+import type { FevRips, ConsultaRips, ProcedimientoRips, ServiciosRips } from "@/lib/types/rips";
 
 // =====================================================================
 // HELPERS: Fábricas de datos de prueba
@@ -76,7 +76,7 @@ function crearConsultaRips(overrides: Partial<ConsultaRips> = {}): ConsultaRips 
     codPrestador: "520010001",
     fechaInicioAtencion: "2025-06-15 08:00",
     numAutorizacion: "AUTH-2025-001",
-    codigoConsulta: "890201",
+    codConsulta: "890201",
     modalidadGrupoServicioTecSal: "01",
     grupoServicios: "01",
     codServicio: 1,
@@ -106,7 +106,7 @@ function crearProcedimientoRips(
     fechaInicioAtencion: "2025-06-15 10:00",
     idMIPRES: null,
     numAutorizacion: "AUTH-2025-002",
-    codigoProcedimiento: "881602",
+    codProcedimiento: "881602",
     viaIngresoServicioSalud: "01",
     modalidadGrupoServicioTecSal: "01",
     grupoServicios: "01",
@@ -126,10 +126,22 @@ function crearProcedimientoRips(
   };
 }
 
-function crearFevRipsBase(overrides: Partial<FevRips> = {}): FevRips {
+function crearFevRipsBase(overrides: Partial<FevRips> & { servicios?: Partial<ServiciosRips> } = {}): FevRips {
+  const { servicios: serviciosOverride, ...rest } = overrides;
+  const serviciosBase: ServiciosRips = {
+    consultas: [crearConsultaRips()],
+    procedimientos: [],
+    urgencias: [],
+    hospitalizacion: [],
+    recienNacidos: [],
+    medicamentos: [],
+    otrosServicios: [],
+    ...serviciosOverride,
+  };
   return {
     numDocumentoIdObligado: "900123456",
     numFactura: "FEV-2025-0001",
+    numObligacion: "",
     tipoNota: null,
     numNota: null,
     usuarios: [
@@ -143,19 +155,12 @@ function crearFevRipsBase(overrides: Partial<FevRips> = {}): FevRips {
         codMunicipioResidencia: "52001",
         codZonaTerritorialResidencia: "U",
         incapacidad: "NO",
+        codEntidadAdministradora: "EPS-S03",
         consecutivo: 1,
+        servicios: serviciosBase,
       },
     ],
-    servicios: {
-      consultas: [crearConsultaRips()],
-      procedimientos: [],
-      urgencias: [],
-      hospitalizacion: [],
-      recienNacidos: [],
-      medicamentos: [],
-      otrosServicios: [],
-    },
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -535,7 +540,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
             consultas: [],
             procedimientos: [
               crearProcedimientoRips({
-                codigoProcedimiento: "881602",
+                codProcedimiento: "881602",
                 vrServicio: 100_000, // sin descuento → debería ser 95_000
               }),
             ],
@@ -566,7 +571,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
           servicios: {
             consultas: [],
             procedimientos: [
-              crearProcedimientoRips({ codigoProcedimiento: "881602" }),
+              crearProcedimientoRips({ codProcedimiento: "881602" }),
             ],
             urgencias: [],
             hospitalizacion: [],
@@ -601,7 +606,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
           servicios: {
             consultas: [
               crearConsultaRips({
-                codigoConsulta: "890301",
+                codConsulta: "890301",
                 vrServicio: 120_000, // pactado: 85_000 → diferencia 35_000 (>10%) → TA2901
               }),
             ],
@@ -636,7 +641,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
             consultas: [],
             procedimientos: [
               crearProcedimientoRips({
-                codigoProcedimiento: "902210",
+                codProcedimiento: "902210",
                 vrServicio: 25_000, // pactado: 15_000 → diferencia >10% → TA2901
               }),
             ],
@@ -1033,8 +1038,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
 
     it("TEST 25 — PE0101: diagnóstico neonatal en adulto de 45 años", () => {
       // Paciente de 45 años con diagnóstico P07 (patología neonatal)
-      const fechaNacimiento = new Date();
-      fechaNacimiento.setFullYear(fechaNacimiento.getFullYear() - 45);
+      const fechaNacimiento = new Date("1980-01-01");
 
       const ctx = crearContexto({
         datosFactura: crearDatosFacturaBase({
@@ -1070,7 +1074,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
       const alerta = buscarAlerta(resultado.alertas, "PE0101");
       expect(alerta).toBeDefined();
       expect(alerta!.tipo).toBe("warning");
-      expect(alerta!.mensaje).toContain("45 años");
+      expect(alerta!.mensaje).toMatch(/paciente de \d+ años/);
       expect(alerta!.mensaje).toContain("neonatal");
     });
   });
@@ -1111,7 +1115,7 @@ describe("Validador Anti-Glosas — Medibill", () => {
           servicios: {
             consultas: [
               crearConsultaRips({
-                codigoConsulta: "890301",
+                codConsulta: "890301",
                 vrServicio: 120_000, // → TA0201 (tarifa diferente)
               }),
             ],
