@@ -250,6 +250,7 @@ export interface DatosFactura {
   copago_calculado?: number;
   es_urgencia: boolean;
   tiene_contrato: boolean;
+  tipo_usuario?: string;
 }
 
 // =====================================================================

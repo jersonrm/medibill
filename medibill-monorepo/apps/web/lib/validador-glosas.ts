@@ -1652,6 +1652,7 @@ export function validarFactura(input: ValidarFacturaInput): ResultadoValidacion 
       copago_calculado: meta.copago_calculado as number | undefined,
       es_urgencia: (meta.es_urgencia as boolean) ?? false,
       tiene_contrato: (meta.tiene_contrato as boolean) ?? !!acuerdo,
+      tipo_usuario: (meta.tipo_usuario as string | undefined) ?? (meta.paciente as Record<string, unknown> | undefined)?.tipo_usuario as string | undefined,
     };
   }
 
