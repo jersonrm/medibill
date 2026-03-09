@@ -63,10 +63,12 @@ export async function guardarPerfil(
         datos.tipo_prestador === "profesional_independiente"
           ? "independiente"
           : "clinica";
-      await crearOrganizacion(
-        datos.razon_social || datos.nombre_comercial || "Mi organización",
-        tipoOrg as "independiente" | "clinica"
-      );
+      await crearOrganizacion({
+        nombre: datos.razon_social || datos.nombre_comercial || "Mi organización",
+        tipo: tipoOrg as "independiente" | "clinica",
+        emailBilling: user.email || "",
+        userId: user.id,
+      });
     }
   }
 
