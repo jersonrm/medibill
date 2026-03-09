@@ -3,7 +3,7 @@ import { buscarCupsPorTexto, buscarCupsPorCodigo } from "@/lib/cups-service";
 import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { logAudit } from "@/lib/logger";
+import { logAudit, devError } from "@/lib/logger";
 
 // --- Filtro de prompt injection (defensa en profundidad) ---
 const INJECTION_PATTERNS = [
