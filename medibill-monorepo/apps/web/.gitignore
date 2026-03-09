@@ -35,5 +35,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# datos de importación (Excel CUPS)
-/data/
+# datos de importación (Excel CUPS, archivos grandes)
+/data/*.xlsx
+/data/*.md
+/data/catalogo_glosas_medibill.json
