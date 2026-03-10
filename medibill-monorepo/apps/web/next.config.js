@@ -38,9 +38,9 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob:",
-              "font-src 'self'",
+              "font-src 'self' https://fonts.gstatic.com",
               `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL || ""} https://generativelanguage.googleapis.com https://*.ingest.us.sentry.io`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
