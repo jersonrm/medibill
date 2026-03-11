@@ -73,12 +73,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const supabase = createServiceClient();
-
     // ── Router de comandos ──
     if (text === "/start") {
       return await handleStart(chatId, telegramUserId);
     }
+
+    // Crear cliente Supabase solo cuando se necesite (lazy)
+    const supabase = createServiceClient();
 
     if (text.startsWith("/vincular")) {
       return await handleVincular(chatId, telegramUserId, telegramUsername, text, supabase);
