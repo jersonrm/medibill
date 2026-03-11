@@ -42,8 +42,8 @@ export async function middleware(request: NextRequest) {
   const isInvitacionPage = request.nextUrl.pathname.startsWith('/invitacion')
   const isAdminPage = request.nextUrl.pathname.startsWith('/admin')
 
-  // 4. REGLA A: Si NO hay usuario y quiere entrar a cualquier lado que no sea el login o invitación, lo pateamos al login.
-  if (!user && !isLoginPage && !isInvitacionPage) {
+  // 4. REGLA A: Si NO hay usuario y quiere entrar a cualquier lado que no sea el login, invitación o API, lo pateamos al login.
+  if (!user && !isLoginPage && !isInvitacionPage && !isApiRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
