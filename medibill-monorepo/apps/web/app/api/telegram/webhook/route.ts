@@ -39,11 +39,9 @@ function createServiceClient() {
 export async function POST(request: NextRequest) {
   try {
     const update: TelegramUpdate = await request.json();
-    console.log("Telegram webhook received:", JSON.stringify(update).slice(0, 200));
 
     // Validar que el bot token coincida (token secreto en la URL)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    console.log("Bot token present:", !!botToken);
     if (!botToken) {
       return NextResponse.json({ error: "Bot no configurado" }, { status: 500 });
     }
