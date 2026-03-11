@@ -1,33 +1,46 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { obtenerKPIsDashboard, obtenerFacturacionMensual, obtenerDistribucionEPS, obtenerItemsAtencion } from "@/app/actions/dashboard";
+import { obtenerAlertasCartera } from "@/app/actions/pagos";
+import type { AlertaCartera } from "@/app/actions/pagos";
 import { formatCOP } from "@/lib/formato";
 import type { KPIDashboard, FacturacionMensual, DistribucionEPS, ItemAtencion } from "@/lib/types/dashboard";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import BenchmarkPanel from "@/components/dashboard/BenchmarkPanel";
 
-const COLORS_PIE = ["#0353a4", "#006daa", "#b9d6f2", "#003559", "#061a40", "#4dabf7", "#1971c2"];
+const DashboardBarChart = dynamic(
+  () => import("@/components/dashboard/DashboardCharts").then((m) => ({ default: m.BarChartFacturacion })),
+  { ssr: false, loading: () => <div className="h-[250px] animate-pulse bg-medi-light/20 rounded-xl" /> },
+);
+const DashboardPieChart = dynamic(
+  () => import("@/components/dashboard/DashboardCharts").then((m) => ({ default: m.PieChartEPS })),
+  { ssr: false, loading: () => <div className="h-[180px] animate-pulse bg-medi-light/20 rounded-xl" /> },
+);
 
 export default function DashboardPage() {
   const [kpis, setKpis] = useState<KPIDashboard | null>(null);
   const [mensual, setMensual] = useState<FacturacionMensual[]>([]);
   const [eps, setEps] = useState<DistribucionEPS[]>([]);
   const [items, setItems] = useState<ItemAtencion[]>([]);
+  const [alertasCartera, setAlertasCartera] = useState<AlertaCartera[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     const load = async () => {
-      const [k, m, e, i] = await Promise.all([
+      const [k, m, e, i, ac] = await Promise.all([
         obtenerKPIsDashboard(),
         obtenerFacturacionMensual(),
         obtenerDistribucionEPS(),
         obtenerItemsAtencion(),
+        obtenerAlertasCartera(),
       ]);
       setKpis(k);
       setMensual(m);
       setEps(e);
       setItems(i);
+      setAlertasCartera(ac);
       setCargando(false);
     };
     load();
@@ -62,45 +75,50 @@ export default function DashboardPage() {
         {/* Facturación mensual */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-medi-light/50 p-6 shadow-sm">
           <h3 className="text-xs font-black text-medi-dark uppercase mb-4">Facturación Mensual</h3>
-          {mensual.length > 0 ? (
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mensual}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="mes_label" tick={{ fontSize: 11, fill: "#003559" }} />
-                <YAxis tick={{ fontSize: 10, fill: "#003559" }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value) => formatCOP(Number(value))} labelFormatter={(l) => `Mes: ${l}`} />
-                <Bar dataKey="valor_total" fill="#0353a4" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <p className="text-sm text-medi-dark/40 text-center py-12">Sin datos de facturación</p>}
+          <DashboardBarChart data={mensual} />
         </div>
 
         {/* Distribución EPS */}
         <div className="bg-white rounded-2xl border border-medi-light/50 p-6 shadow-sm">
           <h3 className="text-xs font-black text-medi-dark uppercase mb-4">Distribución por EPS</h3>
-          {eps.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={eps} dataKey="valor_total" nameKey="eps_nombre" cx="50%" cy="50%" outerRadius={70} innerRadius={40}>
-                    {eps.map((_, i) => <Cell key={i} fill={COLORS_PIE[i % COLORS_PIE.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCOP(Number(value))} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-1 mt-2">
-                {eps.map((e, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS_PIE[i % COLORS_PIE.length] }} />
-                    <span className="truncate flex-grow text-medi-deep">{e.eps_nombre}</span>
-                    <span className="font-bold text-medi-dark/60">{e.cantidad}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : <p className="text-sm text-medi-dark/40 text-center py-12">Sin datos</p>}
+          <DashboardPieChart data={eps} />
         </div>
       </div>
+
+      {/* Benchmarks — Inteligencia Colectiva */}
+      <BenchmarkPanel />
+
+      {/* Alertas de cartera con contexto EPS */}
+      {alertasCartera.length > 0 && (
+        <div className="bg-white rounded-2xl border border-medi-light/50 p-6 shadow-sm mb-8">
+          <h3 className="text-xs font-black text-medi-dark uppercase mb-4">💰 Alertas de Cartera</h3>
+          <div className="space-y-2">
+            {alertasCartera.slice(0, 10).map((alerta) => (
+              <Link
+                href={`/pagos?factura=${alerta.factura_id}`}
+                key={alerta.factura_id}
+                className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-colors hover:bg-medi-light/10 ${
+                  alerta.semaforo === "rojo"
+                    ? "border-red-200 bg-red-50/50"
+                    : "border-amber-200 bg-amber-50/50"
+                }`}
+              >
+                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                  alerta.semaforo === "rojo" ? "bg-red-500" : "bg-amber-500"
+                }`} />
+                <div className="flex-grow min-w-0">
+                  <span className="text-sm font-bold text-medi-deep">{alerta.num_factura}</span>
+                  <span className="ml-2 text-[10px] text-medi-dark/40">{alerta.eps_nombre}</span>
+                  <p className="text-xs text-medi-dark/60 truncate">{alerta.mensaje}</p>
+                </div>
+                <span className="text-xs font-bold text-medi-dark/40 flex-shrink-0">
+                  {alerta.dias_antiguedad}d
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Requiere atención */}
       <div className="bg-white rounded-2xl border border-medi-light/50 p-6 shadow-sm mb-8">

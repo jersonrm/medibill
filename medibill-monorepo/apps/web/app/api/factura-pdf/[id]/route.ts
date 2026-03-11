@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { createRateLimiter } from "@/lib/rate-limit";
 import { escapeHtml } from "@/lib/formato";
-import { logAudit } from "@/lib/logger";
+import { registrarAuditLog } from "@/lib/audit-log";
 
 const limiter = createRateLimiter({ max: 20, windowMs: 60_000 });
 
@@ -19,7 +19,7 @@ export async function GET(
   }
 
   if (await limiter.isLimited(user.id, supabase)) {
-    logAudit(supabase, { action: "rate_limit_exceeded", user_id: user.id, metadata: { route: "factura-pdf" } });
+    registrarAuditLog({ accion: "rate_limit_exceeded", tabla: "rate_limits", metadata: { route: "factura-pdf" } });
     return new NextResponse("Demasiadas solicitudes. Intenta en un momento.", { status: 429 });
   }
 

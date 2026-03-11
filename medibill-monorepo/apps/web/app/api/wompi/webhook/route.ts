@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { wompiProvider } from "@/lib/wompi";
+import { createServiceClient } from "@/lib/supabase-server";
 
 /**
  * POST /api/wompi/webhook
@@ -21,11 +21,7 @@ export async function POST(request: NextRequest) {
   const evento = wompiProvider.parsearEvento(body);
 
   // 3. Crear cliente Supabase con service role para operaciones admin
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  );
+  const supabase = createServiceClient();
 
   // 4. Procesar según tipo de evento
   switch (evento.tipo) {
@@ -38,6 +34,15 @@ export async function POST(request: NextRequest) {
 
       const orgId = parts[1];
       const periodo = parts.slice(2).join("_");
+
+      // Verificar si ya procesamos esta transacción (idempotencia)
+      const { data: existente } = await supabase
+        .from("historial_pagos")
+        .select("id")
+        .eq("wompi_transaction_id", evento.transactionId)
+        .maybeSingle();
+
+      if (existente) break; // Ya procesado, no duplicar cambios de suscripción
 
       // Activar suscripción
       const ahora = new Date();
@@ -62,17 +67,20 @@ export async function POST(request: NextRequest) {
           .eq("id", orgId);
       }
 
-      // Registrar pago
-      await supabase.from("historial_pagos").insert({
-        organizacion_id: orgId,
-        wompi_transaction_id: evento.transactionId,
-        monto_cop: evento.montoCop || 0,
-        estado: "paid",
-        descripcion: `Pago suscripción ${periodo}`,
-        periodo,
-        fecha_pago: ahora.toISOString(),
-        metodo_pago: evento.metodoPago,
-      });
+      // Registrar pago (idempotente: ignora si ya existe el transaction_id)
+      await supabase.from("historial_pagos").upsert(
+        {
+          organizacion_id: orgId,
+          wompi_transaction_id: evento.transactionId,
+          monto_cop: evento.montoCop || 0,
+          estado: "paid",
+          descripcion: `Pago suscripción ${periodo}`,
+          periodo,
+          fecha_pago: ahora.toISOString(),
+          metodo_pago: evento.metodoPago,
+        },
+        { onConflict: "wompi_transaction_id", ignoreDuplicates: true }
+      );
 
       break;
     }
@@ -92,16 +100,19 @@ export async function POST(request: NextRequest) {
         })
         .eq("organizacion_id", orgId);
 
-      // Registrar intento fallido
-      await supabase.from("historial_pagos").insert({
-        organizacion_id: orgId,
-        wompi_transaction_id: evento.transactionId,
-        monto_cop: evento.montoCop || 0,
-        estado: "declined",
-        descripcion: "Pago rechazado",
-        fecha_pago: new Date().toISOString(),
-        metodo_pago: evento.metodoPago,
-      });
+      // Registrar intento fallido (idempotente: ignora si ya existe el transaction_id)
+      await supabase.from("historial_pagos").upsert(
+        {
+          organizacion_id: orgId,
+          wompi_transaction_id: evento.transactionId,
+          monto_cop: evento.montoCop || 0,
+          estado: "declined",
+          descripcion: "Pago rechazado",
+          fecha_pago: new Date().toISOString(),
+          metodo_pago: evento.metodoPago,
+        },
+        { onConflict: "wompi_transaction_id", ignoreDuplicates: true }
+      );
 
       break;
     }

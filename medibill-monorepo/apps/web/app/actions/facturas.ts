@@ -5,7 +5,10 @@ import { devError } from "@/lib/logger";
 import { registrarAuditLog } from "@/lib/audit-log";
 import { anonimizarTextoMedico } from "@/lib/validacion-medica";
 import { getContextoOrg, getOrgIdActual } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
 import { verificarLimite, incrementarUso } from "@/lib/suscripcion";
+import { CrearFacturaSchema, EditarFacturaSchema } from "@/lib/schemas/facturas.schema";
+import { safeError } from "@/lib/safe-error";
 import type { CrearFacturaInput, EstadoFacturaMVP } from "@/lib/types/factura";
 
 // ==========================================
@@ -28,6 +31,14 @@ export async function obtenerSiguienteNumeroFactura(): Promise<{ numero: string;
     return { numero: "", resolucion_id: null, error: "No hay resolución de facturación activa. Configúrala en Configuración." };
   }
 
+  // Verificar que la resolución no esté vencida
+  if (resolucion.fecha_vigencia_hasta) {
+    const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+    if (resolucion.fecha_vigencia_hasta < hoy) {
+      return { numero: "", resolucion_id: null, error: "La resolución de facturación está vencida. Actualízala en Configuración." };
+    }
+  }
+
   const siguiente = resolucion.consecutivo_actual != null
     ? resolucion.consecutivo_actual + 1
     : (resolucion.rango_inicio || 1);
@@ -44,10 +55,15 @@ export async function obtenerSiguienteNumeroFactura(): Promise<{ numero: string;
 /** Crea una factura en estado borrador, upserta el paciente, y crea auditoría */
 export async function crearFacturaBorrador(input: CrearFacturaInput) {
   const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
+
+  const parsed = CrearFacturaSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
   const supabase = await createClient();
 
   // 1. Generar número temporal (el consecutivo real se asigna al aprobar)
-  const numero = `BORR-${Date.now().toString(36).toUpperCase()}`;
+  const numero = `BORR-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4)}`;
   // Obtener resolución activa solo para asociar, sin consumir consecutivo
   const { data: resolucion } = await supabase
     .from("resoluciones_facturacion")
@@ -103,7 +119,7 @@ export async function crearFacturaBorrador(input: CrearFacturaInput) {
       num_factura: numero,
       nit_prestador: perfil?.numero_documento || "",
       nit_erp: input.nit_erp,
-      fecha_expedicion: new Date().toISOString().split("T")[0],
+      fecha_expedicion: new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }),
       valor_total: input.valor_total,
       subtotal: input.subtotal,
       descuentos: input.descuentos,
@@ -133,7 +149,7 @@ export async function crearFacturaBorrador(input: CrearFacturaInput) {
 
   if (error) {
     devError("Error creando factura", error);
-    return { success: false, error: error.message };
+    return { success: false, error: safeError("crearFacturaBorrador", error) };
   }
 
   // 5. No se actualiza consecutivo — se asigna al aprobar
@@ -146,7 +162,22 @@ export async function crearFacturaBorrador(input: CrearFacturaInput) {
 /** Aprueba una factura borrador — asigna el consecutivo real en este momento */
 export async function aprobarFactura(facturaId: string) {
   const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "aprobar_factura");
   const supabase = await createClient();
+
+  // Bloquear aprobación de facturas en trial
+  const { data: subCheck } = await supabase
+    .from("suscripciones")
+    .select("estado")
+    .eq("organizacion_id", ctx.orgId)
+    .single();
+
+  if (subCheck?.estado === "trialing") {
+    return {
+      success: false,
+      error: "Durante el período de prueba puedes crear prefacturas (borradores) pero no aprobar facturas ante la DIAN. Activa tu plan para facturar.",
+    };
+  }
 
   // Verificar límite de facturas DIAN del plan
   const limiteOk = await verificarLimite(ctx.orgId, "factura_dian");
@@ -171,7 +202,7 @@ export async function aprobarFactura(facturaId: string) {
 
   if (rpcError) {
     // La función lanza excepción si el rango está agotado
-    return { success: false, error: rpcError.message };
+    return { success: false, error: safeError("aprobarFactura", rpcError) };
   }
 
   const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult;
@@ -196,7 +227,7 @@ export async function aprobarFactura(facturaId: string) {
     .eq("organizacion_id", ctx.orgId)
     .eq("estado", "borrador");
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("aprobarFactura", error) };
 
   await incrementarUso(ctx.orgId, "factura_dian");
   registrarAuditLog({ accion: "aprobar_factura", tabla: "facturas", registroId: facturaId, metadata: { num_factura: numero } });
@@ -206,17 +237,21 @@ export async function aprobarFactura(facturaId: string) {
 
 /** Anula una factura (solo borrador) */
 export async function anularFactura(facturaId: string) {
-  const orgId = await getOrgIdActual();
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "anular_factura");
+  const orgId = ctx.orgId;
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("facturas")
     .update({ estado: "anulada", updated_at: new Date().toISOString() })
     .eq("id", facturaId)
     .eq("organizacion_id", orgId)
-    .eq("estado", "borrador");
+    .eq("estado", "borrador")
+    .select("id");
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("anularFactura", error) };
+  if (!data || data.length === 0) return { success: false, error: "La factura no existe o no está en estado borrador" };
 
   registrarAuditLog({ accion: "anular_factura", tabla: "facturas", registroId: facturaId });
 
@@ -285,7 +320,8 @@ export async function marcarComoDescargada(facturaId: string) {
     .eq("organizacion_id", orgId)
     .eq("estado", "aprobada");
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("marcarComoDescargada", error) };
+  registrarAuditLog({ accion: "marcar_descargada", tabla: "facturas", registroId: facturaId });
   return { success: true };
 }
 
@@ -315,6 +351,11 @@ export async function editarFacturaBorrador(facturaId: string, datos: Partial<{
   };
 }>) {
   const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
+
+  const parsed = EditarFacturaSchema.safeParse(datos);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
   const supabase = await createClient();
 
   // Extraer atencion y datos_paciente del objeto de datos
@@ -370,6 +411,7 @@ export async function editarFacturaBorrador(facturaId: string, datos: Partial<{
     .eq("organizacion_id", ctx.orgId)
     .eq("estado", "borrador");
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("editarFacturaBorrador", error) };
+  registrarAuditLog({ accion: "editar_factura_borrador", tabla: "facturas", registroId: facturaId });
   return { success: true };
 }

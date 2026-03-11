@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase-server";
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const OUTPUT_DIMENSIONALITY = 768; // Truncar de 3072 a 768 para pgvector
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const EMBEDDING_TIMEOUT_MS = 15_000;
 
 // Task types para embeddings (asimétricos: documento vs consulta)
 export enum TaskType {
@@ -60,6 +61,7 @@ export async function generarEmbedding(
       taskType,
       outputDimensionality: OUTPUT_DIMENSIONALITY,
     }),
+    signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -107,6 +109,7 @@ export async function generarEmbeddingsBatch(
         outputDimensionality: OUTPUT_DIMENSIONALITY,
       })),
     }),
+    signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
   });
 
   if (!response.ok) {

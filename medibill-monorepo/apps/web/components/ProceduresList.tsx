@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import type { ProcedimientoUI, AlternativaIA, FuenteTarifa } from "@/lib/types/ui";
-import ModalBusquedaCodigo, { type ResultadoBusqueda } from "@/components/ModalBusquedaCodigo";
+import type { ResultadoBusqueda } from "@/components/ModalBusquedaCodigo";
 import { buscarCupsAction } from "@/app/actions/busqueda-codigos";
+
+const ModalBusquedaCodigo = dynamic(() => import("@/components/ModalBusquedaCodigo"), { ssr: false });
 
 interface ProceduresListProps {
   procedimientos: ProcedimientoUI[];

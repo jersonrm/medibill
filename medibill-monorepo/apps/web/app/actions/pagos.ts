@@ -2,6 +2,11 @@
 
 import { createClient } from "@/lib/supabase-server";
 import { devError } from "@/lib/logger";
+import { registrarAuditLog } from "@/lib/audit-log";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
+import { RegistrarPagoSchema } from "@/lib/schemas/pagos.schema";
+import { safeError } from "@/lib/safe-error";
 import type {
   RegistrarPagoInput,
   PagoDB,
@@ -62,18 +67,21 @@ export async function registrarPago(input: RegistrarPagoInput): Promise<{
   data?: PagoDB;
   nuevo_estado?: string;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
+  // Validar input con Zod (monto > 0, campos requeridos)
+  const parsed = RegistrarPagoSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
 
-  // 1. Verificar que la factura existe y pertenece al usuario
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
+
+  const supabase = await createClient();
+
+  // 1. Verificar que la factura existe y pertenece a la org
   const { data: factura } = await supabase
     .from("facturas")
     .select("id, valor_total, estado")
-    .eq("id", input.factura_id)
-    .eq("user_id", user.id)
+    .eq("id", parsed.data.factura_id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (!factura) return { success: false, error: "Factura no encontrada" };
@@ -90,17 +98,17 @@ export async function registrarPago(input: RegistrarPagoInput): Promise<{
   const { data: pagosExistentes } = await supabase
     .from("pagos")
     .select("monto")
-    .eq("factura_id", input.factura_id);
+    .eq("factura_id", parsed.data.factura_id);
 
   const totalPagado =
     pagosExistentes?.reduce((sum, p) => sum + (p.monto || 0), 0) || 0;
   const saldoPendiente = factura.valor_total - totalPagado;
 
   // Validar que el monto no exceda el saldo
-  if (input.monto > saldoPendiente) {
+  if (parsed.data.monto > saldoPendiente) {
     return {
       success: false,
-      error: `El monto ($${input.monto.toLocaleString()}) excede el saldo pendiente ($${saldoPendiente.toLocaleString()})`,
+      error: `El monto ($${parsed.data.monto.toLocaleString()}) excede el saldo pendiente ($${saldoPendiente.toLocaleString()})`,
     };
   }
 
@@ -108,24 +116,24 @@ export async function registrarPago(input: RegistrarPagoInput): Promise<{
   const { data: pago, error } = await supabase
     .from("pagos")
     .insert({
-      factura_id: input.factura_id,
-      user_id: user.id,
-      monto: input.monto,
-      fecha_pago: input.fecha_pago,
-      metodo_pago: input.metodo_pago,
-      referencia: input.referencia || null,
-      notas: input.notas || null,
+      factura_id: parsed.data.factura_id,
+      user_id: ctx.userId,
+      monto: parsed.data.monto,
+      fecha_pago: parsed.data.fecha_pago,
+      metodo_pago: parsed.data.metodo_pago,
+      referencia: parsed.data.referencia || null,
+      notas: parsed.data.notas || null,
     })
     .select()
     .single();
 
   if (error) {
     devError("Error registrando pago", error);
-    return { success: false, error: error.message };
+    return { success: false, error: safeError("registrarPago", error) };
   }
 
   // 4. Actualizar estado de la factura
-  const nuevoTotalPagado = totalPagado + input.monto;
+  const nuevoTotalPagado = totalPagado + parsed.data.monto;
   let nuevoEstado = factura.estado;
 
   if (nuevoTotalPagado >= factura.valor_total) {
@@ -139,8 +147,10 @@ export async function registrarPago(input: RegistrarPagoInput): Promise<{
       .from("facturas")
       .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
       .eq("id", input.factura_id)
-      .eq("user_id", user.id);
+      .eq("organizacion_id", ctx.orgId);
   }
+
+  registrarAuditLog({ accion: "registrar_pago", tabla: "pagos", registroId: pago.id, metadata: { factura_id: parsed.data.factura_id, monto: parsed.data.monto, nuevo_estado: nuevoEstado } });
 
   return { success: true, data: pago, nuevo_estado: nuevoEstado };
 }
@@ -149,17 +159,14 @@ export async function registrarPago(input: RegistrarPagoInput): Promise<{
 export async function listarPagosPorFactura(
   facturaId: string
 ): Promise<PagoDB[]> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
 
   const { data } = await supabase
     .from("pagos")
     .select("*")
     .eq("factura_id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .order("fecha_pago", { ascending: false });
 
   return (data as PagoDB[]) || [];
@@ -169,15 +176,8 @@ export async function listarPagosPorFactura(
 export async function obtenerCarteraPendiente(
   filtros?: FiltrosCartera
 ): Promise<{ items: ItemCartera[]; resumen: ResumenCartera }> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return {
-      items: [],
-      resumen: { total_pendiente: 0, total_facturas: 0, promedio_dias: 0 },
-    };
 
   // Obtener facturas radicadas/pagada_parcial con sus pagos
   let query = supabase
@@ -185,7 +185,7 @@ export async function obtenerCarteraPendiente(
     .select(
       "id, num_factura, fecha_expedicion, nit_erp, valor_total, estado, metadata, created_at, pacientes(primer_nombre, primer_apellido, numero_documento)"
     )
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .in("estado", ["radicada", "pagada_parcial"])
     .order("created_at", { ascending: true });
 
@@ -211,7 +211,7 @@ export async function obtenerCarteraPendiente(
 
   // Obtener todos los pagos del usuario (con chunking si hay >50 facturas)
   const facturaIds = facturas.map((f) => f.id);
-  const pagosPorFactura = await consultarPagosEnLotes(supabase, user.id, facturaIds);
+  const pagosPorFactura = await consultarPagosEnLotes(supabase, ctx.orgId, facturaIds);
 
   const hoy = new Date();
   const items: ItemCartera[] = facturas.map((f) => {
@@ -296,24 +296,21 @@ export async function obtenerKPICartera(): Promise<{
   valor_pendiente: number;
   facturas_pendientes: number;
 }> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { valor_pendiente: 0, facturas_pendientes: 0 };
 
   // Facturas radicadas o pagadas parcialmente
   const { data: facturas } = await supabase
     .from("facturas")
     .select("id, valor_total")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .in("estado", ["radicada", "pagada_parcial"]);
 
   if (!facturas || facturas.length === 0)
     return { valor_pendiente: 0, facturas_pendientes: 0 };
 
   const facturaIds = facturas.map((f) => f.id);
-  const pagosPorFactura = await consultarPagosEnLotes(supabase, user.id, facturaIds);
+  const pagosPorFactura = await consultarPagosEnLotes(supabase, ctx.orgId, facturaIds);
 
   let totalPendiente = 0;
   for (const f of facturas) {
@@ -330,16 +327,13 @@ export async function obtenerKPICartera(): Promise<{
 export async function listarEPSUsuario(): Promise<
   { nit_erp: string; eps_nombre: string }[]
 > {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
 
   const { data } = await supabase
     .from("facturas")
     .select("nit_erp, metadata")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .in("estado", ["radicada", "pagada_parcial", "pagada"]);
 
   if (!data) return [];
@@ -356,4 +350,112 @@ export async function listarEPSUsuario(): Promise<
     nit_erp,
     eps_nombre,
   }));
+}
+
+// ==========================================
+// ALERTAS DE CARTERA CON CONTEXTO EPS
+// ==========================================
+
+export interface AlertaCartera {
+  factura_id: string;
+  num_factura: string;
+  eps_nombre: string;
+  nit_erp: string;
+  dias_antiguedad: number;
+  promedio_comunidad: number;
+  semaforo: "verde" | "amarillo" | "rojo";
+  mensaje: string;
+}
+
+/**
+ * Obtiene alertas de cartera con contexto de benchmark EPS.
+ * Semáforo: verde (<promedio), amarillo (100-150%), rojo (>150%).
+ */
+export async function obtenerAlertasCartera(): Promise<AlertaCartera[]> {
+  const ctx = await getContextoOrg();
+  const supabase = await createClient();
+
+  // Facturas pendientes de pago
+  const { data: facturas } = await supabase
+    .from("facturas")
+    .select("id, num_factura, nit_erp, metadata, created_at")
+    .eq("organizacion_id", ctx.orgId)
+    .in("estado", ["radicada", "pagada_parcial"])
+    .order("created_at", { ascending: true });
+
+  if (!facturas || facturas.length === 0) return [];
+
+  // EPS únicas
+  const epsSet = new Set(facturas.map((f) => f.nit_erp));
+  const epsCodigos = Array.from(epsSet);
+
+  // Benchmark de días pago por EPS
+  const { data: benchmarks } = await supabase
+    .from("mv_dias_pago_por_eps" as never)
+    .select("*")
+    .in("eps_codigo", epsCodigos);
+
+  const promediosPorEps = new Map<string, number>();
+  if (benchmarks) {
+    for (const b of benchmarks as { eps_codigo: string; promedio_dias: number }[]) {
+      promediosPorEps.set(b.eps_codigo, b.promedio_dias);
+    }
+  }
+
+  const hoy = new Date();
+  const alertas: AlertaCartera[] = [];
+
+  for (const f of facturas) {
+    const meta = f.metadata as Record<string, unknown> | null;
+    const fechaRef = (meta?.fecha_radicacion as string) || f.created_at;
+    const dias = Math.ceil(
+      (hoy.getTime() - new Date(fechaRef).getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const promedio = promediosPorEps.get(f.nit_erp);
+    const epsNombre = (meta?.eps_nombre as string) || f.nit_erp;
+
+    // Sin benchmark, no generar alerta contextualizada
+    if (!promedio) continue;
+
+    let semaforo: AlertaCartera["semaforo"];
+    let mensaje: string;
+
+    const ratio = dias / promedio;
+
+    if (ratio <= 1) {
+      semaforo = "verde";
+      mensaje = `Promedio pago ${epsNombre}: ${promedio} días. Tu factura lleva ${dias} días — dentro del rango esperado.`;
+    } else if (ratio <= 1.5) {
+      semaforo = "amarillo";
+      mensaje = `Promedio pago ${epsNombre}: ${promedio} días. Tu factura lleva ${dias} días — acercándose al límite.`;
+    } else {
+      semaforo = "rojo";
+      mensaje = `Promedio pago ${epsNombre}: ${promedio} días. Tu factura lleva ${dias} días — excede significativamente el promedio.`;
+    }
+
+    // Solo incluir amarillo y rojo como alertas
+    if (semaforo === "verde") continue;
+
+    alertas.push({
+      factura_id: f.id,
+      num_factura: f.num_factura,
+      eps_nombre: epsNombre,
+      nit_erp: f.nit_erp,
+      dias_antiguedad: dias,
+      promedio_comunidad: promedio,
+      semaforo,
+      mensaje,
+    });
+  }
+
+  // Ordenar: rojos primero, luego amarillos, luego por días descendente
+  alertas.sort((a, b) => {
+    const prioridad = { rojo: 0, amarillo: 1, verde: 2 };
+    if (prioridad[a.semaforo] !== prioridad[b.semaforo]) {
+      return prioridad[a.semaforo] - prioridad[b.semaforo];
+    }
+    return b.dias_antiguedad - a.dias_antiguedad;
+  });
+
+  return alertas;
 }

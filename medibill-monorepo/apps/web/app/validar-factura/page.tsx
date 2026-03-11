@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   validarFacturaPorId,
   obtenerFacturasPendientesValidacion,
 } from "@/app/actions/glosas";
 import PanelResultados from "@/components/validacion/PanelResultados";
-import ModalRegistrarGlosa from "@/components/glosas/ModalRegistrarGlosa";
+
+const ModalRegistrarGlosa = dynamic(() => import("@/components/glosas/ModalRegistrarGlosa"), { ssr: false });
 import type {
   ResultadoValidacion,
   FacturaDB,

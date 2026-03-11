@@ -160,7 +160,7 @@ describe("clasificarTextoMedico", () => {
     configurarTabla(mockState, "auditorias_rips", "insert", { data: null, error: null });
   });
 
-  it("retorna exito con datos cuando el pipeline completa", async () => {
+  it("retorna success con datos cuando el pipeline completa", async () => {
     const iaResponse = crearRespuestaIA();
     mockGenerateContent.mockResolvedValue({
       response: { text: () => JSON.stringify(iaResponse) },
@@ -169,8 +169,8 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Paciente con dolor lumbar crónico");
 
-    expect(result.exito).toBe(true);
-    if (result.exito) {
+    expect(result.success).toBe(true);
+    if (result.success) {
       expect(result.datos.diagnosticos).toHaveLength(1);
       expect(result.datos.diagnosticos[0].codigo_cie10).toBe("M545");
       expect(result.datos.procedimientos).toHaveLength(1);
@@ -204,7 +204,7 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Dolor abdominal");
 
-    expect(result.exito).toBe(true);
+    expect(result.success).toBe(true);
   });
 
   it("ejecuta 5 sub-validaciones en orden", async () => {
@@ -238,8 +238,8 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Consulta y radiografía");
 
-    expect(result.exito).toBe(true);
-    if (result.exito) {
+    expect(result.success).toBe(true);
+    if (result.success) {
       // 890201 should be deduped (matches codConsultaCups)
       const cupsCodes = result.datos.procedimientos.map((p: { codigo_cups: string }) => p.codigo_cups);
       expect(cupsCodes).not.toContain("890201");
@@ -270,8 +270,8 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Radiografía columna");
 
-    expect(result.exito).toBe(true);
-    if (result.exito) {
+    expect(result.success).toBe(true);
+    if (result.success) {
       expect(result.datos.procedimientos[0].diagnostico_asociado).toBe("M545");
       expect(result.datos.procedimientos[0].diagnostico_asociado_corregido).toBe(true);
     }
@@ -294,8 +294,8 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Consulta general");
 
-    expect(result.exito).toBe(true);
-    if (result.exito) {
+    expect(result.success).toBe(true);
+    if (result.success) {
       expect(result.datos.atencion.valor_consulta).toBe(75000);
       expect(result.datos.procedimientos[0].valor_procedimiento).toBe(62000);
     }
@@ -303,7 +303,7 @@ describe("clasificarTextoMedico", () => {
 
   it("tipo_servicio defaults a 'consulta' si la IA no lo genera", async () => {
     const iaResponse = crearRespuestaIA();
-    delete iaResponse.atencion.tipo_servicio;
+    delete (iaResponse.atencion as Partial<typeof iaResponse.atencion>).tipo_servicio;
 
     mockGenerateContent.mockResolvedValue({
       response: { text: () => JSON.stringify(iaResponse) },
@@ -312,8 +312,8 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Dolor cabeza");
 
-    expect(result.exito).toBe(true);
-    if (result.exito) {
+    expect(result.success).toBe(true);
+    if (result.success) {
       expect(result.datos.atencion.tipo_servicio).toBe("consulta");
     }
   });
@@ -337,9 +337,9 @@ describe("clasificarTextoMedico", () => {
     const { clasificarTextoMedico } = await import("@/app/actions/clasificacion");
     const result = await clasificarTextoMedico("Nota médica");
 
-    expect(result.exito).toBe(false);
-    if (!result.exito) {
-      expect(result.error).toContain("Gemini API unavailable");
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Error al procesar la información médica");
     }
   });
 });

@@ -5,7 +5,13 @@ import { devError } from "@/lib/logger";
 import { mapFacturaToMatiasJson } from "@/lib/providers/matias-mapper";
 import * as matiasClient from "@/lib/providers/matias-client";
 import { obtenerContextoFacturacion } from "@/lib/services/contexto-facturacion";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
+import { createRateLimiter } from "@/lib/rate-limit";
 import type { EstadoDian } from "@/lib/types/factura";
+
+// Rate limit: 5 envíos DIAN/min por usuario
+const dianRateLimiter = createRateLimiter({ max: 5, windowMs: 60_000 });
 
 // ==========================================
 // DIAN — Server Actions (Matias API)
@@ -18,16 +24,21 @@ import type { EstadoDian } from "@/lib/types/factura";
 export async function enviarFacturaDian(
   facturaId: string,
 ): Promise<{ success: true; cufe: string; trackId: string } | { success: false; error: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "enviar_dian");
+
+  if (await dianRateLimiter.isLimited(ctx.userId)) {
+    return { success: false, error: "Demasiadas solicitudes. Intenta de nuevo en un momento." };
+  }
+
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   // 1. Obtener factura con paciente
   const { data: facturaRow, error: errFactura } = await supabase
     .from("facturas")
     .select("*, pacientes(*)")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (errFactura || !facturaRow) {
@@ -43,10 +54,10 @@ export async function enviarFacturaDian(
   }
 
   // 2. Obtener contexto (perfil + resolución + mapeos)
-  const ctx = await obtenerContextoFacturacion(supabase, user.id, facturaRow);
-  if (!ctx.ok) return { success: false, error: ctx.error };
+  const ctxFact = await obtenerContextoFacturacion(supabase, ctx.userId, facturaRow);
+  if (!ctxFact.ok) return { success: false, error: ctxFact.error };
 
-  const { factura, perfilInput, resolucionInput, clienteInput, pacienteInput } = ctx.data;
+  const { factura, perfilInput, resolucionInput, clienteInput, pacienteInput } = ctxFact.data;
 
   // 2. Mapear a formato Matias JSON
   const matiasJson = mapFacturaToMatiasJson(factura, perfilInput, resolucionInput, clienteInput, pacienteInput);
@@ -74,7 +85,7 @@ export async function enviarFacturaDian(
         updated_at: new Date().toISOString(),
       })
       .eq("id", facturaId)
-      .eq("user_id", user.id);
+      .eq("organizacion_id", ctx.orgId);
 
     if (errUpdate) {
       devError("Error actualizando factura post-DIAN", errUpdate);
@@ -98,15 +109,15 @@ export async function enviarFacturaDian(
 export async function consultarEstadoDian(
   facturaId: string,
 ): Promise<{ success: true; estadoDian: EstadoDian; mensaje: string } | { success: false; error: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "enviar_dian");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   const { data: factura, error: errFactura } = await supabase
     .from("facturas")
     .select("track_id_dian, estado_dian")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (errFactura || !factura) {
@@ -136,7 +147,7 @@ export async function consultarEstadoDian(
         updated_at: new Date().toISOString(),
       })
       .eq("id", facturaId)
-      .eq("user_id", user.id);
+      .eq("organizacion_id", ctx.orgId);
 
     return {
       success: true,
@@ -155,15 +166,15 @@ export async function consultarEstadoDian(
 export async function descargarXmlFirmado(
   facturaId: string,
 ): Promise<{ success: true; xml: string } | { success: false; error: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "enviar_dian");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   const { data: factura } = await supabase
     .from("facturas")
     .select("track_id_dian, estado_dian")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (!factura?.track_id_dian) {
@@ -186,15 +197,15 @@ export async function descargarXmlFirmado(
 export async function descargarPdfDian(
   facturaId: string,
 ): Promise<{ success: true; pdfBase64: string } | { success: false; error: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "enviar_dian");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   const { data: factura } = await supabase
     .from("facturas")
     .select("track_id_dian, estado_dian")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (!factura?.track_id_dian) {

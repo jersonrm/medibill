@@ -6,6 +6,7 @@ import { PricingCard } from "../components/PricingCard";
 import { FAQAccordion } from "../components/FAQAccordion";
 import { ContactForm } from "../components/ContactForm";
 import { StatCounter } from "../components/StatCounter";
+import { SavingsCalculator } from "../components/SavingsCalculator";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://app.medibill.co";
 
@@ -292,7 +293,7 @@ export default function HomePage() {
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-gradient-to-b from-medi-light/20 to-white pb-20 pt-32 md:pt-40">
         <div className="mx-auto max-w-7xl px-6 text-center">
-          <SectionBadge emoji="🏥" text="Facturación médica con IA" />
+          <SectionBadge text="Facturación médica con IA" />
           <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-bold leading-tight tracking-tight text-medi-deep md:text-6xl">
             Facturación médica inteligente,{" "}
             <span className="text-medi-primary">impulsada por IA</span>
@@ -329,7 +330,7 @@ export default function HomePage() {
       {/* ── Servicios ── */}
       <section id="servicios" className="bg-gray-50/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <SectionBadge emoji="⚡" text="Funcionalidades" />
+          <SectionBadge text="Funcionalidades" />
           <div className="mt-4">
             <SectionHeading
               title="Todo lo que necesitas para facturar con confianza"
@@ -347,7 +348,7 @@ export default function HomePage() {
       {/* ── Por qué elegirnos ── */}
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <SectionBadge emoji="🛡️" text="Por qué Medibill" />
+          <SectionBadge text="Por qué Medibill" />
           <div className="mt-4">
             <SectionHeading
               title="Respaldo tecnológico para tu práctica médica"
@@ -362,10 +363,26 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Proceso ── */}
+      {/* ── Ahorro ── */}
       <section className="bg-gray-50/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <SectionBadge emoji="🗂️" text="Proceso" />
+          <SectionBadge text="Tu tiempo vale dinero" />
+          <div className="mt-4">
+            <SectionHeading
+              title="¿Cuánto dinero estás dejando de ganar?"
+              subtitle="Cada minuto que gastas codificando RIPS manualmente es dinero que no estás facturando. Calcula cuánto recuperas con Medibill."
+            />
+          </div>
+          <div className="mt-14">
+            <SavingsCalculator />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Proceso ── */}
+      <section className="py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <SectionBadge text="Proceso" />
           <div className="mt-4">
             <SectionHeading
               title="De la nota clínica a la radicación, sin salir de Medibill"
@@ -381,9 +398,9 @@ export default function HomePage() {
       </section>
 
       {/* ── Precios ── */}
-      <section id="precios" className="py-24">
+      <section id="precios" className="bg-gray-50/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <SectionBadge emoji="💰" text="Planes" />
+          <SectionBadge text="Planes" />
           <div className="mt-4">
             <SectionHeading
               title="Precios transparentes, sin sorpresas"
@@ -399,9 +416,9 @@ export default function HomePage() {
       </section>
 
       {/* ── FAQ ── */}
-      <section className="bg-gray-50/50 py-24">
+      <section className="py-24">
         <div className="mx-auto max-w-5xl px-6">
-          <SectionBadge emoji="❓" text="Preguntas Frecuentes" />
+          <SectionBadge text="Preguntas Frecuentes" />
           <div className="mt-4">
             <SectionHeading
               title="Resolvemos tus dudas"
@@ -415,11 +432,11 @@ export default function HomePage() {
       </section>
 
       {/* ── Contacto ── */}
-      <section id="contacto" className="py-24">
+      <section id="contacto" className="bg-gray-50/50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-12 lg:grid-cols-2">
             <div>
-              <SectionBadge emoji="📬" text="Contacto" />
+              <SectionBadge text="Contacto" />
               <h2 className="mt-4 text-3xl font-bold tracking-tight text-medi-deep md:text-4xl">
                 ¿Listo para transformar tu facturación?
               </h2>

@@ -39,7 +39,7 @@ export default function Sidebar() {
   } | null>(null);
 
   useEffect(() => {
-    obtenerBadgesSidebar().then(setBadges).catch(() => {});
+    obtenerBadgesSidebar().then(setBadges).catch((e) => console.error("Error cargando badges", e));
     obtenerFeaturesUsuario()
       .then((res) => {
         if (res) setPlanFeatures({
@@ -48,7 +48,7 @@ export default function Sidebar() {
           maxUsuarios: res.maxUsuarios,
         });
       })
-      .catch(() => {});
+      .catch((e) => console.error("Error cargando features", e));
   }, [pathname]);
 
   const navItems: NavItem[] = [

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase-server";
 import { validarFactura } from "@/lib/validador-glosas";
 import { tieneFeature } from "@/lib/suscripcion";
 import { devLog, devError } from "@/lib/logger";
+import { getContextoOrg } from "@/lib/organizacion";
 import type { ResultadoValidacion, FacturaResumen, ValidacionPreRadicacionDB } from "@/lib/types/glosas";
 
 // ==========================================
@@ -46,19 +47,11 @@ export async function obtenerMisPendientes(
   const mesesAtras = opciones?.mesesAtras ?? 12;
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const ctx = await getContextoOrg();
   const emptyResult: ResumenPendientes = { kpis: { totalFacturado: 0, totalGlosado: 0, tasaGlosas: 0, pendientesTotal: 0, facturasBorrador: 0, glosasRecibidasPendientes: 0, glosasRecibidasVencidas: 0 }, pendientes: [] };
-  if (!user) return emptyResult;
 
   // Feature gate: requiere ia_sugerencias_glosas
-  const { data: memb } = await supabase
-    .from("usuarios_organizacion")
-    .select("organizacion_id")
-    .eq("user_id", user.id)
-    .eq("activo", true)
-    .limit(1)
-    .single();
-  if (!memb || !await tieneFeature(memb.organizacion_id, "ia_sugerencias_glosas")) {
+  if (!await tieneFeature(ctx.orgId, "ia_sugerencias_glosas")) {
     return emptyResult;
   }
 
@@ -72,7 +65,7 @@ export async function obtenerMisPendientes(
   const { data: facturas } = await supabase
     .from('facturas')
     .select('id, num_factura, fecha_expedicion, fecha_limite_rad, valor_total, valor_glosado, estado')
-    .eq('user_id', user.id)
+    .eq('organizacion_id', ctx.orgId)
     .gte('fecha_expedicion', fechaLimiteISO)
     .limit(100);
 
@@ -119,9 +112,9 @@ export async function obtenerMisPendientes(
     .select(`
       id, codigo_causal, valor_glosado, fecha_formulacion,
       fecha_limite_resp, estado, tipo, descripcion_erp, factura_id,
-      facturas!inner(num_factura, fecha_radicacion, user_id)
+      facturas!inner(num_factura, fecha_radicacion, organizacion_id)
     `)
-    .eq('facturas.user_id', user.id)
+    .eq('facturas.organizacion_id', ctx.orgId)
     .gte('fecha_formulacion', fechaLimiteISO)
     .limit(100);
 
@@ -197,7 +190,7 @@ export async function obtenerMisPendientes(
     const { data: glosasRecibidas } = await supabase
       .from('glosas_recibidas')
       .select('id, estado, valor_glosado, codigo_glosa, fecha_notificacion, factura_id')
-      .eq('user_id', user.id)
+      .eq('organizacion_id', ctx.orgId)
       .limit(100);
 
     if (glosasRecibidas) {
@@ -247,16 +240,15 @@ export async function obtenerMisPendientes(
  */
 export async function validarFacturaPorId(facturaId: string): Promise<ResultadoValidacion | null> {
   try {
+    const ctx = await getContextoOrg();
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
 
     // 1. Obtener factura con verificación de propiedad
     const { data: factura, error: errorFactura } = await supabase
       .from('facturas')
       .select('*')
       .eq('id', facturaId)
-      .eq('user_id', user.id)
+      .eq('organizacion_id', ctx.orgId)
       .single();
 
     if (errorFactura || !factura) {
@@ -279,7 +271,7 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
       const { data: acuerdo } = await supabase
         .from('acuerdos_voluntades')
         .select('id, eps_codigo, nombre_eps, fecha_inicio, fecha_fin, requiere_autorizacion')
-        .eq('prestador_id', user.id)
+        .eq('prestador_id', ctx.orgId)
         .eq('eps_codigo', factura.nit_erp)
         .eq('activo', true)
         .order('fecha_fin', { ascending: false })
@@ -318,7 +310,7 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
     const { data: facturasExistentes } = await supabase
       .from('facturas')
       .select('num_factura, estado')
-      .eq('user_id', user.id)
+      .eq('organizacion_id', ctx.orgId)
       .neq('id', facturaId);
 
     // 6. Ejecutar validación
@@ -337,7 +329,7 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
         .from('validaciones_factura')
         .insert({
           factura_id: facturaId,
-          user_id: user.id,
+          user_id: ctx.userId,
           resultado_json: resultado,
           errores: resultado.errores,
           advertencias: resultado.advertencias,
@@ -362,14 +354,13 @@ export async function validarFacturaPorId(facturaId: string): Promise<ResultadoV
  */
 export async function obtenerFacturasPendientesValidacion(): Promise<FacturaResumen[]> {
   try {
+    const ctx = await getContextoOrg();
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
 
     const { data: facturas, error } = await supabase
       .from('facturas')
       .select('id, num_factura, fecha_expedicion, nit_erp, valor_total, estado')
-      .eq('user_id', user.id)
+      .eq('organizacion_id', ctx.orgId)
       .in('estado', ['borrador', 'radicada', 'devuelta'])
       .order('created_at', { ascending: false });
 
@@ -423,16 +414,15 @@ export async function obtenerFacturasPendientesValidacion(): Promise<FacturaResu
  */
 export async function obtenerHistorialValidaciones(facturaId: string): Promise<ValidacionPreRadicacionDB[]> {
   try {
+    const ctx = await getContextoOrg();
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
 
-    // Verificar que la factura pertenece al usuario
+    // Verificar que la factura pertenece a la organización
     const { data: factura } = await supabase
       .from('facturas')
       .select('id')
       .eq('id', facturaId)
-      .eq('user_id', user.id)
+      .eq('organizacion_id', ctx.orgId)
       .single();
 
     if (!factura) return [];

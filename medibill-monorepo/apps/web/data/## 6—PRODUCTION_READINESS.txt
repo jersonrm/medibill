@@ -1,0 +1,259 @@
+# PRODUCTION_READINESS.md — Medibill
+
+**Fecha de auditoría:** 2026-03-10  
+**Auditor:** Automated Analysis  
+**Alcance:** `medibill-monorepo/apps/web` (app principal), `infra/muv-docker` (servicio MUV)
+
+---
+
+## 6.1 Checklist de Deploy
+
+### ✅ ¿Existe `.env.example` documentando todas las variables necesarias?
+
+**PARCIAL — GAPS CRÍTICOS**
+
+Existe `apps/web/.env.example` con 14 variables documentadas, pero faltan **16 variables** que el código usa activamente:
+
+| Variable faltante | Archivo donde se usa | Severidad |
+|---|---|---|
+| `RESEND_API_KEY` | `lib/email.ts:3` | **CRITICAL** — emails no funcionan |
+| `MUV_ENCRYPTION_KEY` | `lib/muv-crypto.ts:13` | **CRITICAL** — encriptación AES-256-GCM de credenciales |
+| `UPSTASH_REDIS_REST_URL` | `lib/rate-limit.ts:24` | HIGH — rate limiting en producción |
+| `UPSTASH_REDIS_REST_TOKEN` | `lib/rate-limit.ts:25` | HIGH — rate limiting en producción |
+| `TELEGRAM_BOT_TOKEN` | `lib/telegram.ts:9` | MEDIUM — bot de Telegram |
+| `WOMPI_PUBLIC_KEY` | `lib/wompi.ts:33` | **CRITICAL** — pagos no funcionan |
+| `WOMPI_PRIVATE_KEY` | `lib/wompi.ts:27` | **CRITICAL** — pagos no funcionan |
+| `WOMPI_EVENTS_SECRET` | `lib/wompi.ts:39` | **CRITICAL** — webhook de pagos |
+| `WOMPI_INTEGRITY_KEY` | `lib/wompi.ts:45` | **CRITICAL** — integridad de transacciones |
+| `WOMPI_ENVIRONMENT` | `lib/wompi.ts:22` | **CRITICAL** — sin esto, apunta a sandbox |
+| `NEXT_PUBLIC_APP_URL` | `app/actions/billing.ts:84` | HIGH — URLs de retorno de pagos |
+| `NEXT_PUBLIC_LANDING_URL` | `app/login/page.tsx:3` | LOW — link al landing |
+| `CRON_SECRET` | `app/api/cron/*/route.ts` | HIGH — protección de cron endpoints |
+| `SENTRY_ORG` | `next.config.js:57` | MEDIUM — source maps a Sentry |
+| `SENTRY_PROJECT` | `next.config.js:58` | MEDIUM — source maps a Sentry |
+| `DIAN_WS_URL` | `.env.local:9` (usado en config) | MEDIUM — URL del WS de DIAN |
+
+**Variables documentadas correctamente (14):** `GOOGLE_GENERATIVE_AI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DIAN_SOFTWARE_ID`, `DIAN_SOFTWARE_PIN`, `DIAN_AMBIENTE`, `MATIAS_API_URL`, `MATIAS_API_EMAIL`, `MATIAS_API_PASSWORD`, `MATIAS_PAT_TOKEN`, `MUV_DOCKER_URL`, `ENABLE_HYBRID_SEARCH`, `ENABLE_SEMANTIC_SEARCH`.
+
+Documentación parcial adicional en `docs/env-suscripciones.md` para variables de Wompi, pero no están en `.env.example`.
+
+---
+
+### ✅ ¿El build de producción compila sin errores ni warnings?
+
+**SÍ** — `get_errors` retorna 0 errores en el workspace. El CI pipeline (`ci.yml:38`) ejecuta `pnpm turbo build` con éxito.
+
+---
+
+### ✅ ¿Hay un proceso de CI/CD configurado?
+
+**SÍ** — `.github/workflows/ci.yml`
+
+Pipeline ejecuta en push/PR a `main`:
+1. **Lint** — `pnpm turbo lint`
+2. **Type check** — `pnpm turbo check-types`
+3. **Tests** — `pnpm turbo test` (con env vars placeholder)
+4. **Build** — `pnpm turbo build`
+
+Características:
+- ✅ `concurrency` con `cancel-in-progress: true` (evita builds redundantes)
+- ✅ `timeout-minutes: 15`
+- ✅ `pnpm install --frozen-lockfile` (determinista)
+- ✅ Node 20 + pnpm 9
+
+**GAPS:**
+- ❌ No hay CD (deploy automático). No existe `vercel.json` ni step de deploy en CI.
+- ❌ No hay stage/preview environments definidos en el pipeline.
+- ❌ No se ejecutan checks de seguridad (SAST, dependency audit).
+
+---
+
+### ✅ ¿Las variables de entorno de producción son diferentes a desarrollo?
+
+**SÍ, parcialmente.**
+
+Mecanismos de diferenciación encontrados:
+- `WOMPI_ENVIRONMENT` controla sandbox vs producción (`lib/wompi.ts:22`)
+- `DIAN_AMBIENTE` controla habilitación vs producción (`lib/generar-fev-xml.ts:32`)
+- `NODE_ENV` controla Sentry enabled/disabled (`sentry.client.config.ts:8`)
+- `NODE_ENV` controla logging dev vs producción (`lib/logger.ts:4`)
+
+**GAPS:**
+- ⚠️ Sentry DSN **hardcodeado** en los 3 archivos de config (`sentry.client.config.ts:4`, `sentry.server.config.ts:4`, `sentry.edge.config.ts:4`) con valor `https://a088802db65084950599ef916f9e0f65@o4511016097546240.ingest.us.sentry.io/4511016105410560`. Debería usar `SENTRY_DSN` env var para permitir DSNs diferentes por entorno o desactivar sin rebuild.
+- ⚠️ `NEXT_PUBLIC_APP_URL` tiene fallback a `http://localhost:3000` en `app/actions/billing.ts:84`, lo que significa que si no se configura en producción, los links de retorno de Wompi apuntarían a localhost.
+- ⚠️ Fallback de `NEXT_PUBLIC_LANDING_URL` en el Telegram webhook apunta a `https://medibill-wheat.vercel.app` (URL de preview, no producción) en `app/api/telegram/webhook/route.ts:21`.
+
+---
+
+### ✅ ¿El DEBUG o modo de desarrollo está desactivado?
+
+**SÍ**
+
+- `logger.ts` usa `NODE_ENV === 'development'` para `devLog`/`devWarn` — en producción emite JSON estructurado y envía a Sentry.
+- Sentry habilitado solo cuando `NODE_ENV === "production"` (`sentry.client.config.ts:8`).
+- `poweredBy: false` en `next.config.js:4` (no expone Next.js en headers).
+- No se encontraron `console.log` sueltos en `apps/web/app/**` (búsqueda verificada).
+- Rate limiter graceful degradation: usa Upstash Redis en producción, Map in-memory en desarrollo (`lib/rate-limit.ts:6-7`).
+
+✅ Sin problemas detectados.
+
+---
+
+### ✅ ¿Hay health checks configurados?
+
+**PARCIAL**
+
+- ✅ **MUV Docker** (`infra/muv-docker/Dockerfile:29-30`): `HEALTHCHECK --interval=30s --timeout=5s --retries=3` con endpoint `GET /health` en `server.js:41-44`.
+- ❌ **App Next.js (`apps/web`)**: No existe endpoint `/api/health`. No hay health check para monitorizar Supabase, Redis, o APIs externas.
+- ❌ No hay endpoint `/api/ready` para readiness probes.
+
+---
+
+## 6.2 Observabilidad
+
+### ✅ ¿Existe logging estructurado para producción?
+
+**SÍ**
+
+`lib/logger.ts` implementa un sistema de logging dual:
+- **Desarrollo**: `console.log/warn/error` con prefijo `[DEV]`
+- **Producción**: JSON estructurado con `{ level, label, message, ts }` + Sentry para errores
+
+Funciones disponibles:
+- `devLog(label, ...args)` — solo en desarrollo
+- `devWarn(label, ...args)` — JSON en producción
+- `devError(label, ...args)` — JSON en producción + `Sentry.captureException`/`captureMessage`
+- `logAudit(supabase, event)` — fire-and-forget a tabla `audit_log`
+
+**GAPS:**
+- ⚠️ No hay request ID/correlation ID. Un request no se puede trazar end-to-end (ver sección de trazabilidad).
+- ⚠️ No hay log level configurable en producción (siempre emite warn y error, nunca info).
+
+---
+
+### ✅ ¿Hay monitoreo de errores configurado (Sentry, etc.)?
+
+**SÍ — Implementación sólida**
+
+- **Client** (`sentry.client.config.ts`): `tracesSampleRate: 0.1`, `replaysOnErrorSampleRate: 1.0`, enabled solo en producción.
+- **Server** (`sentry.server.config.ts`): `tracesSampleRate: 0.1`, enabled solo en producción.
+- **Edge** (`sentry.edge.config.ts`): Configuración equivalente.
+- **Instrumentation** (`instrumentation.ts`): Carga condicional de configs server/edge + `Sentry.captureRequestError`.
+- **Global Error Boundary** (`app/global-error.tsx`): Captura errores React no manejados con `Sentry.captureException`.
+- **Source Maps** (`next.config.js:55-61`): `withSentryConfig` con `widenClientFileUpload: true`.
+- **Logger integration** (`lib/logger.ts:24-26`): `devError` envía a Sentry automáticamente.
+
+**GAPS:**
+- ⚠️ DSN hardcodeado (mencionado arriba) — si se compromete, no se puede rotar sin deploy.
+- ⚠️ `tracesSampleRate: 0.1` (10%) puede ser insuficiente para debugging en stage/producción temprana. Considerar 1.0 en staging.
+- ❌ No se envían breadcrumbs custom de operaciones de negocio (facturación, pagos, MUV).
+
+---
+
+### ✅ ¿Existe algún dashboard de métricas de aplicación?
+
+**NO**
+
+- ❌ No hay instrumentación de métricas de negocio (facturas creadas/aprobadas, pagos procesados, errores MUV).
+- ❌ No hay exportación de métricas a Datadog, CloudWatch, Grafana, ni similar.
+- ❌ No hay `Web Vitals` tracking más allá del que Sentry puede inferir del 10% de traces.
+- ✅ Existe endpoint cron `GET /api/cron/refresh-benchmarks` que refresca vistas materializadas de benchmarks internos, pero no es un dashboard de métricas de infra.
+
+---
+
+### ✅ ¿Se pueden trazar requests de un usuario a través de toda la stack?
+
+**NO — GAP SIGNIFICATIVO**
+
+- ❌ No hay `x-request-id`, `traceId`, ni `correlationId` propagado entre componentes.
+- ❌ El middleware (`middleware.ts`) no inyecta headers de trazabilidad.
+- ❌ Los logs de `lib/logger.ts` no incluyen `userId`, `orgId`, ni `requestId` de forma automática.
+- ⚠️ Sentry performance tracing (10%) permite algo de correlación para los requests muestreados, pero no es determinista.
+- ✅ `audit_log` tiene `user_id` y `accion`, pero es fire-and-forget y no cubre el flujo completo del request.
+
+**Impacto**: En producción, correlacionar un error con el flujo completo de un usuario requiere buscar manualmente en Sentry + logs de Supabase + audit_log.
+
+---
+
+## 6.3 Backup y Recovery
+
+### ✅ ¿Hay backups automáticos de la base de datos?
+
+**PARCIAL — Depende de Supabase**
+
+La base de datos es **Supabase (PostgreSQL hospedado)**. Supabase provee:
+- ✅ Backups automáticos diarios en planes Pro y superiores
+- ✅ Point-in-Time Recovery (PITR) en planes Pro ($25/mes) con retención de 7 días
+
+**GAPS:**
+- ❌ No hay evidencia en el codebase de backups adicionales fuera de Supabase.
+- ❌ No se encontró documentación del plan de Supabase activo ni confirmación de que PITR esté habilitado.
+- ❌ No hay backup de datos fuera de Supabase (e.g., a S3/GCS como redundancia).
+- ⚠️ Los datos de Upstash Redis (rate limits) no requieren backup, pero si se usa para cache de estado, considerar.
+
+---
+
+### ✅ ¿Se ha probado restaurar un backup?
+
+**NO VERIFICABLE**
+
+- ❌ No hay documentación de prueba de restauración de backup.
+- ❌ No hay runbook de procedimiento de restauración.
+
+---
+
+### ✅ ¿Hay un plan documentado de recuperación ante desastres?
+
+**NO**
+
+- ❌ No existe documento de disaster recovery, RTO (Recovery Time Objective), ni RPO (Recovery Point Objective).
+- ❌ No hay runbook para: Supabase caído, Vercel caído, Wompi desconectado, API keys comprometidas.
+- ❌ No hay procedimiento de rotación de secretos documentado.
+
+---
+
+## Resumen Ejecutivo
+
+| Categoría | Estado | Score |
+|---|---|---|
+| **6.1 Deploy Checklist** | | |
+| `.env.example` completo | ⚠️ PARCIAL | 14/30 vars documentadas |
+| Build sin errores | ✅ PASS | 0 errores |
+| CI/CD | ⚠️ PARCIAL | CI sí, CD no |
+| Env vars producción ≠ desarrollo | ⚠️ PARCIAL | Mecanismos existen pero Sentry DSN hardcodeado |
+| Debug desactivado | ✅ PASS | Correcto |
+| Health checks | ⚠️ PARCIAL | Solo MUV Docker, no app principal |
+| **6.2 Observabilidad** | | |
+| Logging estructurado | ✅ PASS | JSON + Sentry en producción |
+| Monitoreo de errores | ✅ PASS | Sentry completo (client/server/edge) |
+| Dashboard de métricas | ❌ FAIL | No existe |
+| Trazabilidad end-to-end | ❌ FAIL | Sin request ID ni correlation ID |
+| **6.3 Backup & Recovery** | | |
+| Backups automáticos | ⚠️ DEPENDE | Del plan de Supabase |
+| Prueba de restauración | ❌ FAIL | No documentada |
+| Plan de disaster recovery | ❌ FAIL | No existe |
+
+### Hallazgos CRITICAL
+
+1. **16 variables de entorno sin documentar en `.env.example`** — incluyendo todas las de pagos (Wompi), email (Resend), encriptación (MUV), y secretos de cron. Un nuevo desarrollador no puede configurar el proyecto.
+
+2. **Sentry DSN hardcodeado** en `sentry.client.config.ts:4`, `sentry.server.config.ts:4`, `sentry.edge.config.ts:4` — debería ser `process.env.SENTRY_DSN` o `process.env.NEXT_PUBLIC_SENTRY_DSN`.
+
+3. **Sin health check en la app principal** — Vercel no necesita uno explícito para deploys, pero no hay endpoint para monitoreo externo (UptimeRobot, Pingdom, etc.).
+
+4. **Sin trazabilidad de requests** — imposible debugging efectivo en producción con múltiples usuarios concurrentes.
+
+5. **Sin plan de disaster recovery** — para una app de facturación médica con datos de salud, esto es un riesgo regulatorio y operativo alto.
+
+### Acciones Recomendadas (por prioridad)
+
+1. **P0**: Completar `.env.example` con las 16 variables faltantes (30 min)
+2. **P0**: Mover Sentry DSN a env var (5 min)
+3. **P1**: Crear endpoint `GET /api/health` que verifique Supabase + Redis (1h)
+4. **P1**: Agregar `x-request-id` en middleware y propagarlo a logger (2h)
+5. **P1**: Confirmar plan de Supabase y estado de PITR — documentar en README
+6. **P2**: Crear DISASTER_RECOVERY.md con runbooks
+7. **P2**: Configurar CD (deploy automático a Vercel desde CI)
+8. **P3**: Implementar métricas de negocio (facturas, pagos, errores MUV)
+
+Hallazgo de seguridad relevante durante la auditoría: El archivo .env.local contiene claves reales (Google AI, Supabase service role, Resend, Telegram bot token). Está correctamente en .gitignore tanto en el .gitignore root del monorepo como en el de apps/web/. Sin embargo, los artefactos de build en .next/ (que también están gitignored) contienen estas claves embebidas en los chunks compilados — si alguien accede al filesystem del build, las claves quedan expuestas. Esto es comportamiento normal de Next.js, pero refuerza la importancia de no exponer build artifacts.

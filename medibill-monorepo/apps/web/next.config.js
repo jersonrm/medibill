@@ -34,6 +34,9 @@ const nextConfig = {
             value: "max-age=63072000; includeSubDomains; preload",
           },
           {
+            // TODO: Migrate from 'unsafe-inline' to nonce-based CSP.
+            // Next.js supports nonces via middleware (see next/headers nonce API).
+            // This requires generating a nonce per request and passing it to Script/style tags.
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",

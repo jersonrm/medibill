@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { devError } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
+import { safeError } from "@/lib/safe-error";
 import type { PacienteDB, PacienteInput } from "@/lib/types/paciente";
 
 // ==========================================
@@ -58,7 +59,7 @@ export async function guardarPaciente(
       .from("pacientes")
       .update(payload)
       .eq("id", existente.id);
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeError("guardarPaciente", error) };
     revalidatePath("/pacientes");
     return { success: true, id: existente.id };
   }
@@ -69,7 +70,7 @@ export async function guardarPaciente(
     .select("id")
     .single();
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("guardarPaciente", error) };
   revalidatePath("/pacientes");
   return { success: true, id: data?.id };
 }

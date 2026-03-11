@@ -3,6 +3,10 @@
 import { createClient } from "@/lib/supabase-server";
 import { devError } from "@/lib/logger";
 import { registrarAuditLog } from "@/lib/audit-log";
+import { safeError } from "@/lib/safe-error";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
+import { GuardarAcuerdoSchema } from "@/lib/schemas/acuerdos.schema";
 
 // ==========================================
 // ACUERDOS DE VOLUNTADES — Server Actions
@@ -18,6 +22,7 @@ export async function obtenerAcuerdos() {
     .from('acuerdos_voluntades')
     .select('*')
     .eq('prestador_id', user.id)
+    .eq('activo', true)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -64,12 +69,16 @@ export async function guardarAcuerdo(datos: {
   requiere_autorizacion: boolean;
   observaciones?: string;
 }) {
+  const parsed = GuardarAcuerdoSchema.safeParse(datos);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { exito: false, error: "No autenticado" };
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "gestionar_acuerdos");
 
   const payload = {
-    prestador_id: user.id,
+    prestador_id: ctx.userId,
+    organizacion_id: ctx.orgId,
     eps_codigo: datos.eps_codigo,
     nombre_eps: datos.nombre_eps,
     email_radicacion: datos.email_radicacion || null,
@@ -88,19 +97,19 @@ export async function guardarAcuerdo(datos: {
       .from('acuerdos_voluntades')
       .update(payload)
       .eq('id', datos.id)
-      .eq('prestador_id', user.id);
-    if (error) return { exito: false, error: error.message };
+      .eq('prestador_id', ctx.userId);
+    if (error) return { success: false, error: safeError("guardarAcuerdo", error) };
     registrarAuditLog({ accion: "actualizar_acuerdo", tabla: "acuerdos_voluntades", registroId: datos.id, metadata: { eps_codigo: datos.eps_codigo } });
-    return { exito: true, id: datos.id };
+    return { success: true, id: datos.id };
   } else {
     const { data, error } = await supabase
       .from('acuerdos_voluntades')
       .insert(payload)
       .select('id')
       .single();
-    if (error) return { exito: false, error: error.message };
+    if (error) return { success: false, error: safeError("guardarAcuerdo", error) };
     registrarAuditLog({ accion: "crear_acuerdo", tabla: "acuerdos_voluntades", registroId: data?.id, metadata: { eps_codigo: datos.eps_codigo } });
-    return { exito: true, id: data?.id };
+    return { success: true, id: data?.id };
   }
 }
 
@@ -117,19 +126,19 @@ export async function guardarTarifasAcuerdo(
     observaciones?: string;
   }>
 ) {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "gestionar_acuerdos");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { exito: false, error: "No autenticado" };
 
   // Verificar que el acuerdo pertenece al usuario
   const { data: acuerdo } = await supabase
     .from('acuerdos_voluntades')
     .select('id')
     .eq('id', acuerdoId)
-    .eq('prestador_id', user.id)
+    .eq('prestador_id', ctx.userId)
     .single();
 
-  if (!acuerdo) return { exito: false, error: "Acuerdo no encontrado" };
+  if (!acuerdo) return { success: false, error: "Acuerdo no encontrado" };
 
   // Eliminar tarifas existentes
   await supabase
@@ -154,25 +163,25 @@ export async function guardarTarifasAcuerdo(
       .from('acuerdo_tarifas')
       .insert(rows);
 
-    if (error) return { exito: false, error: error.message };
+    if (error) return { success: false, error: safeError("guardarTarifasAcuerdo", error) };
   }
 
-  return { exito: true };
+  return { success: true };
 }
 
 /** Eliminar un acuerdo de voluntades y sus tarifas (cascade) */
 export async function eliminarAcuerdo(acuerdoId: string) {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "gestionar_acuerdos");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { exito: false, error: "No autenticado" };
 
   const { error } = await supabase
     .from('acuerdos_voluntades')
-    .delete()
+    .update({ activo: false })
     .eq('id', acuerdoId)
-    .eq('prestador_id', user.id);
+    .eq('prestador_id', ctx.userId);
 
-  if (error) return { exito: false, error: error.message };
+  if (error) return { success: false, error: safeError("eliminarAcuerdo", error) };
   registrarAuditLog({ accion: "eliminar_acuerdo", tabla: "acuerdos_voluntades", registroId: acuerdoId });
-  return { exito: true };
+  return { success: true };
 }

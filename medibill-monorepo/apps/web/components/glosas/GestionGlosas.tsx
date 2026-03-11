@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import type {
   GlosaRecibidaEnriquecida,
@@ -18,7 +19,8 @@ import {
 import TarjetaGlosa from "@/components/glosas/TarjetaGlosa";
 import FormularioRespuestaGlosa from "@/components/glosas/FormularioRespuestaGlosa";
 import ResumenRespuesta from "@/components/glosas/ResumenRespuesta";
-import ModalRegistrarGlosa from "@/components/glosas/ModalRegistrarGlosa";
+
+const ModalRegistrarGlosa = dynamic(() => import("@/components/glosas/ModalRegistrarGlosa"), { ssr: false });
 
 // =====================================================================
 // Helpers

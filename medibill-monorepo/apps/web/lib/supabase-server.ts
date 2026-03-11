@@ -1,7 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { devWarn } from "@/lib/logger";
 import type { User } from "@supabase/supabase-js";
+
+/**
+ * Cliente Supabase con service_role (sin cookies, para webhooks/cron/admin).
+ * NO pasa por RLS — usar solo en contextos server-side seguros.
+ */
+export function createServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 export async function createClient() {
   const cookieStore = await cookies();

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import type { AtencionUI, DatosPaciente } from "@/lib/types/ui";
 import {
   DICCIONARIO_MODALIDAD,
@@ -8,8 +9,9 @@ import {
   DICCIONARIO_TIPO_DIAG,
   DICCIONARIO_TIPO_SERVICIO,
 } from "@/lib/types/ui";
-import ModalBusquedaCodigo from "@/components/ModalBusquedaCodigo";
 import { buscarCupsAction } from "@/app/actions/busqueda-codigos";
+
+const ModalBusquedaCodigo = dynamic(() => import("@/components/ModalBusquedaCodigo"), { ssr: false });
 
 /* Diccionario de códigos de consulta por especialidad */
 const CODIGOS_CONSULTA: Record<string, string> = {

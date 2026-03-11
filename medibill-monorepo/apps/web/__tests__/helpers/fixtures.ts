@@ -5,7 +5,7 @@
 
 import type { DatosParaRips, MedicamentoInput, OtroServicioInput } from "@/lib/types/rips";
 import type { DiagnosticoIA, ProcedimientoIA } from "@/lib/types/validacion";
-import type { CrearFacturaInput, FacturaCompleta } from "@/lib/types/factura";
+import type { CrearFacturaInput, FacturaCompleta, ProcedimientoFactura } from "@/lib/types/factura";
 import type { RegistrarPagoInput, PagoDB } from "@/lib/types/pago";
 import type { FilaNormalizada, FilaSabana } from "@/lib/types/sabana";
 import type { AtencionUI, DiagnosticoUI, ProcedimientoUI } from "@/lib/types/ui";
@@ -82,6 +82,20 @@ export function crearProcedimientoUI(overrides?: Partial<ProcedimientoUI>): Proc
     valor_procedimiento: 45000,
     valor_unitario: 45000,
     fuente_tarifa: "propia",
+    ...overrides,
+  };
+}
+
+export function crearProcedimientoFactura(overrides?: Partial<ProcedimientoFactura>): ProcedimientoFactura {
+  return {
+    codigo_cups: "881602",
+    descripcion: "Radiografía de columna lumbosacra",
+    cantidad: 1,
+    alternativas: [],
+    valor_procedimiento: 45000,
+    valor_unitario: 45000,
+    fuente_tarifa: "propia",
+    manual: false,
     ...overrides,
   };
 }

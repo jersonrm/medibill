@@ -1,0 +1,327 @@
+# INTEGRATIONS_AUDIT.md — Fase 5: Validación de Integraciones Externas
+
+**Fecha**: 2026-03-10  
+**Auditor**: GitHub Copilot (Claude Opus 4.6)  
+**Alcance**: `medibill-monorepo/apps/web` — Todas las integraciones con servicios externos
+
+---
+
+## INVENTARIO DE SERVICIOS EXTERNOS
+
+| # | Servicio | Tipo | Archivo principal | Propósito |
+|---|----------|------|-------------------|-----------|
+| 1 | **Supabase** (PostgreSQL + Auth) | BaaS | `lib/supabase-server.ts` | Base de datos, autenticación, RLS |
+| 2 | **Google Gemini AI** | AI API | `lib/gemini.ts`, `lib/gemini-glosas.ts`, `lib/embedding-service.ts`, `lib/sabana-mapper.ts` | Clasificación médica, embeddings, respuesta glosas |
+| 3 | **Matias API** | Facturación DIAN | `lib/providers/matias-client.ts` | Envío facturas electrónicas, CUFE, XML/PDF |
+| 4 | **MUV Docker** (MinSalud) | Validación local | `lib/providers/muv-client.ts` | Validación RIPS → CUV |
+| 5 | **Wompi** | Pagos | `lib/wompi.ts` | Checkout, cobros, webhooks de transacciones |
+| 6 | **Resend** | Email | `lib/email.ts` | Envío de emails de radicación |
+| 7 | **Telegram Bot API** | Bot | `lib/telegram.ts` | Enviar/recibir mensajes, audio, botones |
+| 8 | **Sentry** | Monitoreo | `sentry.*.config.ts` | Error tracking, tracing |
+| 9 | **Upstash Redis** | Rate limiting | `lib/rate-limit.ts` | Sliding window rate limiter |
+
+---
+
+## 5.1 — ANÁLISIS POR SERVICIO
+
+---
+
+### 1. SUPABASE (PostgreSQL + Auth)
+
+**Archivos**: `lib/supabase-server.ts`, middleware.ts, todos los `app/actions/*.ts`
+
+#### Manejo de errores
+- **PASS** ✅ — Cada query Supabase verifica `error` antes de usar `data`. Patrón consistente:
+  ```typescript
+  const { data, error } = await supabase.from("tabla").select("*");
+  if (error) return { success: false, error: error.message };
+  
+¿Si el servicio cae?
+WARN ⚠️ — Si Supabase no responde, toda la app deja de funcionar (auth + datos). No hay fallback offline ni cache local. Esto es inherente al modelo SaaS + BaaS y es aceptable, pero no hay circuit breaker ni health check propio.
+API keys/secrets en env vars
+PASS ✅ — Todas las claves en variables de entorno:
+NEXT_PUBLIC_SUPABASE_URL (pública, solo URL)
+NEXT_PUBLIC_SUPABASE_ANON_KEY (pública, RLS protege)
+SUPABASE_SERVICE_ROLE_KEY (server-only, .env.local)
+Validación de respuestas
+PASS ✅ — TypeScript tipado + verificación de error en cada query.
+Rate limits
+INFO ℹ️ — Supabase tiene rate limits en su free tier (500 req/min). El plan Pro sube a 5000/min. No hay throttling del lado de la app para proteger el backend.
+Costos
+PASS ✅ — Supabase Pro es fixed cost ($25/mo). Sin costos variables significativos.
+
+2. GOOGLE GEMINI AI (Clasificación, Embeddings, Glosas)
+Archivos: lib/gemini.ts (L1-200), lib/gemini-glosas.ts (L1-50), lib/embedding-service.ts (L1-160), lib/sabana-mapper.ts (L17-29), app/actions/clasificacion.ts, app/actions/telegram-clasificacion.ts
+
+Manejo de errores
+PASS ✅ — Clasificación en app/actions/clasificacion.ts L160-180: try/catch envolvente con mensaje de error al usuario.
+PASS ✅ — Embedding en lib/embedding-service.ts L62-68: verifica response.ok y lanza error con detalle.
+WARN ⚠️ — Sin timeout explícito: las llamadas a Gemini via @google/generative-ai SDK no tienen timeout configurable. Si Gemini tarda 60+ segundos, la request de Vercel hará timeout (función serverless max 10-60s según plan). No hay AbortSignal.timeout().
+WARN ⚠️ — Sin retry: si Gemini devuelve 429 (rate limit) o 503 (overloaded), la app no reintenta. Retorna error directo al usuario.
+¿Si el servicio cae?
+PASS ✅ — Las partes de la app que NO usan IA siguen funcionando (facturas manuales, gestión pacientes, configuración, DIAN). La clasificación y el bot de Telegram fallarán con error amigable.
+PASS ✅ — AI Helper en /api/ai-helper/route.ts L46-62 tiene fallback: primero busca en la DB (sin IA), solo usa Gemini si la búsqueda directa no basta.
+PASS ✅ — RAG extraction en clasificacion.ts L55-58: si el RAG falla, continúa con el texto original sin candidatos.
+API keys/secrets en env vars
+PASS ✅ — GOOGLE_GENERATIVE_AI_API_KEY en .env.local, referenciada vía process.env en 5 archivos.
+CRITICAL 🔴 — DSN de Sentry hardcodeada: en sentry.client.config.ts, sentry.server.config.ts, sentry.edge.config.ts el DSN está hardcodeado en el código fuente:
+dsn: "https://a088802db65084950599ef916f9e0f65@o4511016097546240.ingest.us.sentry.io/4511016105410560"
+
+Esto no es un secreto de seguridad (DSN solo permite enviar eventos, no leer), pero es un bad practice que dificulta rotación y puede causar spam si alguien lo usa para inyectar eventos falsos. Debería estar en SENTRY_DSN env var.
+Validación de respuestas
+PASS ✅ — Gemini responde JSON con responseMimeType: "application/json" y responseSchema estricto. Si falla el parse, el catch envolvente captura el error.
+PASS ✅ — Post-clasificación aplica 5 validaciones: validarYCorregirCups, validarYCorregirCie10, validarCoherenciaAnatomica, ordenarDiagnosticosPorRol, corrección de diagnostico_asociado. No se confía ciegamente en la IA.
+Rate limits del servicio
+WARN ⚠️ — Gemini 2.5 Flash tiene rate limits (15 RPM free tier, 1000 RPM con pago). La app tiene rate limiting por usuario en /api/ai-helper (10 req/min) y en Telegram webhook (5 req/min), pero clasificarTextoMedico() desde la web no tiene rate limit a nivel de la API de Gemini. Un usuario podría clasificar muchas veces seguidas y agotar la cuota.
+MITIGANTE ✅ — La verificación de suscripción (verificarLimite) limita clasificaciones por plan (100-500/mes), lo cual restringe indirectamente.
+Costos controlados
+PASS ✅ — Costos documentados y controlados vía verificarLimite() en lib/suscripcion.ts:
+Starter: max 100 clasificaciones/mes (~$3 COP/clasificación = ~$300 COP/mes max)
+Profesional: max 500/mes
+Clínica/IPS: unlimited pero per-user billing
+PASS ✅ — Embedding cache en lib/embedding-service.ts L73-80: cache en memoria (max 200 entradas) evita recomputar embeddings.
+INFO ℹ️ — El bot de Telegram para anónimos permite 3 clasificaciones gratis con Gemini sin necesitar cuenta. Abuso potencial bajo: el limit es por telegram_user_id.
+3. MATIAS API (Facturación DIAN)
+Archivos: lib/providers/matias-client.ts (L1-250), app/actions/dian.ts (L1-200)
+
+Manejo de errores
+PASS ✅ — Todas las funciones verifican res.ok y lanzan errores descriptivos con status code y body.
+PASS ✅ — En enviarFactura() L102-114: hay retry automático para HTTP 401 (token expirado). Invalida cache y re-autentica.
+PASS ✅ — En enviarFactura() L129-131: error 402 (límite de consumo) produce mensaje claro al usuario.
+WARN ⚠️ — Sin timeout: las llamadas fetch() a Matias API no tienen AbortSignal.timeout(). Si el servidor tarda, la función serverless de Vercel hará timeout pero el usuario no recibe mensaje claro de timeout vs error.
+WARN ⚠️ — Sin retry para errores transitorios: solo hay retry para 401. Errores 500 o de red no se reintentan.
+¿Si el servicio cae?
+PASS ✅ — La app sigue funcionando para todo lo que no involucre DIAN. Clasificación, gestión de facturas, pacientes, etc. funcionan independientemente.
+PASS ✅ — Errores de Matias se devuelven como { success: false, error: "mensaje" } sin romper la UI. El usuario ve "Error de conexión con Matias API".
+API keys/secrets en env vars
+PASS ✅ — Todas en env vars: MATIAS_API_URL, MATIAS_API_EMAIL, MATIAS_API_PASSWORD, MATIAS_PAT_TOKEN.
+PASS ✅ — getConfig() lanza error si MATIAS_API_URL no está configurada.
+Validación de respuestas
+WARN ⚠️ — En enviarFactura() L134-142: la respuesta se castea como MatiasInvoiceResponse sin validar la estructura del JSON recibido. Si Matias cambia la API, podría haber undefined accesses. No hay validación con Zod/AJV de la respuesta.
+WARN ⚠️ — En consultarEstado() L160: mismo patrón — cast directo a MatiasStatusResponse.
+Rate limits
+INFO ℹ️ — Matias API tiene rate limits por paquete contratado (30K documentos/año en el paquete base). La app controla uso vía verificarLimite('factura_dian') y consultarConsumo() para monitorear.
+Costos
+PASS ✅ — Costos documentados: $22 COP/doc + $115K COP/NIT/año. Controlados por plan de suscripción.
+4. MUV DOCKER (MinSalud – Validación RIPS)
+Archivos: lib/providers/muv-client.ts (L1-100), app/actions/muv.ts (L1-130)
+
+Manejo de errores
+PASS ✅ — validarEnMuv() L55-88: manejo robusto — parsea errores estructurados del MUV, fallback a error genérico si no es JSON.
+PASS ✅ — Timeout implementado: AbortSignal.timeout(MUV_TIMEOUT_MS) con 30 segundos. Único servicio externo con timeout explícito.
+PASS ✅ — healthCheck() L33-40: verifica disponibilidad antes de enviar con timeout de 5s.
+¿Si el servicio cae?
+PASS ✅ — muv.ts L76-80: si el health check falla, retorna error amigable "El servicio MUV no está disponible. Verifique que el Docker esté corriendo." El flujo de facturación DIAN sigue funcionando sin MUV.
+API keys/secrets en env vars
+PASS ✅ — MUV_DOCKER_URL en env var (default http://localhost:8080).
+PASS ✅ — Credenciales MUV per-prestador están encriptadas en la DB (contrasena_encrypted) y se desencriptan con decrypt() al momento de usar.
+Validación de respuestas
+PASS ✅ — Respuesta parseada y tipada como MuvValidationResponse. Errores estructurados como array MuvError[].
+Rate limits / Costos
+INFO ℹ️ — MUV es un servicio gubernamental self-hosted (Docker local). Sin costos ni rate limits externos.
+5. WOMPI (Pagos)
+Archivos: lib/wompi.ts (L1-210), lib/payment-provider.ts (L1-75), app/api/wompi/webhook/route.ts (L1-100), app/actions/billing.ts
+
+Manejo de errores
+PASS ✅ — cobrarConToken() L108-130: verifica response.ok, devuelve ChargeResult con estado descriptivo.
+WARN ⚠️ — Sin timeout en fetch() a WOMPI_API. Si Wompi tarda, timeout de Vercel.
+WARN ⚠️ — Sin retry para errores transitorios de Wompi.
+¿Si el servicio cae?
+PASS ✅ — Solo afecta el flujo de pago. El resto de la app (clasificación, DIAN, gestión) funciona normalmente.
+PASS ✅ — Error controlado en billing.ts L108: return { error: error instanceof Error ? error.message : "Error al iniciar checkout" }.
+API keys/secrets en env vars
+PASS ✅ — Todas en env vars: WOMPI_PUBLIC_KEY, WOMPI_PRIVATE_KEY, WOMPI_EVENTS_SECRET, WOMPI_INTEGRITY_KEY, WOMPI_ENVIRONMENT.
+PASS ✅ — Helper functions (getPrivateKey(), etc.) lanzan error claro si no están configuradas.
+Validación de respuestas
+PASS ✅ — cobrarConToken() mapea estados via estadoMap con fallback a "error". No asume estructura.
+Rate limits / Costos
+INFO ℹ️ — Wompi cobra 2.5% por transacción. Controlado por naturaleza (solo se ejecuta en pagos del usuario). No hay riesgo de exceder rate limits.
+6. RESEND (Email)
+Archivos: lib/email.ts (L1-100), app/actions/radicacion.ts (L145-270)
+
+Manejo de errores
+PASS ✅ — enviarEmailRadicacion() L30-45: try/catch envolvente. Retorna { success: false, error: string } sin crashear.
+WARN ⚠️ — Sin timeout ni retry. Si Resend tarda o falla, el usuario pierde la radicación. No guarda el paquete para reintentar.
+WARN ⚠️ — Si el email falla, la factura NO cambia a "radicada" (correcto), pero tampoco se registra el intento fallido para auditoría.
+¿Si el servicio cae?
+PASS ✅ — Solo afecta el envío de radicación por email. El usuario puede descargar el ZIP manualmente y enviar por su cuenta.
+API keys/secrets en env vars
+PASS ✅ — RESEND_API_KEY en .env.local.
+WARN ⚠️ — lib/email.ts L3: const resend = new Resend(process.env.RESEND_API_KEY) — inicializa al importar el módulo. Si RESEND_API_KEY es undefined, Resend SDK podría funcionar silenciosamente hasta el primer envío, donde fallaría. Mejor verificar al momento de uso.
+Validación de respuestas
+PASS ✅ — Verifica error del SDK de Resend antes de retornar success.
+Rate limits / Costos
+INFO ℹ️ — Resend free tier: 100 emails/día, 3000/mes. Suficiente para early stage. No hay control de la app para evitar exceder.
+7. TELEGRAM BOT API
+Archivos: lib/telegram.ts (L1-130), app/api/telegram/webhook/route.ts (L1-660)
+
+Manejo de errores
+PASS ✅ — webhook/route.ts L36-38: try/catch global que siempre retorna 200 a Telegram (correcto, para evitar que Telegram re-envíe el update infinitamente).
+PASS ✅ — Validaciones de audio: duración max 5 min, tamaño max 5 MB.
+WARN ⚠️ — lib/telegram.ts: las funciones enviarMensaje(), enviarMensajeConBotones() no verifican res.ok. Si Telegram rechaza un mensaje (chat bloqueado, etc.), el error se ignora silenciosamente.
+WARN ⚠️ — Sin timeout en las llamadas fetch a Telegram API.
+¿Si el servicio cae?
+PASS ✅ — El bot de Telegram es un feature secundario. La app web funciona completamente sin él.
+API keys/secrets en env vars
+PASS ✅ — TELEGRAM_BOT_TOKEN en .env.local.
+Rate limits
+PASS ✅ — Rate limiting implementado: createRateLimiter({ max: 5, windowMs: 60_000 }) por telegram_user_id.
+INFO ℹ️ — Telegram Bot API limit: ~30 msg/sec a chats distintos. Improbable que Medibill lo alcance.
+Costos
+PASS ✅ — Telegram Bot API es gratuita. Costo indirecto: cada audio procesa ~3 llamadas a Gemini (transcripción + RAG + clasificación).
+8. SENTRY (Error Tracking)
+Archivos: sentry.client.config.ts, sentry.server.config.ts, sentry.edge.config.ts, instrumentation.ts
+
+Manejo de errores
+PASS ✅ — Sentry se inicializa con enabled: process.env.NODE_ENV === "production". No interfiere en desarrollo.
+PASS ✅ — Trace sample rate al 10% (tracesSampleRate: 0.1) — razonable para costos.
+¿Si el servicio cae?
+PASS ✅ — Sentry es completamente no-bloqueante. Si no puede enviar eventos, la app funciona normalmente.
+API keys/secrets
+CRITICAL 🔴 — Sentry DSN hardcodeada en tres archivos fuente. No es un secreto de autenticación, pero:
+Dificulta rotación de proyecto
+Permite que terceros inyecten eventos falsos al proyecto de Sentry
+Debería moverse a SENTRY_DSN env var (ya soportado por el SDK)
+Costos
+PASS ✅ — Free tier de Sentry: 5K eventos/mes. El 10% sampling reduce volumen.
+9. UPSTASH REDIS (Rate Limiting)
+Archivos: lib/rate-limit.ts (L1-90)
+
+Manejo de errores
+PASS ✅ — Fallback in-memory si UPSTASH_REDIS_REST_URL no está configurada. La app nunca crashea por falta de Redis.
+¿Si el servicio cae?
+PASS ✅ — Graceful degradation a rate limiter in-memory. Los rate limits siguen funcionando pero no son distribuidos (cada instancia serverless tiene su propio conteo).
+API keys/secrets
+PASS ✅ — UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN en env vars.
+Costos
+PASS ✅ — Upstash free tier: 10K commands/day. Suficiente para rate limiting.
+5.2 — WEBHOOKS Y CALLBACKS
+WEBHOOK 1: Wompi (/api/wompi/webhook)
+Archivo: app/api/wompi/webhook/route.ts (L1-100)
+
+Autenticidad
+PASS ✅ — Verificación de firma HMAC-SHA256 en wompiProvider.verificarWebhookFirma() (lib/wompi.ts L148-168):
+Concatena transaction.id + status + amount_in_cents + timestamp + events_secret
+Compara con signature.checksum del payload
+Rechaza con 401 si no coincide
+Idempotencia
+HIGH 🟠 — NO es idempotente. Si Wompi envía el mismo webhook dos veces con transaction.approved:
+
+suscripciones.update se ejecuta de nuevo — sobrescribe fechas pero no duplica filas (OK por ser UPDATE)
+historial_pagos.insert SÍ crea un registro duplicado — no hay ON CONFLICT ni verificación de wompi_transaction_id existente
+organizaciones.update de wompi_payment_source — idempotente (sobrescribe con mismo valor)
+IMPACTO: Registros duplicados en historial_pagos. La suscripción no se duplica, pero el historial de pagos se contamina.
+
+FIX RECOMENDADO: Agregar verificación antes del insert:
+// Verificar si ya procesamos esta transacción
+const { data: existing } = await supabase
+  .from("historial_pagos")
+  .select("id")
+  .eq("wompi_transaction_id", evento.transactionId)
+  .single();
+if (existing) break; // Ya procesado
+O agregar UNIQUE constraint en historial_pagos(wompi_transaction_id).
+
+Tiempo de respuesta
+PASS ✅ — El webhook procesa todo sincrónicamente pero solo hace 2-3 queries a Supabase (update + insert). Debería completar en <1 segundo. No hay procesamiento pesado delegado.
+WEBHOOK 2: Telegram (/api/telegram/webhook)
+Archivo: app/api/telegram/webhook/route.ts (L1-660)
+
+Autenticidad
+HIGH 🟠 — Verificación de autenticidad insuficiente. El webhook verifica que TELEGRAM_BOT_TOKEN exista pero no valida que el request proviene de Telegram:
+// L43-46: Solo verifica que el token exista en env vars, NO que la request sea de Telegram
+const botToken = process.env.TELEGRAM_BOT_TOKEN;
+if (!botToken) {
+  return NextResponse.json({ error: "Bot no configurado" }, { status: 500 });
+}
+Telegram recomienda usar secret_token al registrar el webhook con setWebhook() y verificar el header X-Telegram-Bot-Api-Secret-Token en cada request. Esto NO está implementado.
+
+IMPACTO: Cualquiera que descubra la URL /api/telegram/webhook puede enviar updates falsos. Un atacante podría:
+
+Simular mensajes de usuarios que no existen
+Consumir clasificaciones de Gemini sin autorización
+Agotar el rate limit de otros usuarios
+FIX RECOMENDADO:
+
+Agregar TELEGRAM_WEBHOOK_SECRET env var
+Pasar secret_token al llamar setWebhook
+Verificar request.headers.get("x-telegram-bot-api-secret-token") en L42
+Idempotencia
+WARN ⚠️ — Parcialmente idempotente. Si Telegram re-envía un update:
+
+Clasificaciones: se ejecutarían de nuevo (duplicado en auditorías_rips y uso_mensual incrementado doble). Sin embargo, Telegram raramente re-envía si el webhook retorna 200 (que siempre hace, L38).
+Vinculación: el código de vinculación ya está usado=true, así que el re-envío retorna "ya fue usado" (OK).
+MITIGANTE: El webhook siempre retorna 200, por lo que Telegram no re-envía. Riesgo real bajo.
+
+Tiempo de respuesta
+HIGH 🟠 — Puede exceder 5 segundos fácilmente. El procesamiento de audio en handleAudio() hace:
+
+obtenerArchivo() → fetch a Telegram API (~200ms)
+descargarArchivo() → fetch a Telegram API (~500ms-2s para audio 5MB)
+clasificarAudioTelegram() → 3 llamadas a Gemini (transcripción 3s + RAG ~2s + clasificación ~3s) = **8-12 segundos**
+Validaciones DB + enviar respuesta (~500ms)
+Total estimado: 12-16 segundos para audio processing. Telegram espera respuesta en ~60 segundos, así que no timeout, pero Vercel serverless (10s free, 60s Pro) podría ser el bottleneck.
+
+FIX RECOMENDADO: Para deployment Free tier de Vercel (<10s timeout), considerar:
+
+Responder 200 inmediatamente, procesar en background
+O asegurar plan Pro de Vercel (60s timeout)
+RESUMEN EJECUTIVO
+🔴 CRITICAL (2)
+#	Hallazgo	Archivo	Línea	Impacto
+C1	Sentry DSN hardcodeada en 3 archivos	sentry.client.config.ts, sentry.server.config.ts, sentry.edge.config.ts	L4	Bad practice, permite inyección de eventos falsos, dificulta rotación
+C2	Webhook de Telegram sin verificación de secret_token	app/api/telegram/webhook/route.ts	L42-46	Cualquier atacante puede enviar updates falsos y consumir recursos (Gemini API)
+🟠 HIGH (3)
+#	Hallazgo	Archivo	Línea	Impacto
+H1	Wompi webhook NO idempotente — puede duplicar registros en historial_pagos	app/api/wompi/webhook/route.ts	L71-81	Historial de pagos contaminado si webhook se recibe doble
+H2	Telegram webhook toma ~12-16s para audio, puede exceder timeout serverless	app/api/telegram/webhook/route.ts	L295-420	Failure en Vercel free tier; respuesta incompleta en Pro tier bajo carga
+H3	Ninguna integración HTTP (Gemini SDK, Matias, Wompi, Resend, Telegram) tiene timeout explícito excepto MUV	Múltiples archivos	—	Si un servicio externo no responde, la función serverless consume recursos hasta timeout de Vercel
+⚠️ WARN (10)
+#	Hallazgo	Archivo	Impacto
+W1	Sin timeout en fetch a Gemini (embedding-service)	lib/embedding-service.ts L54, L99	Hang hasta Vercel timeout
+W2	Sin timeout en fetch a Matias API	lib/providers/matias-client.ts L66-221	Hang hasta Vercel timeout
+W3	Sin timeout en fetch a Wompi API	lib/wompi.ts L108	Hang hasta Vercel timeout
+W4	Sin timeout en fetch a Telegram API	lib/telegram.ts L30-87	Hang hasta Vercel timeout
+W5	Sin retry para errores transitorios de Matias (500, network error)	lib/providers/matias-client.ts	Factura DIAN falla sin reintento
+W6	Sin retry para Gemini rate limit (429) o overload (503)	lib/gemini.ts, app/actions/clasificacion.ts	Clasificación falla sin reintento
+W7	Resend SDK inicializado sin verificar API key	lib/email.ts L3	Error silencioso hasta primer uso
+W8	Telegram enviarMensaje() no verifica res.ok	lib/telegram.ts L30-35	Error silencioso si chat bloqueado
+W9	Matias respuesta cast sin validación de estructura	lib/providers/matias-client.ts L134, L160	Undefined access si API cambia
+W10	Radicación email fallida: intento no registrado para auditoría	app/actions/radicacion.ts L260	Sin traza de intentos fallidos
+✅ PASS (Resumen de lo que funciona bien)
+API keys en env vars: Todas las credenciales en .env.local, .gitignore las protege
+.env.example completo: Documenta todas las variables requeridas
+Graceful degradation: La app funciona sin Gemini, sin Matias, sin MUV, sin Telegram
+Rate limiting: Implementado en AI Helper (10/min), Telegram (5/min), con Upstash Redis + fallback in-memory
+Costos de IA controlados: verificarLimite() por plan (100-500 clasificaciones/mes)
+MUV con timeout y health check: Único servicio con AbortSignal.timeout(30_000) y health check previo
+Wompi webhook con firma HMAC: Verificación criptográfica de autenticidad
+Prompt injection defense: AI Helper tiene 11 regex patterns para detectar injection attempts
+Sentry error tracking: Configurado en client, server, y edge con sampling al 10%
+CSP headers: Content-Security-Policy configurada en next.config.js con connect-src restrictivo
+MATRIZ DE DEPENDENCIAS CRÍTICAS
+User Request → ¿Qué servicios se usan?
+
+Clasificar nota    → Supabase + Gemini AI (2-3 calls)
+Enviar factura     → Supabase + Matias API
+Validar RIPS (CUV) → Supabase + Matias API + MUV Docker
+Pagar suscripción  → Supabase + Wompi
+Radicar por email  → Supabase + Resend
+Bot Telegram audio → Supabase + Telegram API + Gemini AI (3 calls)
+Buscar CUPS (helper) → Supabase + (opcionalmente Gemini AI)
+Monitoreo errores  → Sentry (no-bloqueante)
+Rate limiting      → Upstash Redis (con fallback in-memory)
+ACCIONES CORRECTIVAS PRIORITIZADAS
+Prioridad 1 (Seguridad)
+C2: Implementar secret_token en webhook de Telegram
+C1: Mover Sentry DSN a variable de entorno SENTRY_DSN
+Prioridad 2 (Confiabilidad)
+H1: Agregar idempotencia al webhook de Wompi (unique constraint en wompi_transaction_id)
+H3: Agregar AbortSignal.timeout() a todos los fetch() externos (Gemini embeddings, Matias, Wompi, Telegram)
+Prioridad 3 (Resiliencia)
+W5/W6: Implementar retry con exponential backoff para Matias y Gemini (429, 500, 503)
+H2: Para Telegram audio, considerar responder 200 inmediato y procesar async, o asegurar plan Vercel Pro
+Prioridad 4 (Observabilidad)
+W10: Logear intentos fallidos de radicación email
+W8: Verificar respuesta de Telegram API y logear errores
+W9: Agregar validación runtime (Zod) de respuestas de Matias API

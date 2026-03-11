@@ -40,7 +40,7 @@ export async function obtenerInfoBilling(): Promise<{
     return {
       limites: null,
       historial: [],
-      error: error instanceof Error ? error.message : "Error obteniendo billing",
+      error: "Error obteniendo datos de suscripción. Intenta de nuevo.",
     };
   }
 }
@@ -105,7 +105,7 @@ export async function iniciarCheckout(planId: string, periodo: "mensual" | "anua
 
     return { redirectUrl: session.redirectUrl };
   } catch (error: unknown) {
-    return { error: error instanceof Error ? error.message : "Error al iniciar checkout" };
+    return { error: "Error al iniciar el pago. Intenta de nuevo." };
   }
 }
 
@@ -150,7 +150,7 @@ export async function cambiarPlan(nuevoPlanId: string): Promise<{ success: boole
 
     return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al cambiar plan. Intenta de nuevo." };
   }
 }
 
@@ -171,6 +171,6 @@ export async function cancelarSuscripcion(): Promise<{ success: boolean; error?:
 
     return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al cancelar suscripción. Intenta de nuevo." };
   }
 }

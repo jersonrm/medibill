@@ -10,6 +10,9 @@ const MENSAJES_PERMITIDOS: Record<string, string> = {
   error_credenciales: "Correo electrónico o contraseña incorrectos.",
   cuenta_no_encontrada: "No se encontró una cuenta con ese correo electrónico.",
   consentimiento_requerido: "Debes aceptar los Términos y la Política de Privacidad para registrarte.",
+  demasiados_intentos: "Has excedido el número de intentos. Intenta de nuevo en 15 minutos.",
+  password_reset_ok: "Te enviamos un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.",
+  password_reset_error: "No pudimos enviar el correo de recuperación. Verifica el email e intenta de nuevo.",
 };
 
 export default async function LoginPage({
@@ -88,6 +91,12 @@ export default async function LoginPage({
               </span>
             </label>
 
+            <div className="text-right">
+              <a href="/forgot-password" className="text-xs text-medi-dark/60 hover:text-medi-deep transition-colors">
+                ¿Olvidaste tu contraseña?
+              </a>
+            </div>
+
             <button 
               formAction={iniciarSesion} 
               className="w-full bg-medi-deep hover:bg-medi-dark text-white font-black text-lg py-4 rounded-xl shadow-md transition-all active:scale-[0.98]"
@@ -98,8 +107,11 @@ export default async function LoginPage({
               formAction={registrarCuenta} 
               className="w-full bg-white hover:bg-medi-light text-medi-deep border-2 border-medi-soft font-bold text-lg py-4 rounded-xl transition-all active:scale-[0.98]"
             >
-              Registrar Consultorio
+              Crear cuenta gratis
             </button>
+            <p className="text-xs text-center text-medi-dark/50">
+              14 días de prueba gratuita · Para profesionales independientes, clínicas e IPS
+            </p>
           </div>
         </form>
 

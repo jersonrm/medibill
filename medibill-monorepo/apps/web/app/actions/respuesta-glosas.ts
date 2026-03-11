@@ -16,6 +16,10 @@
 import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 import { devLog, devError } from "@/lib/logger";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
+import { safeError } from "@/lib/safe-error";
+import { validateFileMagicBytes } from "@/lib/file-validation";
 import type {
   CodigoRespuesta,
   GlosaRecibidaEnriquecida,
@@ -161,9 +165,9 @@ export async function registrarRespuestaGlosa(respuesta: {
   soportes?: SoporteAdjunto[];
   origen_respuesta?: "manual" | "automatica" | "ia";
 }): Promise<{ success: boolean; error?: string; respuestaId?: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "responder_glosa");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   try {
     // 1. Obtener la glosa
@@ -241,7 +245,7 @@ export async function registrarRespuestaGlosa(respuesta: {
     const { data, error } = await supabase
       .from("respuestas_glosas")
       .insert({
-        user_id: user.id,
+        user_id: ctx.userId,
         glosa_id: respuesta.glosa_id,
         codigo_respuesta: respuesta.codigo_respuesta,
         justificacion: respuesta.justificacion || null,
@@ -258,7 +262,7 @@ export async function registrarRespuestaGlosa(respuesta: {
 
     if (error) {
       devLog("[registrarRespuestaGlosa]", "Error insertando respuesta", error);
-      return { success: false, error: `Error registrando respuesta: ${error.message}` };
+      return { success: false, error: safeError("registrarRespuestaGlosa", error) };
     }
 
     // 6. Actualizar estado de la glosa a 'respondida'
@@ -266,7 +270,7 @@ export async function registrarRespuestaGlosa(respuesta: {
       .from("glosas_recibidas")
       .update({ estado: "respondida", updated_at: new Date().toISOString() })
       .eq("id", respuesta.glosa_id)
-      .eq("user_id", user.id);
+      .eq("organizacion_id", ctx.orgId);
 
     revalidatePath("/glosas");
     return { success: true, respuestaId: data.id };
@@ -698,6 +702,13 @@ export async function subirSoporteGlosa(
     return { success: false, error: `Tipo de archivo no permitido: ${file.type}. Aceptados: PDF, JPG, PNG` };
   }
 
+  // Validar magic bytes (previene spoofeo de Content-Type del cliente)
+  const buffer = await file.arrayBuffer();
+  const detectedMime = validateFileMagicBytes(buffer, ALLOWED_TYPES);
+  if (!detectedMime) {
+    return { success: false, error: "El contenido del archivo no corresponde al tipo declarado. Verifica que sea un PDF, JPG o PNG válido." };
+  }
+
   // Sanitize filename
   const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${user.id}/${glosaId}/${Date.now()}_${sanitized}`;
@@ -708,7 +719,7 @@ export async function subirSoporteGlosa(
 
   if (error) {
     devLog("[subirSoporteGlosa]", "Error subiendo archivo", error);
-    return { success: false, error: `Error subiendo archivo: ${error.message}` };
+    return { success: false, error: safeError("subirSoporteGlosa", error) };
   }
 
   const { data: urlData } = supabase.storage

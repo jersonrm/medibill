@@ -1,16 +1,31 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 
 export async function middleware(request: NextRequest) {
+  // Generate correlation ID for request tracing
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+
   // 0. Rutas API no necesitan auth middleware — salir inmediatamente
+  // IMPORTANTE: Cada API route DEBE verificar auth internamente.
+  // Patterns válidos: getUser(), CRON_SECRET bearer, webhookSecret header, HMAC signature.
+  // Test de cobertura: __tests__/api-auth-coverage.test.ts
   if (request.nextUrl.pathname.startsWith('/api')) {
-    return NextResponse.next()
+    const response = NextResponse.next();
+    response.headers.set('x-request-id', requestId);
+    return response;
   }
 
   // 1. Inicializamos la respuesta base de Next.js
   let supabaseResponse = NextResponse.next({
-    request,
+    request: {
+      headers: new Headers([...request.headers.entries(), ['x-request-id', requestId]]),
+    },
   })
+  supabaseResponse.headers.set('x-request-id', requestId);
+
+  // Set Sentry tag for correlation
+  Sentry.setTag('request_id', requestId);
 
   // 2. Creamos el cliente de Supabase específico para el Middleware
   const supabase = createServerClient(
@@ -26,6 +41,7 @@ export async function middleware(request: NextRequest) {
           supabaseResponse = NextResponse.next({
             request,
           })
+          supabaseResponse.headers.set('x-request-id', requestId);
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           )
@@ -40,6 +56,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+  const isForgotPassword = request.nextUrl.pathname.startsWith('/forgot-password')
   const isOnboardingPage = request.nextUrl.pathname.startsWith('/onboarding')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
   const isAuthCallback = request.nextUrl.pathname.startsWith('/api/auth')
@@ -48,7 +65,7 @@ export async function middleware(request: NextRequest) {
   const isAdminPage = request.nextUrl.pathname.startsWith('/admin')
 
   // 4. REGLA A: Si NO hay usuario y quiere entrar a cualquier lado que no sea el login, invitación o API, lo pateamos al login.
-  if (!user && !isLoginPage && !isInvitacionPage && !isApiRoute) {
+  if (!user && !isLoginPage && !isForgotPassword && !isInvitacionPage && !isApiRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
@@ -144,11 +161,20 @@ export async function middleware(request: NextRequest) {
       if (membership) {
         const { data: sub } = await supabase
           .from('suscripciones')
-          .select('estado, fin_periodo_actual')
+          .select('estado, fin_periodo_actual, trial_fin')
           .eq('organizacion_id', membership.organizacion_id)
           .single()
 
-        const estado = sub?.estado || 'none'
+        let estado = sub?.estado || 'none'
+
+        // Si el trial venció, marcarlo como expirado
+        if (estado === 'trialing' && sub?.trial_fin) {
+          const trialExpired = new Date(sub.trial_fin) < new Date()
+          if (trialExpired) {
+            estado = 'trial_expired'
+          }
+        }
+
         supabaseResponse.cookies.set('medibill_sub_status', estado, {
           path: '/',
           httpOnly: true,
@@ -156,13 +182,13 @@ export async function middleware(request: NextRequest) {
           maxAge: 300, // Re-check cada 5 minutos
         })
 
-        if (estado === 'canceled' || estado === 'unpaid') {
+        if (estado === 'canceled' || estado === 'unpaid' || estado === 'trial_expired') {
           const url = request.nextUrl.clone()
           url.pathname = '/configuracion/suscripcion'
           return NextResponse.redirect(url)
         }
       }
-    } else if (subStatus === 'canceled' || subStatus === 'unpaid') {
+    } else if (subStatus === 'canceled' || subStatus === 'unpaid' || subStatus === 'trial_expired') {
       const url = request.nextUrl.clone()
       url.pathname = '/configuracion/suscripcion'
       return NextResponse.redirect(url)

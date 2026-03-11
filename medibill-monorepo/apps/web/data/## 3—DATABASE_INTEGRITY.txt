@@ -1,0 +1,546 @@
+# DATABASE_INTEGRITY.md — Auditoría Fase 3: Integridad de Base de Datos
+
+**Proyecto:** Medibill (Medicapp)  
+**Base de datos:** Supabase (PostgreSQL 15+)  
+**Fecha del diagnóstico:** 2026-03-10  
+**Fuente:** Dump completo de producción + código fuente  
+
+---
+
+## 3.1 Schema y Constraints
+
+### 3.1.1 Columnas NOT NULL — ¿default o requeridas en lógica de inserción?
+
+| Tabla.Columna | NOT NULL | Default | ¿Cubierta en código? | Veredicto |
+|---|---|---|---|---|
+| `audit_log.action` | YES | `''` (string vacío) | La función `logAudit()` en logger.ts siempre envía `action` | ⚠️ DEFAULT vacío es inútil — debería ser NOT NULL sin default |
+| `audit_log.accion` | YES | ninguno | `registrarAuditLog()` siempre envía `accion` | ✅ OK — requerido en código |
+| `audit_log.user_id` | YES | ninguno | Código verifica `if (!user) return` antes de insertar | ✅ OK |
+| `facturas.valor_total` | YES | `0` | Código siempre envía `valor_total` desde input | ✅ OK |
+| `facturas.valor_glosado` | YES | `0` | Valor por defecto correcto | ✅ OK |
+| `facturas.valor_aceptado` | YES | `0` | Valor por defecto correcto | ✅ OK |
+| `organizaciones.email_billing` | YES | ninguno | `crearOrganizacion()` siempre envía `emailBilling` | ✅ OK |
+| `perfiles.numero_documento` | YES | ninguno | Requerido en onboarding | ✅ OK |
+| `perfiles.codigo_habilitacion` | YES | ninguno | Requerido en onboarding | ✅ OK |
+
+**Hallazgos críticos:**
+
+1. **🔴 `audit_log` tiene columnas duplicadas: `accion` (TEXT NOT NULL) y `action` (TEXT NOT NULL DEFAULT '').** Dos scripts crearon la misma tabla con esquemas distintos: `schema-audit-log.sql` usa `accion`, y `001-rate-limits-and-audit.sql` usa `action`. Ambas columnas coexisten en producción. El código usa ambas: `registrarAuditLog()` escribe en `accion`, mientras `logAudit()` escribe en `action`. Resultado: toda fila insertada por un camino tendrá la otra columna vacía/null.
+
+2. **⚠️ `acuerdo_tarifas.created_at` permite NULL** — no tiene NOT NULL. Lo mismo para `acuerdos_voluntades.created_at`, `auditorias_rips.creado_en`, `facturas.created_at`, y muchas más. Aunque el default `now()` lo cubre, una inserción explícita con `NULL` lo aceptará.
+
+### 3.1.2 Foreign Keys — ¿definidas en la DB, no solo ORM?
+
+**FKs correctamente definidas (25 relaciones):** Todas las FKs listadas en la sección 4 del diagnóstico están en la DB real.
+
+**🔴 Columnas FK-like SIN constraint en la DB (sección 21 del diagnóstico):**
+
+| Columna | Tipo | Tabla destino esperada | Riesgo |
+|---|---|---|---|
+| `acuerdos_voluntades.prestador_id` | uuid | → ¿`perfiles.id`? | ALTO — huérfanos posibles |
+| `audit_log.user_id` | uuid | → `auth.users(id)` | MEDIO — no se puede borrar users limpiamente |
+| `audit_log.registro_id` | uuid | → polimórfico | BAJO — UUID genérico intencional |
+| `auditoria_plazos.entidad_id` | uuid | → polimórfico (`factura`, `glosa`, `respuesta`) | BAJO — validado vía RLS policy CASE |
+| `clasificaciones_pendientes.user_id` | uuid | → `auth.users(id)` | MEDIO — puede ser NULL (uso anónimo) |
+| `clasificaciones_pendientes.telegram_user_id` | bigint | → `telegram_uso_anonimo` | BAJO — relación débil intencional |
+| `facturas.user_id` | uuid | → `auth.users(id)` | **🔴 CRÍTICO** — columna central de RLS sin FK |
+| `telegram_vinculaciones.telegram_user_id` | bigint | → externo (Telegram API) | BAJO — no se puede FK a sistema externo |
+| `historial_pagos.wompi_transaction_id` | text | → externo (Wompi API) | N/A |
+| `organizaciones.wompi_customer_id` | text | → externo (Wompi API) | N/A |
+| `suscripciones.wompi_subscription_id` | text | → externo (Wompi API) | N/A |
+
+**Recomendaciones:**
+- `facturas.user_id` → Agregar FK a `auth.users(id)`. Sin ella, si se elimina un usuario de auth, las facturas quedan huérfanas sin posibilidad de limpieza por CASCADE.
+- `acuerdos_voluntades.prestador_id` → No tiene FK. El schema SQL muestra que fue intencional para permitir flexibilidad, pero debería al menos documentarse.
+
+### 3.1.3 Tipos de datos — ¿correctos?
+
+| Hallazgo | Tabla.Columna | Tipo actual | Tipo recomendado | Severidad |
+|---|---|---|---|---|
+| ⚠️ `num_factura` | `facturas.num_factura` | TEXT | VARCHAR(30) | BAJA — funcional pero sin límite |
+| ⚠️ NIT como TEXT | `facturas.nit_prestador`, `nit_erp` | TEXT | VARCHAR(20) | BAJA |
+| ⚠️ Valores monetarios | `facturas.valor_total`, etc. | NUMERIC(18,2) / NUMERIC | Correcto pero inconsistente — algunos usan `NUMERIC` sin precisión, otros `NUMERIC(18,2)`, otros `NUMERIC(15,2)`, otros `NUMERIC(12,2)` | MEDIA |
+| ✅ UUIDs | Todas las PKs | UUID | Correcto | OK |
+| ✅ Timestamps | `created_at`, `updated_at` | TIMESTAMPTZ | Correcto | OK |
+| ⚠️ Inconsistencia timestamp | `cups_alias.created_at` | `timestamp without time zone` | Debería ser TIMESTAMPTZ como el resto | MEDIA |
+| ⚠️ `diagnosticos`, `procedimientos` | `facturas` | JSONB | Correcto para flexibilidad, pero sin JSON Schema validation | BAJA |
+| ⚠️ `perfiles.id` default | `perfiles.id` | UUID default `auth.uid()` | Inusual — PK = auth UID directamente; funciona pero lo duplica con `user_id` | BAJA |
+
+### 3.1.4 ENUM/CHECK constraints — ¿cubren todos los valores válidos?
+
+| Tabla | CHECK | DB values | Code values | ¿Match? |
+|---|---|---|---|---|
+| `organizaciones.tipo` | `'independiente', 'clinica', 'ips'` | Contiene `'ips'` | TypeScript: `"independiente" \| "clinica"` — **NO incluye 'ips'** | **🔴 Desincronizado** — DB permite `'ips'` pero TS no lo tipea. Schema SQL original solo tenía `'independiente', 'clinica'`. Alguien amplió el CHECK en DB sin actualizar TS. |
+| `facturas.estado` | 11 valores | Incluye `'pagada_parcial'` | MVP original no tenía `'pagada_parcial'` — se agregó en migration-pagos.sql | ✅ OK ahora |
+| `facturas.estado_dian` | `NULL, 'pendiente', 'enviada', 'aceptada', 'rechazada'` | — | Código usa estos valores | ✅ OK |
+| `facturas.estado_muv` | `NULL, 'pendiente', 'validando', 'validado', 'rechazado'` | — | Código usa estos valores | ✅ OK |
+| `usuarios_organizacion.rol` | `'owner', 'admin', 'doctor', 'facturador', 'auditor'` | — | Matches `RolOrganizacion` TS type | ✅ OK |
+| `suscripciones.estado` | 6 valores | — | Matches `EstadoSuscripcion` TS type | ✅ OK |
+| `pagos.monto` | `monto > 0` | — | — | ✅ OK |
+| `glosas_recibidas.estado` | `'pendiente', 'respondida', 'vencida', 'en_conciliacion'` | — | Código usa estos valores | ✅ OK |
+| `respuestas_glosas.codigo_respuesta` | `'RS01'..'RS05'` | — | Matches catalogo-respuestas-glosa.ts | ✅ OK |
+
+### 3.1.5 Índices — ¿columnas frecuentes cubiertas?
+
+**Bien cubiertos (✅):**
+- `facturas`: índices en `user_id`, `estado`, `nit_erp`, `organizacion_id`, `(fecha_expedicion, fecha_radicacion)`, `cufe`, `cuv`, `track_id_dian`, `estado_dian`, `estado_muv`
+- `glosas`: índices en `factura_id`, `estado`, `codigo_causal`, `tipo`, `fecha_limite_resp`
+- `glosas_recibidas`: índices en `factura_id`, `user_id`, `estado`, `eps_codigo`
+- `cups_maestro`: excelente — btree, gin trgm, gin fts, hnsw embedding
+- `cie10_maestro`: excelente — btree, gin trgm, gin fts, hnsw embedding
+
+**Faltantes (⚠️):**
+
+| Tabla | Columna sin índice | Uso en código | Prioridad |
+|---|---|---|---|
+| `facturas` | `num_factura` | Ya tiene UNIQUE index — OK | — |
+| `auditorias_rips` | `user_id` | Usado en RLS USING | MEDIA — ⚠️ RLS hace scan sin índice |
+| `clasificaciones_pendientes` | `expira_at` | Necesario para cleanup de expirados | BAJA |
+| `telegram_codigos_vinculacion` | `expira_at` | Necesario para cleanup | BAJA |
+| `suscripciones` | `plan_id` | JOIN con `planes` | BAJA (solo 3 filas) |
+| `perfiles` | `organizacion_id` | Consultas por org | MEDIA |
+
+### 3.1.6 Índices compuestos existentes
+
+| Tabla | Índice | Columnas | ¿Necesario? |
+|---|---|---|---|
+| `acuerdo_tarifas` | `idx_acuerdo_tarifas_uniq` | `(acuerdo_id, cups_codigo)` UNIQUE | ✅ Correcto |
+| `facturas` | `idx_facturas_fechas` | `(fecha_expedicion, fecha_radicacion)` | ✅ Para rangos |
+| `cups_maestro` | `cups_maestro_codigo_seccion_unique` | `(codigo, seccion)` UNIQUE | ✅ |
+| `uso_mensual` | UNIQUE | `(organizacion_id, periodo)` | ✅ |
+| `usuarios_organizacion` | UNIQUE | `(organizacion_id, user_id)` | ✅ |
+| `pacientes` | UNIQUE | `(user_id, tipo_documento, numero_documento)` | ✅ |
+| `resoluciones_facturacion` | UNIQUE | `(user_id, prefijo)` | ✅ |
+
+**Faltantes:**
+- `facturas(user_id, estado)` — usado en dashboard queries con filtro combinado.
+- `facturas(organizacion_id, estado)` — para multi-tenant queries.
+
+---
+
+## 3.2 Consistencia de Datos
+
+### 3.2.1 Registros huérfanos — queries diagnósticas
+
+```sql
+-- Facturas sin user_id válido en auth.users
+SELECT f.id, f.num_factura, f.user_id 
+FROM facturas f 
+LEFT JOIN auth.users u ON u.id = f.user_id 
+WHERE u.id IS NULL;
+-- RESULTADO ESPERADO: 0 filas (solo 4 usuarios y 9 facturas)
+
+-- Facturas con paciente_id inválido
+SELECT f.id, f.num_factura, f.paciente_id 
+FROM facturas f 
+WHERE f.paciente_id IS NOT NULL 
+AND NOT EXISTS (SELECT 1 FROM pacientes p WHERE p.id = f.paciente_id);
+-- SIN FK CONSTRAINT — podrían existir huérfanos
+
+-- Facturas con resolucion_id inválido (sí tiene FK)
+-- Protegido por FK constraint — OK
+
+-- glosas_recibidas sin factura válida
+SELECT gr.id, gr.factura_id 
+FROM glosas_recibidas gr 
+WHERE NOT EXISTS (SELECT 1 FROM facturas f WHERE f.id = gr.factura_id);
+-- Protegido por FK — OK
+
+-- acuerdo_tarifas sin acuerdo válido
+-- Protegido por FK con ON DELETE CASCADE — OK
+
+-- acuerdos_voluntades.prestador_id → sin FK constraint
+SELECT av.id, av.prestador_id 
+FROM acuerdos_voluntades av 
+WHERE NOT EXISTS (SELECT 1 FROM perfiles p WHERE p.id = av.prestador_id);
+-- ⚠️ SIN FK — potenciales huérfanos
+
+3.2.2 Duplicados donde no debería haberlos
+-- facturas.num_factura — TIENE UNIQUE constraint ✅
+-- Sin embargo, borradores usan "BORR-{timestamp}" que se reemplaza al aprobar.
+-- Si el proceso de aprobación falla entre generar número y update, podría
+-- haber duplicados de BORR- (no crítico).
+
+-- perfiles con mismo numero_documento (diferentes orgs)
+SELECT numero_documento, COUNT(*) 
+FROM perfiles 
+GROUP BY numero_documento 
+HAVING COUNT(*) > 1;
+-- ⚠️ NO HAY UNIQUE en perfiles.numero_documento — un mismo NIT podría tener
+-- múltiples perfiles si un usuario se registra dos veces
+
+-- organizaciones con mismo NIT
+SELECT nit, COUNT(*) 
+FROM organizaciones 
+WHERE nit IS NOT NULL 
+GROUP BY nit 
+HAVING COUNT(*) > 1;
+-- ⚠️ NO HAY UNIQUE en organizaciones.nit — dos orgs con mismo NIT es posible
+
+-- suscripciones — protegido por UNIQUE(organizacion_id) ✅
+
+-- usuarios_organizacion — protegido por UNIQUE(organizacion_id, user_id) ✅
+
+Hallazgos:
+
+🔴 organizaciones.nit no tiene UNIQUE constraint. Dos organizaciones podrían registrarse con el mismo NIT. Para prestadores de salud, el NIT es un identificador único legal.
+⚠️ perfiles.numero_documento no tiene UNIQUE constraint a nivel global (solo compuesto perfiles_user_id_key en user_id).
+3.2.3 Valores fuera de rango
+
+-- Valores monetarios negativos en facturas
+SELECT id, num_factura, valor_total, subtotal, descuentos, copago, cuota_moderadora
+FROM facturas 
+WHERE valor_total < 0 OR subtotal < 0 OR descuentos < 0 
+   OR copago < 0 OR cuota_moderadora < 0;
+-- ⚠️ NO HAY CHECK constraint para evitar valores negativos en facturas
+-- pagos.monto SÍ tiene CHECK (monto > 0) — bien
+
+-- glosas con valor_glosado negativo
+SELECT id FROM glosas WHERE valor_glosado < 0;
+SELECT id FROM glosas_recibidas WHERE valor_glosado < 0 OR valor_factura < 0;
+-- ⚠️ SIN CHECK constraint
+
+-- Fechas futuras en campos que no deberían tenerlas
+SELECT id FROM facturas WHERE fecha_expedicion > NOW() + INTERVAL '1 day';
+-- Posible pero no validado en DB
+
+-- Rangos de resolución inválidos
+SELECT id, rango_desde, rango_hasta, consecutivo_actual
+FROM resoluciones_facturacion
+WHERE rango_desde > rango_hasta;
+-- ⚠️ SIN CHECK (rango_desde <= rango_hasta)
+
+Hallazgos:
+
+⚠️ Sin CHECK para valores monetarios no-negativos en facturas — valor_total, valor_glosado, valor_aceptado, subtotal podrían ser negativos.
+✅ pagos.monto tiene CHECK (monto > 0) — correcto.
+⚠️ Sin CHECK en resoluciones_facturacion para rango_desde <= rango_hasta.
+3.2.4 NULLs semánticos incorrectos
+-- Facturas sin nit_prestador (NOT NULL pero podría tener string vacío)
+SELECT id, num_factura FROM facturas WHERE nit_prestador = '' OR nit_prestador IS NULL;
+-- El código inserta: perfil?.numero_documento || "" — puede insertar string vacío
+
+-- Perfiles sin user_id (nullable pero semánticamente requerido)
+-- perfiles.user_id es NULL=YES pero tiene UNIQUE y se usa en todos los RLS
+SELECT id FROM perfiles WHERE user_id IS NULL;
+-- ⚠️ user_id debería ser NOT NULL
+
+-- organizaciones sin nombre
+-- nombre es NOT NULL ✅ — protegido
+
+-- facturas.organizacion_id es NULL=YES pero requerido para multi-tenant
+SELECT id FROM facturas WHERE organizacion_id IS NULL;
+-- ⚠️ facturas antiguas pre-migración podrían tener org_id NULL
+
+Hallazgos:
+
+🔴 perfiles.user_id permite NULL — es nullable pero se usa como columna de aislamiento RLS.
+⚠️ facturas.organizacion_id permite NULL — requerido para multi-tenant pero fue agregado post-migración sin NOT NULL.
+⚠️ auditorias_rips.organizacion_id permite NULL — mismo caso.
+⚠️ acuerdos_voluntades.organizacion_id permite NULL.
+⚠️ pacientes.organizacion_id permite NULL.
+3.2.5 Inconsistencias de estado
+
+-- Factura "pagada" con valor_total = 0
+SELECT id, num_factura, estado, valor_total
+FROM facturas 
+WHERE estado IN ('pagada', 'pagada_parcial') AND valor_total = 0;
+
+-- Factura "aprobada" sin resolución
+SELECT id, num_factura, estado, resolucion_id
+FROM facturas 
+WHERE estado NOT IN ('borrador', 'anulada') AND resolucion_id IS NULL;
+
+-- Factura con estado_dian = 'aceptada' pero sin CUFE
+SELECT id FROM facturas 
+WHERE estado_dian = 'aceptada' AND (cufe IS NULL OR cufe = '');
+
+-- Factura con estado_muv = 'validado' pero sin CUV
+SELECT id FROM facturas 
+WHERE estado_muv = 'validado' AND (cuv IS NULL OR cuv = '');
+
+-- Suscripción activa con trial_fin en el pasado y sin periodo_actual
+SELECT id, organizacion_id, estado, trial_fin, periodo_actual_inicio
+FROM suscripciones 
+WHERE estado = 'trialing' AND trial_fin < NOW();
+
+-- Glosa respondida sin respuesta
+SELECT gr.id 
+FROM glosas_recibidas gr 
+WHERE gr.estado = 'respondida' 
+AND NOT EXISTS (SELECT 1 FROM respuestas_glosas r WHERE r.glosa_id = gr.id);
+
+3.2.6 Timestamps sospechosos
+
+-- created_at > updated_at (imposible normalmente)
+SELECT id, created_at, updated_at 
+FROM facturas 
+WHERE created_at > updated_at;
+
+SELECT id, created_at, updated_at 
+FROM suscripciones 
+WHERE created_at > updated_at;
+
+-- Registros sin timestamps (created_at IS NULL donde tiene DEFAULT now())
+SELECT 'facturas' AS tabla, COUNT(*) FROM facturas WHERE created_at IS NULL
+UNION ALL
+SELECT 'organizaciones', COUNT(*) FROM organizaciones WHERE created_at IS NULL
+UNION ALL
+SELECT 'suscripciones', COUNT(*) FROM suscripciones WHERE created_at IS NULL;
+
+Hallazgo sobre triggers updated_at:
+
+🔴 Solo glosas_recibidas tiene trigger update_updated_at. Las demás tablas con updated_at (facturas, acuerdos_voluntades, credenciales_muv, mapeos_sabana_eps, pacientes, perfiles, suscripciones, pagos, respuestas_glosas, organizaciones) NO tienen trigger automático. El código debe actualizar manualmente updated_at, y si alguna ruta lo olvida, la columna quedará con su valor original.
+
+3.3 RLS y Políticas de Acceso
+3.3.1 ¿RLS habilitado en TODAS las tablas con datos de usuario?
+Tabla	RLS	Datos sensibles	Veredicto
+catalogo_causales_glosa	OFF	No — catálogo público read-only	✅ OK — datos de referencia
+cups_alias	OFF	No — alias de códigos CUPS	⚠️ Debería tener RLS con policy SELECT para authenticated, o al menos proteger INSERT/UPDATE/DELETE
+cups_categorias	OFF	No — categorías de códigos	⚠️ Mismo que cups_alias
+reglas_coherencia	OFF	No — reglas de validación	⚠️ Pero permite INSERT/UPDATE/DELETE sin restricción
+Todas las tablas con datos de usuarios tienen RLS=ON. ✅
+
+Pero hay un problema grave con permisos:
+
+3.3.2 🔴 CRÍTICO: Permisos del rol anon
+TODAS las tablas otorgan permisos completos (SELECT, INSERT, UPDATE, DELETE, TRUNCATE, TRIGGER, REFERENCES) al rol anon. Esto significa que cualquier persona sin autenticación, usando solo la anon key pública, podría ejecutar operaciones si no hubiera RLS.
+
+Para tablas CON RLS habilitado, las policies protegen (la mayoría usa auth.uid() que retorna NULL para anon). Pero:
+
+catalogo_causales_glosa (RLS OFF): anon tiene DELETE, INSERT, UPDATE. Un atacante con la anon key podría borrar o modificar todo el catálogo de causales de glosa (215 registros de referencia normativa).
+
+cups_alias (RLS OFF): anon puede INSERT/UPDATE/DELETE. Podría inyectar alias maliciosos en las búsquedas CUPS.
+
+cups_categorias (RLS OFF): anon puede INSERT/UPDATE/DELETE.
+
+reglas_coherencia (RLS OFF): anon puede INSERT/UPDATE/DELETE. Podría desactivar reglas de coherencia médica.
+
+rate_limits (RLS ON, sin policies): RLS sin policies = bloqueo total para anon/authenticated. Solo funciona vía check_rate_limit() SECURITY DEFINER. ✅ Correcto.
+
+Tablas con RLS ON pero policy USING=true (lectura abierta):
+
+acuerdo_tarifas: SELECT USING=true — cualquier authenticated puede ver TODAS las tarifas pactadas de TODOS los prestadores 🔴
+acuerdos_voluntades: SELECT USING tiene OR true al final — misma vulnerabilidad 🔴
+auditoria_plazos: "Lectura publica plazos" USING=true — todos los plazos de todos los usuarios visibles ⚠️
+3.3.3 Análisis detallado de policies por tabla
+Tablas con policies correctas (✅):
+
+facturas — CRUD filtrado por auth.uid() = user_id
+pacientes — ALL filtrado por auth.uid() = user_id
+perfiles — SELECT/INSERT/UPDATE por auth.uid() = user_id (y auth.uid() = id para compatibilidad legacy)
+glosas — via JOIN a facturas.user_id
+glosas_recibidas — auth.uid() = user_id
+respuestas_glosas — auth.uid() = user_id
+organizaciones — SELECT/UPDATE vía get_user_org_id() con role check
+suscripciones — SELECT/UPDATE vía get_user_org_id()
+usuarios_organizacion — CRUD vía get_user_org_id() + user_has_role('admin')
+invitaciones — INSERT requiere admin role, SELECT por org
+historial_pagos — SELECT por org
+uso_mensual — SELECT por org
+validaciones_pre_radicacion — via JOIN a facturas.user_id
+credenciales_muv — auth.uid() = user_id
+importaciones_sabana — auth.uid() = user_id
+mapeos_sabana_eps — auth.uid() = user_id
+pagos — auth.uid() = user_id
+resoluciones_facturacion — auth.uid() = user_id
+servicios_medico — auth.uid() = usuario_id
+telegram_vinculaciones — user_id = auth.uid()
+telegram_codigos_vinculacion — user_id = auth.uid()
+clasificaciones_pendientes — user_id = auth.uid()
+Tablas con policies problemáticas (🔴):
+
+Tabla	Policy	Problema
+acuerdo_tarifas	SELECT USING=true	Cualquier usuario autenticado ve TODAS las tarifas de TODOS los prestadores. Información comercial sensible.
+acuerdos_voluntades	SELECT USING contiene OR true	Intención era filtrar, pero OR true lo anula. Todos ven todos los acuerdos.
+auditoria_plazos	"Lectura publica plazos" USING=true	Conflicto: existe otra policy más restrictiva que filtra por entidad, pero la policy true la overridea (PostgreSQL OR entre policies).
+audit_log	INSERT WITH CHECK auth.uid() IS NOT NULL (de 001-rate-limits) vs auth.uid() = user_id (de schema-audit-log)	La policy más permisiva (IS NOT NULL) permite insertar audit logs con user_id de OTRO usuario. 🔴
+perfiles	Policies duplicadas: 3 SELECT, 3 INSERT, 3 UPDATE	Legacy + migration + multi-tenant. No es un problema funcional (PostgreSQL ORs them), pero es confuso.
+3.3.4 RLS sobre tablas sensibles sin RLS
+Tabla	Datos	RLS	Acción requerida
+catalogo_causales_glosa	Catálogo normativo (no sensible)	OFF	Habilitar RLS + SELECT para authenticated + restrict write
+cups_alias	Alias de búsqueda	OFF	Habilitar RLS + SELECT para authenticated
+cups_categorias	Jerarquía CUPS	OFF	Habilitar RLS + SELECT para authenticated
+reglas_coherencia	Reglas de validación médica	OFF	Habilitar RLS + SELECT para authenticated
+3.3.5 Service role / admin bypass correctamente limitados
+Uso de service_role	Archivo	¿Correcto?
+Wompi webhook	api/wompi/webhook/route.ts	✅ — verifica firma HMAC antes de usar service role
+Telegram webhook	api/telegram/webhook/route.ts	✅ — backend-only, rate limited
+Cron refresh benchmarks	api/cron/refresh-benchmarks/route.ts	✅ — endpoint CRON protegido
+Cron eliminar cuentas	api/cron/eliminar-cuentas/route.ts	✅
+Platform admin	lib/platform-admin.ts	✅ — verifica auth + platform_admins table
+Admin actions	actions/admin.ts	✅ — requirePlatformAdmin() antes de cualquier operación
+Telegram clasificación	actions/telegram-clasificacion.ts	✅ — backend action
+Scripts (CLI)	scripts/*.ts	✅ — ejecución local/CI
+SECURITY DEFINER functions (bypass RLS):
+
+Función	SET search_path	¿Segura?
+check_rate_limit	✅ SET search_path = 'public'	✅
+cleanup_rate_limits	✅ SET search_path = 'public'	✅
+get_user_org_id	❌ No tiene SET search_path	⚠️ Teóricamente vulnerable a search_path hijack
+user_has_role	❌ No tiene SET search_path	⚠️ Mismo riesgo
+incrementar_uso_mensual	❌ No tiene SET search_path	⚠️ Mismo riesgo
+siguiente_numero_factura	❌ No tiene SET search_path	⚠️ Mismo riesgo
+refresh_benchmark_views	❌ No tiene SET search_path	⚠️ Mismo riesgo
+Recomendación: Agregar SET search_path = 'public' a TODAS las funciones SECURITY DEFINER.
+
+3.4 Migraciones
+3.4.1 ¿Versionadas y ejecutables en orden?
+🔴 NO hay versionamiento formal. Los scripts SQL están en apps/web/scripts/ como archivos sueltos, sin:
+
+Numeración secuencial (excepto 001-rate-limits-and-audit.sql)
+Sistema de migraciones (no hay Flyway, dbmate, Supabase CLI migrations, etc.)
+Estado de tracking (no hay tabla schema_migrations o equivalente)
+No existe directorio supabase/migrations/
+Orden de ejecución inferido (basado en dependencias):
+
+schema-glosas.sql (crea tablas base: catalogo, acuerdos, reglas, facturas-base)
+migration-facturas-mvp.sql (agrega columnas MVP a facturas)
+migration-dian-columns.sql
+migration-muv-columns.sql
+migration-autorizaciones.sql
+migration-consecutivo-atomico.sql
+migration-pagos.sql
+migration-respuestas-glosas.sql
+schema-suscripciones.sql (organizaciones, planes, etc.)
+migrate-users-to-orgs.sql (migra usuarios existentes)
+schema-telegram.sql
+schema-benchmarks.sql
+001-rate-limits-and-audit.sql
+schema-audit-log.sql (conflicto con #13)
+migration-rls-fase5-completa.sql
+migration-sabana-import.sql
+migration-credenciales-muv.sql
+migration-email-radicacion.sql
+Problema: Los scripts #13 y #14 crean audit_log con esquemas diferentes, resultando en columnas duplicadas (accion + action).
+
+3.4.2 ¿Migraciones destructivas sin reversibilidad?
+Script	Operación destructiva	¿Reversible?
+migration-respuestas-glosas.sql	DROP TABLE IF EXISTS respuestas_glosa; DROP TABLE IF EXISTS respuestas_glosas;	⚠️ DROP sin backup — pero la tabla estaba vacía según el comentario
+migration-facturas-mvp.sql	ALTER TABLE facturas DROP CONSTRAINT	⚠️ No reversible pero solo modifica CHECK
+migration-pagos.sql	DROP CONSTRAINT ... estado_check	⚠️ Mismo
+migration-eliminacion-cuenta.sql	Posiblemente destructiva	Necesita revisión
+Ningún script tiene sentencia DOWN o rollback. En caso de error, se requeriría intervención manual.
+
+3.4.3 ¿Estado actual = migraciones?
+Discrepancias encontradas:
+
+Aspecto	Migraciones dicen	DB real dice
+organizaciones.tipo CHECK	'independiente', 'clinica'	'independiente', 'clinica', 'ips' — alguien agregó 'ips' fuera de migraciones
+audit_log schema	Dos scripts contradictorios	Ambos schemas fusionados: tiene accion, action, tabla, registro_id, metadata
+facturas.nota_clinica_original	No existe en migraciones	Existe en DB como columna (null=YES) — agregada fuera de migraciones
+perfiles columns	Schema original tenía menos columnas	Muchas columnas agregadas sin migration file visible
+Resumen de Hallazgos — Clasificación por Severidad
+🔴 CRÍTICOS (requieren acción inmediata)
+Tablas sin RLS expuestas al rol anon con permisos de escritura:
+
+catalogo_causales_glosa, cups_alias, cups_categorias, reglas_coherencia — un atacante con la anon key pública puede DELETE/INSERT/UPDATE datos de referencia.
+acuerdo_tarifas y acuerdos_voluntades tienen SELECT USING=true:
+
+Cualquier usuario autenticado puede ver las tarifas pactadas y acuerdos de TODOS los prestadores. Información comercial sensible expuesta.
+audit_log INSERT policy permite insertar con user_id ajeno:
+
+Policy auth.uid() IS NOT NULL permite que user A inserte un log atribuido a user B.
+facturas.user_id no tiene FK a auth.users:
+
+Si se elimina un usuario, sus facturas quedan huérfanas e inaccesibles.
+Columnas duplicadas en audit_log (accion + action):
+
+Dos code paths insertan en columnas diferentes, ninguna auditoría está completa.
+⚠️ IMPORTANTES (deben corregirse pronto)
+SECURITY DEFINER sin SET search_path en 5 funciones críticas (get_user_org_id, user_has_role, etc.).
+
+organizaciones.nit sin UNIQUE constraint — permite organizaciones duplicadas con mismo NIT.
+
+organizaciones.tipo CHECK incluye 'ips' pero TypeScript no — datos inconsistentes code↔DB.
+
+perfiles.user_id permite NULL — columna de aislamiento RLS nullable.
+
+facturas.organizacion_id permite NULL — multi-tenant incompleto.
+
+Solo 1 trigger update_updated_at (en glosas_recibidas) — 10+ tablas con updated_at sin actualización automática.
+
+Sin sistema de migraciones versionado — scripts sueltos, estado DB diverge del código.
+
+Sin CHECK para valores monetarios no-negativos en facturas, glosas.
+
+auditoria_plazos tiene policy SELECT USING=true que overridea la policy restricta.
+
+📋 MENORES (mejoras recomendadas)
+cups_alias.created_at usa timestamp without time zone — debería ser TIMESTAMPTZ.
+Inconsistencia en precisión NUMERIC: (18,2) vs (15,2) vs (12,2) vs sin precisión.
+Faltan índices en auditorias_rips.user_id, perfiles.organizacion_id.
+Falta índice compuesto facturas(organizacion_id, estado) para queries multi-tenant.
+Políticas duplicadas en perfiles (3 SELECT, 3 INSERT, 3 UPDATE) — limpiar.
+Queries de Remediación Sugeridas
+-- 1. Proteger tablas sin RLS
+ALTER TABLE catalogo_causales_glosa ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "catalogo_select_authenticated" ON catalogo_causales_glosa
+  FOR SELECT TO authenticated USING (true);
+-- NO crear policies INSERT/UPDATE/DELETE — solo service_role puede escribir
+
+ALTER TABLE cups_alias ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "cups_alias_select_authenticated" ON cups_alias
+  FOR SELECT TO authenticated USING (true);
+
+ALTER TABLE cups_categorias ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "cups_categorias_select_authenticated" ON cups_categorias
+  FOR SELECT TO authenticated USING (true);
+
+ALTER TABLE reglas_coherencia ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "reglas_select_authenticated" ON reglas_coherencia
+  FOR SELECT TO authenticated USING (true);
+
+-- 2. Revocar permisos excesivos de anon
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON catalogo_causales_glosa FROM anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON cups_alias FROM anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON cups_categorias FROM anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON reglas_coherencia FROM anon;
+
+-- 3. Fijar policies de acuerdo_tarifas y acuerdos_voluntades
+DROP POLICY IF EXISTS "Usuarios ven tarifas de sus acuerdos" ON acuerdo_tarifas;
+CREATE POLICY "Usuarios ven tarifas de sus acuerdos" ON acuerdo_tarifas
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM acuerdos_voluntades av
+      WHERE av.id = acuerdo_tarifas.acuerdo_id
+      AND av.organizacion_id = get_user_org_id()
+    )
+  );
+
+DROP POLICY IF EXISTS "Usuarios ven sus acuerdos" ON acuerdos_voluntades;
+CREATE POLICY "Usuarios ven sus acuerdos" ON acuerdos_voluntades
+  FOR SELECT USING (organizacion_id = get_user_org_id());
+
+-- 4. Fijar audit_log INSERT policy
+DROP POLICY IF EXISTS "Authenticated users can insert audit logs" ON audit_log;
+CREATE POLICY "Authenticated users can insert audit logs" ON audit_log
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- 5. Fijar auditoria_plazos lectura abierta
+DROP POLICY IF EXISTS "Lectura publica plazos" ON auditoria_plazos;
+
+-- 6. SET search_path en SECURITY DEFINER functions
+CREATE OR REPLACE FUNCTION get_user_org_id()
+RETURNS UUID LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$ SELECT organizacion_id FROM usuarios_organizacion
+     WHERE user_id = auth.uid() AND activo = true LIMIT 1; $$;
+
+-- Repetir para user_has_role, incrementar_uso_mensual,
+-- siguiente_numero_factura, refresh_benchmark_views
+
+-- 7. UNIQUE en organizaciones.nit
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organizaciones_nit_unique
+  ON organizaciones(nit) WHERE nit IS NOT NULL;
+
+-- 8. NOT NULL en columnas críticas
+ALTER TABLE perfiles ALTER COLUMN user_id SET NOT NULL;
+-- ALTER TABLE facturas ALTER COLUMN organizacion_id SET NOT NULL;
+-- ^ Ejecutar DESPUÉS de rellenar NULLs existentes
+
+---
+
+**Resumen ejecutivo:** La base de datos tiene una estructura sólida con buen uso de CHECK constraints, índices, y RLS en la mayoría de tablas. Sin embargo, hay **3 vulnerabilidades de seguridad críticas** (tablas sin RLS con permisos de escritura para `anon`, policies con `USING=true` exponiendo datos de todos los usuarios, y audit_log que permite suplantación), **1 problema de integridad referencial importante** (`facturas.user_id` sin FK), y **deuda técnica** en el sistema de migraciones (sin versionamiento, columnas duplicadas en audit_log, estado real diverge de scripts).---
+
+**Resumen ejecutivo:** La base de datos tiene una estructura sólida con buen uso de CHECK constraints, índices, y RLS en la mayoría de tablas. Sin embargo, hay **3 vulnerabilidades de seguridad críticas** (tablas sin RLS con permisos de escritura para `anon`, policies con `USING=true` exponiendo datos de todos los usuarios, y audit_log que permite suplantación), **1 problema de integridad referencial importante** (`facturas.user_id` sin FK), y **deuda técnica** en el sistema de migraciones (sin versionamiento, columnas duplicadas en audit_log, estado real diverge de scripts).

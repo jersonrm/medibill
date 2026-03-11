@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
 import { createRateLimiter } from "@/lib/rate-limit";
 import {
   enviarMensaje,
@@ -17,20 +16,12 @@ import {
   guardarClasificacionPendiente,
 } from "@/app/actions/telegram-clasificacion";
 import { devLog, devWarn } from "@/lib/logger";
+import { createServiceClient } from "@/lib/supabase-server";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://medibill-wheat.vercel.app";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_LANDING_URL || "https://medibill.co";
 
 // Rate limit: 5 req/min por telegram_user_id
 const rateLimiter = createRateLimiter({ max: 5, windowMs: 60_000 });
-
-/** Crea cliente Supabase con service role (sin cookies, para webhook) */
-function createServiceClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  );
-}
 
 // ==========================================
 // TELEGRAM WEBHOOK
@@ -38,9 +29,22 @@ function createServiceClient() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Validar secret token para autenticar que el request viene de Telegram
+    const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+      }
+      devWarn("TELEGRAM_WEBHOOK_SECRET no configurado — webhook sin protección");
+    } else {
+      const headerToken = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
+      if (headerToken !== webhookSecret) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
     const update: TelegramUpdate = await request.json();
 
-    // Validar que el bot token coincida (token secreto en la URL)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!botToken) {
       return NextResponse.json({ error: "Bot no configurado" }, { status: 500 });
@@ -288,6 +292,9 @@ async function handleEstado(
   return NextResponse.json({ ok: true });
 }
 
+// NOTA: El procesamiento de audio (transcripción + clasificación IA) tarda ~12-16s.
+// En Vercel Free tier (10s timeout), esto FALLARÁ para audios largos.
+// Requiere Vercel Pro (60s) o migrar a respuesta 200 inmediata + queue async.
 async function handleAudio(
   chatId: number,
   telegramUserId: number,
@@ -385,7 +392,7 @@ async function handleAudio(
 
     const resultado = await clasificarAudioTelegram(audioBuffer, audioMsg.mime_type, telegramUserId);
 
-    if (!resultado.exito || !resultado.datos) {
+    if (!resultado.success || !resultado.datos) {
       await enviarMensaje(chatId, `❌ ${resultado.error || "No pude clasificar. Intentá con una nota más clara."}`);
       return NextResponse.json({ ok: true });
     }
@@ -462,7 +469,7 @@ async function handleAudioAnonimo(
 
   const resultado = await clasificarAudioTelegram(audioBuffer, audioMsg.mime_type, telegramUserId);
 
-  if (!resultado.exito || !resultado.datos) {
+  if (!resultado.success || !resultado.datos) {
     await enviarMensaje(chatId, `❌ ${resultado.error || "No pude clasificar. Intentá con nota más clara."}`);
     return NextResponse.json({ ok: true });
   }

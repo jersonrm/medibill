@@ -38,6 +38,29 @@ vi.mock("@/lib/logger", () => ({
   devError: vi.fn(),
 }));
 
+vi.mock("@/lib/organizacion", () => ({
+  getContextoOrg: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return {
+      userId: mockState.user.id,
+      orgId: "org-test-123",
+      orgNombre: "Clínica Test",
+      orgTipo: "clinica" as const,
+      rol: "owner" as const,
+      suscripcion: { plan_id: "profesional", estado: "active", trial_fin: null, periodo_actual_fin: null },
+    };
+  }),
+  getOrgIdActual: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return "org-test-123";
+  }),
+}));
+
+vi.mock("@/lib/suscripcion", () => ({
+  verificarLimite: vi.fn().mockResolvedValue({ permitido: true, restante: 100 }),
+  incrementarUso: vi.fn().mockResolvedValue(undefined),
+}));
+
 // =====================================================================
 // registrarPago
 // =====================================================================
@@ -169,10 +192,7 @@ describe("registrarPago", () => {
     mockState.user = null;
 
     const { registrarPago } = await import("@/app/actions/pagos");
-    const result = await registrarPago(crearRegistrarPagoInput());
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe("No autenticado");
+    await expect(registrarPago(crearRegistrarPagoInput())).rejects.toThrow("No autenticado");
   });
 
   it("retorna error de la base de datos al insertar pago", async () => {
@@ -192,7 +212,7 @@ describe("registrarPago", () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("DB constraint");
+    expect(result.error).toContain("Error al guardar");
   });
 });
 
@@ -218,16 +238,14 @@ describe("listarPagosPorFactura", () => {
     const result = await listarPagosPorFactura("f1");
 
     expect(result).toHaveLength(2);
-    expect(result[0].monto).toBe(50_000);
+    expect(result[0]!.monto).toBe(50_000);
   });
 
   it("retorna array vacío si no hay usuario", async () => {
     mockState.user = null;
 
     const { listarPagosPorFactura } = await import("@/app/actions/pagos");
-    const result = await listarPagosPorFactura("f1");
-
-    expect(result).toEqual([]);
+    await expect(listarPagosPorFactura("f1")).rejects.toThrow("No autenticado");
   });
 });
 
@@ -275,10 +293,7 @@ describe("obtenerKPICartera", () => {
     mockState.user = null;
 
     const { obtenerKPICartera } = await import("@/app/actions/pagos");
-    const result = await obtenerKPICartera();
-
-    expect(result.valor_pendiente).toBe(0);
-    expect(result.facturas_pendientes).toBe(0);
+    await expect(obtenerKPICartera()).rejects.toThrow("No autenticado");
   });
 });
 

@@ -10,6 +10,8 @@ import {
   eliminarAcuerdo,
   buscarCupsParaTarifa,
 } from "@/app/actions";
+import { obtenerTarifaReferencia } from "@/app/actions/benchmarks";
+import type { TarifaReferencia } from "@/app/actions/benchmarks";
 
 // =====================================================================
 // Tipos locales
@@ -216,6 +218,7 @@ export default function ConfiguracionAcuerdo() {
   // Tarifas del acuerdo en edición
   const [tarifas, setTarifas] = useState<Tarifa[]>([]);
   const [mostrarTarifas, setMostrarTarifas] = useState(false);
+  const [tarifaRefs, setTarifaRefs] = useState<Record<string, TarifaReferencia | null>>({});
 
   // ---- Cargar datos
   const cargar = useCallback(async () => {
@@ -290,7 +293,7 @@ export default function ConfiguracionAcuerdo() {
   const handleEliminar = async (id: string) => {
     if (!confirm("¿Eliminar este acuerdo y todas sus tarifas?")) return;
     const res = await eliminarAcuerdo(id);
-    if (res.exito) {
+    if (res.success) {
       setMensaje({ tipo: "ok", texto: "Acuerdo eliminado" });
       cargar();
     } else {
@@ -313,7 +316,7 @@ export default function ConfiguracionAcuerdo() {
         ...form,
       });
 
-      if (!resAcuerdo.exito || !resAcuerdo.id) {
+      if (!resAcuerdo.success || !resAcuerdo.id) {
         setMensaje({ tipo: "error", texto: resAcuerdo.error || "Error guardando acuerdo" });
         setSaving(false);
         return;
@@ -324,7 +327,7 @@ export default function ConfiguracionAcuerdo() {
         const tarifasLimpias = tarifas.filter((t) => t.cups_codigo.trim() !== "");
         if (tarifasLimpias.length > 0) {
           const resTarifas = await guardarTarifasAcuerdo(resAcuerdo.id, tarifasLimpias);
-          if (!resTarifas.exito) {
+          if (!resTarifas.success) {
             setMensaje({ tipo: "error", texto: `Acuerdo guardado, pero error en tarifas: ${resTarifas.error}` });
             setSaving(false);
             return;
@@ -836,6 +839,15 @@ export default function ConfiguracionAcuerdo() {
                               onChange={(e) =>
                                 actualizarTarifa(idx, "valor_pactado", Number(e.target.value))
                               }
+                              onFocus={async () => {
+                                if (tarifa.cups_codigo && form.eps_codigo) {
+                                  const key = `${form.eps_codigo}:${tarifa.cups_codigo}`;
+                                  if (!(key in tarifaRefs)) {
+                                    const ref = await obtenerTarifaReferencia(tarifa.cups_codigo, form.eps_codigo);
+                                    setTarifaRefs((prev) => ({ ...prev, [key]: ref }));
+                                  }
+                                }
+                              }}
                               placeholder="0"
                               className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medi-primary/30 focus:border-medi-primary"
                             />
@@ -845,6 +857,16 @@ export default function ConfiguracionAcuerdo() {
                               {formatCOP(tarifa.valor_pactado)}
                             </p>
                           )}
+                          {(() => {
+                            const key = `${form.eps_codigo}:${tarifa.cups_codigo}`;
+                            const ref = tarifaRefs[key];
+                            if (!ref) return null;
+                            return (
+                              <p className="text-[10px] text-medi-primary mt-0.5">
+                                📊 Referencia: {form.nombre_eps || form.eps_codigo} paga ~{formatCOP(ref.valor_promedio)} ({formatCOP(ref.valor_min)}–{formatCOP(ref.valor_max)})
+                              </p>
+                            );
+                          })()}
                         </div>
 
                         {/* Toggles */}

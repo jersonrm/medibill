@@ -12,15 +12,22 @@
  */
 
 import type {
-  MatiasAuthResponse,
   MatiasInvoiceRequest,
   MatiasInvoiceResponse,
   MatiasStatusResponse,
 } from "./matias-types";
+import {
+  MatiasAuthResponseSchema,
+  MatiasInvoiceResponseSchema,
+  MatiasStatusResponseSchema,
+} from "./matias-schemas";
+import { withRetry } from "@/lib/retry";
 
 // =====================================================================
 // CONFIGURACIÓN
 // =====================================================================
+
+const MATIAS_TIMEOUT_MS = 30_000;
 
 function getConfig() {
   const url = process.env.MATIAS_API_URL;
@@ -67,6 +74,7 @@ export async function autenticar(): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email: config.email, password: config.password }),
+    signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -74,7 +82,7 @@ export async function autenticar(): Promise<string> {
     throw new Error(`Matias auth failed (${res.status}): ${text}`);
   }
 
-  const data = (await res.json()) as MatiasAuthResponse;
+  const data = MatiasAuthResponseSchema.parse(await res.json());
   cachedToken = data.token;
   // expires_in is in seconds; Matias tokens default to 90 days
   tokenExpiresAt = Date.now() + (data.expires_in || 7776000) * 1000;
@@ -89,53 +97,57 @@ export async function autenticar(): Promise<string> {
 export async function enviarFactura(
   invoiceJson: MatiasInvoiceRequest,
 ): Promise<MatiasInvoiceResponse> {
-  const token = await autenticar();
-  const config = getConfig();
+  return withRetry(async () => {
+    const token = await autenticar();
+    const config = getConfig();
 
-  const res = await fetch(`${config.baseUrl}/invoice`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(invoiceJson),
-  });
-
-  // Si 401, intentar re-autenticar una vez
-  if (res.status === 401) {
-    cachedToken = null;
-    tokenExpiresAt = 0;
-    const newToken = await autenticar();
-
-    const retry = await fetch(`${config.baseUrl}/invoice`, {
+    const res = await fetch(`${config.baseUrl}/invoice`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        Authorization: `Bearer ${newToken}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(invoiceJson),
+      signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
     });
 
-    if (!retry.ok) {
-      const text = await retry.text();
-      throw new Error(`Matias enviarFactura failed (${retry.status}): ${text}`);
+    // Si 401, intentar re-autenticar una vez
+    if (res.status === 401) {
+      cachedToken = null;
+      tokenExpiresAt = 0;
+      const newToken = await autenticar();
+
+      const retryRes = await fetch(`${config.baseUrl}/invoice`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: `Bearer ${newToken}`,
+        },
+        body: JSON.stringify(invoiceJson),
+        signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
+      });
+
+      if (!retryRes.ok) {
+        const text = await retryRes.text();
+        throw new Error(`Matias enviarFactura failed (${retryRes.status}): ${text}`);
+      }
+
+      return MatiasInvoiceResponseSchema.parse(await retryRes.json());
     }
 
-    return (await retry.json()) as MatiasInvoiceResponse;
-  }
+    if (res.status === 402) {
+      throw new Error("Límite de consumo de Matias API alcanzado. Verifique su membresía.");
+    }
 
-  if (res.status === 402) {
-    throw new Error("Límite de consumo de Matias API alcanzado. Verifique su membresía.");
-  }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Matias enviarFactura failed (${res.status}): ${text}`);
+    }
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Matias enviarFactura failed (${res.status}): ${text}`);
-  }
-
-  return (await res.json()) as MatiasInvoiceResponse;
+    return MatiasInvoiceResponseSchema.parse(await res.json());
+  }, { label: "Matias enviarFactura" });
 }
 
 /**
@@ -145,25 +157,28 @@ export async function enviarFactura(
 export async function consultarEstado(
   trackId: string,
 ): Promise<MatiasStatusResponse> {
-  const token = await autenticar();
-  const config = getConfig();
+  return withRetry(async () => {
+    const token = await autenticar();
+    const config = getConfig();
 
-  const res = await fetch(
-    `${config.baseUrl}/status/document/${encodeURIComponent(trackId)}`,
-    {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
+    const res = await fetch(
+      `${config.baseUrl}/status/document/${encodeURIComponent(trackId)}`,
+      {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
       },
-    },
-  );
+    );
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Matias consultarEstado failed (${res.status}): ${text}`);
-  }
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Matias consultarEstado failed (${res.status}): ${text}`);
+    }
 
-  return (await res.json()) as MatiasStatusResponse;
+    return MatiasStatusResponseSchema.parse(await res.json());
+  }, { label: "Matias consultarEstado" });
 }
 
 /**
@@ -178,6 +193,7 @@ export async function descargarXml(trackId: string): Promise<string> {
     `${config.baseUrl}/documents/xml/${encodeURIComponent(trackId)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
     },
   );
 
@@ -200,6 +216,7 @@ export async function descargarPdf(trackId: string): Promise<ArrayBuffer> {
     `${config.baseUrl}/documents/pdf/${encodeURIComponent(trackId)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
     },
   );
 
@@ -223,6 +240,7 @@ export async function consultarConsumo(): Promise<Record<string, unknown>> {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
     },
+    signal: AbortSignal.timeout(MATIAS_TIMEOUT_MS),
   });
 
   if (!res.ok) {

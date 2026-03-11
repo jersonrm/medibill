@@ -34,8 +34,28 @@ vi.mock("@/lib/logger", () => ({
   devError: vi.fn(),
 }));
 
+vi.mock("@/lib/organizacion", () => ({
+  getContextoOrg: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return {
+      userId: mockState.user.id,
+      orgId: "org-test-123",
+      orgNombre: "Clínica Test",
+      orgTipo: "clinica" as const,
+      rol: "owner" as const,
+      suscripcion: { plan_id: "profesional", estado: "active", trial_fin: null, periodo_actual_fin: null },
+    };
+  }),
+  getOrgIdActual: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return "org-test-123";
+  }),
+}));
+
 vi.mock("@/lib/suscripcion", () => ({
   tieneFeature: vi.fn().mockResolvedValue(true),
+  verificarLimite: vi.fn().mockResolvedValue({ permitido: true, restante: 100 }),
+  incrementarUso: vi.fn().mockResolvedValue(undefined),
 }));
 
 // =====================================================================
@@ -124,10 +144,7 @@ describe("obtenerMisPendientes — paginación", () => {
     mockState.user = null;
 
     const { obtenerMisPendientes } = await import("@/app/actions/glosas");
-    const result = await obtenerMisPendientes();
-
-    expect(result.pendientes).toEqual([]);
-    expect(result.kpis.pendientesTotal).toBe(0);
+    await expect(obtenerMisPendientes()).rejects.toThrow("No autenticado");
   });
 
   it("calcula KPIs correctamente con facturas limitadas", async () => {

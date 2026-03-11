@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase-server";
 
 /**
  * Cron endpoint: purga cuentas cuyo `eliminacion_programada_at` >= 7 días.
@@ -16,10 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  const supabase = createServiceClient();
 
   const sieteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -52,10 +49,14 @@ export async function GET(req: NextRequest) {
     .delete()
     .in("user_id", userIds);
 
-  // Eliminar usuarios de auth (service role)
-  for (const uid of userIds) {
-    await supabase.auth.admin.deleteUser(uid);
+  // Eliminar usuarios de auth (service role) — en paralelo
+  const results = await Promise.allSettled(
+    userIds.map((uid) => supabase.auth.admin.deleteUser(uid))
+  );
+  const failed = results.filter((r) => r.status === "rejected");
+  if (failed.length > 0) {
+    console.error(`[cron] ${failed.length}/${userIds.length} auth deletes failed`);
   }
 
-  return NextResponse.json({ purged: userIds.length });
+  return NextResponse.json({ purged: userIds.length, authDeletesFailed: failed.length });
 }

@@ -1,13 +1,11 @@
 "use server";
 
 import { requirePlatformAdmin } from "@/lib/platform-admin";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase-server";
+import { safeError } from "@/lib/safe-error";
 
 function getServiceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+  return createServiceClient();
 }
 
 // ─── Métricas globales ─────────────────────────────────────────────
@@ -192,8 +190,8 @@ export async function cambiarPlanOrg(
     }).eq("id", orgId),
   ]);
 
-  if (subUpdate.error) return { success: false, error: subUpdate.error.message };
-  if (orgUpdate.error) return { success: false, error: orgUpdate.error.message };
+  if (subUpdate.error) return { success: false, error: safeError("cambiarPlanOrg", subUpdate.error) };
+  if (orgUpdate.error) return { success: false, error: safeError("cambiarPlanOrg", orgUpdate.error) };
 
   return { success: true };
 }
@@ -214,6 +212,6 @@ export async function suspenderOrg(
     .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
     .eq("organizacion_id", orgId);
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("suspenderOrg", error) };
   return { success: true };
 }

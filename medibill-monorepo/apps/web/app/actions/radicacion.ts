@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase-server";
 import { generarPaqueteRadicacion } from "@/lib/empaquetador-radicacion";
 import { enviarEmailRadicacion, generarHtmlRadicacion } from "@/lib/email";
 import { registrarAuditLog } from "@/lib/audit-log";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
 
 // ==========================================
 // RADICACIÓN — Server Actions
@@ -19,6 +21,20 @@ export async function generarPaqueteDescarga(
   | { success: true; zipBase64: string; nombreArchivo: string }
   | { success: false; error: string }
 > {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
+  const supabase = await createClient();
+
+  // Verificar que la factura pertenece a la org del usuario
+  const { data: factura } = await supabase
+    .from("facturas")
+    .select("id")
+    .eq("id", facturaId)
+    .eq("organizacion_id", ctx.orgId)
+    .single();
+
+  if (!factura) return { success: false, error: "Factura no encontrada" };
+
   try {
     const { zipBase64, nombreArchivo } =
       await generarPaqueteRadicacion(facturaId);
@@ -43,18 +59,16 @@ export async function radicarFactura(
     return { success: false, error: "El número de radicado es obligatorio" };
   }
 
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   // 1. Obtener factura
   const { data: factura, error: errFactura } = await supabase
     .from("facturas")
     .select("estado, metadata")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (errFactura || !factura) {
@@ -86,11 +100,13 @@ export async function radicarFactura(
       updated_at: new Date().toISOString(),
     })
     .eq("id", facturaId)
-    .eq("user_id", user.id);
+    .eq("organizacion_id", ctx.orgId);
 
   if (errUpdate) {
     return { success: false, error: "Error actualizando la factura" };
   }
+
+  registrarAuditLog({ accion: "radicar_factura", tabla: "facturas", registroId: facturaId, metadata: { numero_radicado: numeroRadicado.trim() } });
 
   return { success: true };
 }
@@ -102,18 +118,16 @@ export async function radicarFactura(
 export async function obtenerEmailRadicacion(
   facturaId: string,
 ): Promise<{ email: string; epsNombre: string } | null> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
 
   // Obtener la factura para saber qué EPS
   const { data: factura } = await supabase
     .from("facturas")
     .select("nit_erp, metadata")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (!factura) return null;
@@ -122,7 +136,7 @@ export async function obtenerEmailRadicacion(
   const { data: acuerdos } = await supabase
     .from("acuerdos_voluntades")
     .select("email_radicacion, nombre_eps, eps_codigo")
-    .eq("prestador_id", user.id)
+    .eq("prestador_id", ctx.orgId)
     .eq("activo", true)
     .not("email_radicacion", "is", null)
     .order("fecha_fin", { ascending: false });
@@ -151,18 +165,16 @@ export async function obtenerEmailRadicacion(
 export async function radicarPorEmail(
   facturaId: string,
 ): Promise<{ success: true; messageId: string } | { success: false; error: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "crear_factura");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   // 1. Obtener factura completa
   const { data: factura, error: errFactura } = await supabase
     .from("facturas")
     .select("*, pacientes(*)")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (errFactura || !factura) {
@@ -189,7 +201,7 @@ export async function radicarPorEmail(
   const { data: acuerdos } = await supabase
     .from("acuerdos_voluntades")
     .select("email_radicacion, nombre_eps, eps_codigo")
-    .eq("prestador_id", user.id)
+    .eq("prestador_id", ctx.orgId)
     .eq("activo", true)
     .not("email_radicacion", "is", null)
     .order("fecha_fin", { ascending: false });
@@ -248,6 +260,16 @@ export async function radicarPorEmail(
   });
 
   if (!resultadoEmail.success) {
+    registrarAuditLog({
+      accion: "radicar_email_fallido",
+      tabla: "facturas",
+      registroId: facturaId,
+      metadata: {
+        email_destinatario: emailDestinatario,
+        eps_nombre: epsNombre,
+        error: resultadoEmail.error,
+      },
+    });
     return { success: false, error: `Error enviando email: ${resultadoEmail.error}` };
   }
 
@@ -271,7 +293,7 @@ export async function radicarPorEmail(
       updated_at: new Date().toISOString(),
     })
     .eq("id", facturaId)
-    .eq("user_id", user.id);
+    .eq("organizacion_id", ctx.orgId);
 
   if (errUpdate) {
     return { success: false, error: "Email enviado pero error actualizando estado de factura" };

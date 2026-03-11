@@ -1,7 +1,17 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Sentry from "@sentry/nextjs";
+import { headers } from "next/headers";
 
 const isDev = process.env.NODE_ENV === 'development';
+
+/** Best-effort extraction of x-request-id from incoming request headers. */
+async function getRequestId(): Promise<string | undefined> {
+  try {
+    const h = await headers();
+    return h.get("x-request-id") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function devLog(label: string, ...args: unknown[]) {
   if (isDev) console.log(`[DEV] ${label}`, ...args);
@@ -15,20 +25,27 @@ export function devWarn(label: string, ...args: unknown[]) {
   }
 }
 
-export function devError(label: string, ...args: unknown[]) {
+export async function devError(label: string, ...args: unknown[]) {
   if (isDev) {
     console.error(`[DEV] ${label}`, ...args);
   } else {
+    const requestId = await getRequestId();
     const error = args.find((a) => a instanceof Error);
     if (error instanceof Error) {
-      Sentry.captureException(error, { tags: { label } });
+      Sentry.captureException(error, {
+        tags: { label, ...(requestId ? { request_id: requestId } : {}) },
+      });
     } else {
-      Sentry.captureMessage(`${label}: ${String(args[0] ?? "")}`, { level: "error" });
+      Sentry.captureMessage(`${label}: ${String(args[0] ?? "")}`, {
+        level: "error",
+        tags: { ...(requestId ? { request_id: requestId } : {}) },
+      });
     }
     console.error(
       JSON.stringify({
         level: "error",
         label,
+        ...(requestId ? { request_id: requestId } : {}),
         message: error instanceof Error ? error.message : String(args[0] ?? ""),
         ts: new Date().toISOString(),
       })
@@ -36,26 +53,4 @@ export function devError(label: string, ...args: unknown[]) {
   }
 }
 
-/**
- * Registra un evento de auditoría en Supabase (fire-and-forget).
- * Usar para: auth fallidos, rate limits excedidos, errores de facturación.
- */
-export function logAudit(
-  supabase: SupabaseClient,
-  event: { action: string; user_id?: string; metadata?: Record<string, unknown> }
-) {
-  supabase
-    .from("audit_log")
-    .insert({
-      action: event.action,
-      user_id: event.user_id ?? null,
-      metadata: event.metadata ?? {},
-    })
-    .then(({ error }) => {
-      if (error) {
-        console.error(
-          JSON.stringify({ level: "error", label: "audit_log_failed", action: event.action })
-        );
-      }
-    });
-}
+

@@ -119,6 +119,7 @@ export const wompiProvider: PaymentProvider = {
         customer_email: emailCliente,
         payment_method: { installments: 1 },
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {

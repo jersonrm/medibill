@@ -3,7 +3,8 @@ import { buscarCupsPorTexto, buscarCupsPorCodigo } from "@/lib/cups-service";
 import { createClient } from "@/lib/supabase-server";
 import { NextResponse } from "next/server";
 import { createRateLimiter } from "@/lib/rate-limit";
-import { logAudit, devError } from "@/lib/logger";
+import { devError } from "@/lib/logger";
+import { registrarAuditLog } from "@/lib/audit-log";
 
 // --- Filtro de prompt injection (defensa en profundidad) ---
 const INJECTION_PATTERNS = [
@@ -120,7 +121,7 @@ export async function POST(req: Request) {
 
     // --- Rate limiting ---
     if (await limiter.isLimited(user.id, supabase)) {
-      logAudit(supabase, { action: "rate_limit_exceeded", user_id: user.id, metadata: { route: "ai-helper" } });
+      registrarAuditLog({ accion: "rate_limit_exceeded", tabla: "rate_limits", metadata: { route: "ai-helper" } });
       return NextResponse.json(
         { error: "Demasiadas solicitudes. Intenta en un momento." },
         { status: 429 }

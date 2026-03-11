@@ -175,7 +175,7 @@ describe("crearFacturaBorrador", () => {
     const result = await crearFacturaBorrador(crearCrearFacturaInput());
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("DB error");
+    expect(result.error).toContain("Error al guardar");
   });
 });
 
@@ -227,7 +227,7 @@ describe("aprobarFactura", () => {
     const result = await aprobarFactura("f1");
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain("agotado");
+    expect(result.error).toContain("Error al guardar");
   });
 
   it("rechaza si usuario no está autenticado", async () => {
@@ -244,7 +244,7 @@ describe("anularFactura", () => {
   });
 
   it("anula una factura borrador exitosamente", async () => {
-    configurarTabla(mockState, "facturas", "update", { data: null, error: null });
+    configurarTabla(mockState, "facturas", "update", { data: [{ id: "f1" }], error: null });
 
     const { anularFactura } = await import("@/app/actions/facturas");
     const result = await anularFactura("f1");

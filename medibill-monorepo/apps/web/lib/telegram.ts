@@ -4,6 +4,7 @@
  */
 
 const TELEGRAM_API = "https://api.telegram.org/bot";
+const TELEGRAM_TIMEOUT_MS = 10_000;
 
 function getToken(): string {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -35,7 +36,11 @@ export async function enviarMensaje(
       text: texto,
       parse_mode: parseMode,
     }),
+    signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
   });
+  if (!res.ok) {
+    console.error(`Telegram sendMessage HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -57,7 +62,11 @@ export async function enviarMensajeConBotones(
         inline_keyboard: botones,
       },
     }),
+    signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
   });
+  if (!res.ok) {
+    console.error(`Telegram sendMessage HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -67,6 +76,7 @@ export async function obtenerArchivo(fileId: string): Promise<{ file_path: strin
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ file_id: fileId }),
+    signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
   });
   const data: TelegramResponse<{ file_path: string; file_size: number }> = await res.json();
   if (!data.ok) throw new Error(`Telegram getFile error: ${data.description}`);
@@ -76,7 +86,7 @@ export async function obtenerArchivo(fileId: string): Promise<{ file_path: strin
 /** Descargar archivo de Telegram como Buffer */
 export async function descargarArchivo(filePath: string): Promise<Buffer> {
   const url = `https://api.telegram.org/file/bot${getToken()}/${filePath}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Error descargando archivo: ${res.status}`);
   const arrayBuffer = await res.arrayBuffer();
   return Buffer.from(arrayBuffer);
@@ -84,14 +94,19 @@ export async function descargarArchivo(filePath: string): Promise<Buffer> {
 
 /** Enviar "typing" action para indicar que el bot está procesando */
 export async function enviarAccionEscribiendo(chatId: number | string): Promise<void> {
-  await fetch(apiUrl("sendChatAction"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      action: "typing",
-    }),
-  });
+  try {
+    await fetch(apiUrl("sendChatAction"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        action: "typing",
+      }),
+      signal: AbortSignal.timeout(TELEGRAM_TIMEOUT_MS),
+    });
+  } catch {
+    // Non-critical: silently ignore typing indicator failures
+  }
 }
 
 /**

@@ -16,6 +16,7 @@ import AnalysisResults from "@/components/AnalysisResults";
 import AlertaCoherenciaPaciente from "@/components/AlertaCoherenciaPaciente";
 import { detectarIncoherenciasPaciente } from "@/lib/validar-coherencia-paciente";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { useBeforeUnload } from "@/lib/hooks/use-before-unload";
 
 export default function MedibillApp() {
   const [nota, setNota] = useState("");
@@ -24,6 +25,10 @@ export default function MedibillApp() {
   const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
   const [historial, setHistorial] = useState<AuditoriaHistorial[]>([]);
   const [numFactura, setNumFactura] = useState("");
+  const [trialMensaje, setTrialMensaje] = useState<string | null>(null);
+
+  // Protección contra cierre accidental con datos sin guardar
+  useBeforeUnload(nota.trim().length > 0 && resultado === null);
 
   // Debounce de la nota para no recalcular validación en cada keystroke
   const notaDebounced = useDebouncedValue(nota, 500);
@@ -71,6 +76,7 @@ export default function MedibillApp() {
     if (!nota.trim()) return;
     setCargando(true);
     setResultado(null);
+    setTrialMensaje(null);
     const [resp, facturaInfo] = await Promise.all([
       clasificarTextoMedico(nota, datosPaciente.nombrePaciente, datosPaciente.cedulaPaciente),
       obtenerSiguienteNumeroFactura(),
@@ -79,12 +85,18 @@ export default function MedibillApp() {
       alert("⚠️ " + facturaInfo.error);
     }
     setNumFactura(facturaInfo.numero);
-    if (resp.exito) {
+    if (resp.success) {
       const d = { ...resp.datos } as ResultadoAnalisis;
       if (!d.atencion) d.atencion = { ...ATENCION_DEFAULT };
       if (!d.diagnosticos) d.diagnosticos = [];
       if (!d.procedimientos) d.procedimientos = [];
       setResultado(d);
+      if ('trial_parcial' in resp && resp.trial_parcial) {
+        setTrialMensaje((resp as { trial_mensaje?: string }).trial_mensaje || "Activa tu plan para ver los códigos completos.");
+      } else if ('trial_restante' in resp) {
+        const restante = (resp as { trial_restante?: number }).trial_restante ?? 0;
+        setTrialMensaje(`Período de prueba: te quedan ${restante} clasificaciones completas.`);
+      }
       datosPaciente.cedulaPaciente.trim().length >= 5 ? await handleBuscarPaciente() : await cargarHistorial();
     } else {
       alert("Error: " + resp.error);
@@ -130,6 +142,20 @@ export default function MedibillApp() {
 
         {/* Right: Results */}
         <section className="flex flex-col gap-8">
+          {trialMensaje && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+              <span className="text-xl">⚡</span>
+              <div>
+                <p className="text-sm font-medium text-amber-800">{trialMensaje}</p>
+                <a
+                  href="/configuracion/suscripcion"
+                  className="mt-1 inline-block text-xs font-bold text-medi-primary hover:text-medi-accent transition-colors"
+                >
+                  Ver planes →
+                </a>
+              </div>
+            </div>
+          )}
           <AnalysisResults resultado={resultado} datosPaciente={datosPaciente} numFactura={numFactura} onResultadoChange={setResultado} nota={nota} />
         </section>
       </main>

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server";
 import { obtenerKPICartera } from "@/app/actions/pagos";
+import { getContextoOrg } from "@/lib/organizacion";
 import type { KPIDashboard, FacturacionMensual, DistribucionEPS, ItemAtencion } from "@/lib/types/dashboard";
 
 // ==========================================
@@ -10,9 +11,9 @@ import type { KPIDashboard, FacturacionMensual, DistribucionEPS, ItemAtencion } 
 
 /** Obtiene los KPIs principales del dashboard */
 export async function obtenerKPIsDashboard(): Promise<KPIDashboard> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { facturas_mes: 0, valor_facturado_mes: 0, pendientes_descarga: 0, glosas_activas: 0, valor_glosado_activo: 0, tasa_recuperacion: 0, cartera_pendiente: 0, facturas_en_cartera: 0 };
+  const emptyKPI: KPIDashboard = { facturas_mes: 0, valor_facturado_mes: 0, pendientes_descarga: 0, glosas_activas: 0, valor_glosado_activo: 0, tasa_recuperacion: 0, cartera_pendiente: 0, facturas_en_cartera: 0 };
 
   const inicioMes = new Date();
   inicioMes.setDate(1);
@@ -22,7 +23,7 @@ export async function obtenerKPIsDashboard(): Promise<KPIDashboard> {
   const { data: facturasMes } = await supabase
     .from("facturas")
     .select("valor_total")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .gte("fecha_expedicion", inicioMesStr)
     .neq("estado", "anulada");
 
@@ -33,14 +34,14 @@ export async function obtenerKPIsDashboard(): Promise<KPIDashboard> {
   const { count: pendientes } = await supabase
     .from("facturas")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .eq("estado", "aprobada");
 
   // Glosas activas
   const { data: glosasActivas } = await supabase
     .from("glosas_recibidas")
     .select("valor_glosado")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .in("estado", ["pendiente", "en_revision"]);
 
   const glosas_activas = glosasActivas?.length || 0;
@@ -50,7 +51,7 @@ export async function obtenerKPIsDashboard(): Promise<KPIDashboard> {
   const { data: respuestas } = await supabase
     .from("respuestas_glosas")
     .select("estado")
-    .eq("user_id", user.id);
+    .eq("organizacion_id", ctx.orgId);
 
   const totalResp = respuestas?.length || 0;
   const recuperadas = respuestas?.filter((r) => r.estado === "aceptada" || r.estado === "resuelta_a_favor").length || 0;
@@ -73,9 +74,8 @@ export async function obtenerKPIsDashboard(): Promise<KPIDashboard> {
 
 /** Obtiene facturación mensual para gráfico de barras */
 export async function obtenerFacturacionMensual(meses = 6): Promise<FacturacionMensual[]> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
 
   const desde = new Date();
   desde.setMonth(desde.getMonth() - meses + 1);
@@ -85,7 +85,7 @@ export async function obtenerFacturacionMensual(meses = 6): Promise<FacturacionM
   const { data } = await supabase
     .from("facturas")
     .select("fecha_expedicion, valor_total")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .gte("fecha_expedicion", desdeStr)
     .neq("estado", "anulada")
     .order("fecha_expedicion");
@@ -115,9 +115,8 @@ export async function obtenerFacturacionMensual(meses = 6): Promise<FacturacionM
 
 /** Obtiene distribución de facturación por EPS */
 export async function obtenerDistribucionEPS(): Promise<DistribucionEPS[]> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
 
   const inicioMes = new Date();
   inicioMes.setDate(1);
@@ -125,7 +124,7 @@ export async function obtenerDistribucionEPS(): Promise<DistribucionEPS[]> {
   const { data } = await supabase
     .from("facturas")
     .select("nit_erp, valor_total, metadata")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .gte("fecha_expedicion", inicioMes.toISOString().split("T")[0])
     .neq("estado", "anulada");
 
@@ -151,9 +150,8 @@ export async function obtenerDistribucionEPS(): Promise<DistribucionEPS[]> {
 
 /** Obtiene items que requieren atención */
 export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
 
   const items: ItemAtencion[] = [];
   const hoy = new Date();
@@ -162,7 +160,7 @@ export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
   const { data: glosas } = await supabase
     .from("glosas_recibidas")
     .select("id, numero_glosa, fecha_limite_respuesta, valor_glosado")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .in("estado", ["pendiente", "en_revision"])
     .not("fecha_limite_respuesta", "is", null);
 
@@ -190,7 +188,7 @@ export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
   const { data: borradores } = await supabase
     .from("facturas")
     .select("id, num_factura, created_at, valor_total")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .eq("estado", "borrador")
     .lte("created_at", hace3dias.toISOString());
 
@@ -216,7 +214,7 @@ export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
   const { data: facturasVencidas } = await supabase
     .from("facturas")
     .select("id, num_factura, valor_total, created_at, metadata")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .in("estado", ["radicada", "pagada_parcial"])
     .lte("created_at", hace60dias.toISOString());
 
@@ -245,7 +243,7 @@ export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
   const { data: acuerdos } = await supabase
     .from("acuerdos_voluntades")
     .select("id, nombre_eps, fecha_fin")
-    .eq("prestador_id", user.id)
+    .eq("prestador_id", ctx.orgId)
     .eq("activo", true)
     .lte("fecha_fin", en30dias.toISOString().split("T")[0]);
 
@@ -270,7 +268,7 @@ export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
   const { data: resolucion } = await supabase
     .from("resoluciones_facturacion")
     .select("id, prefijo, rango_hasta, consecutivo_actual, rango_inicio")
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .eq("activa", true)
     .single();
 
@@ -296,9 +294,8 @@ export async function obtenerItemsAtencion(): Promise<ItemAtencion[]> {
 
 /** Contadores ligeros para badges del sidebar */
 export async function obtenerBadgesSidebar(): Promise<{ glosasUrgentes: number; facturasBorrador: number; carteraVencida: number }> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { glosasUrgentes: 0, facturasBorrador: 0, carteraVencida: 0 };
 
   const hoy = new Date();
   const en5dias = new Date();
@@ -311,18 +308,18 @@ export async function obtenerBadgesSidebar(): Promise<{ glosasUrgentes: number; 
     supabase
       .from("glosas_recibidas")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
+      .eq("organizacion_id", ctx.orgId)
       .in("estado", ["pendiente", "en_revision"])
       .lte("fecha_limite_respuesta", en5dias.toISOString().split("T")[0]),
     supabase
       .from("facturas")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
+      .eq("organizacion_id", ctx.orgId)
       .eq("estado", "borrador"),
     supabase
       .from("facturas")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
+      .eq("organizacion_id", ctx.orgId)
       .in("estado", ["radicada", "pagada_parcial"])
       .lte("created_at", hace60dias.toISOString()),
   ]);

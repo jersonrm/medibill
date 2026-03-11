@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { getContextoOrg } from "@/lib/organizacion";
 import { verificarPermisoOError } from "@/lib/permisos";
+import { safeError } from "@/lib/safe-error";
 import { randomBytes } from "crypto";
 import type { UsuarioOrganizacion, Invitacion, RolOrganizacion } from "@/lib/types/suscripcion";
 
@@ -42,7 +43,7 @@ export async function listarMiembros(): Promise<{
     return {
       miembros: [],
       invitaciones: [],
-      error: error instanceof Error ? error.message : "Error",
+      error: "Error al cargar el equipo. Intenta de nuevo.",
     };
   }
 }
@@ -122,7 +123,7 @@ export async function invitarUsuario(
       });
 
     if (insertError) {
-      return { success: false, error: insertError.message };
+      return { success: false, error: safeError("invitarUsuario", insertError) };
     }
 
     // TODO: Enviar email de invitación con el link
@@ -130,7 +131,7 @@ export async function invitarUsuario(
 
     return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al invitar usuario. Intenta de nuevo." };
   }
 }
 
@@ -163,10 +164,10 @@ export async function cambiarRolMiembro(
       .eq("id", miembroId)
       .eq("organizacion_id", ctx.orgId);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeError("cambiarRolMiembro", error) };
     return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al cambiar rol. Intenta de nuevo." };
   }
 }
 
@@ -198,10 +199,10 @@ export async function desactivarMiembro(
       .eq("id", miembroId)
       .eq("organizacion_id", ctx.orgId);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeError("desactivarMiembro", error) };
     return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al desactivar miembro. Intenta de nuevo." };
   }
 }
 
@@ -258,7 +259,7 @@ export async function aceptarInvitacion(
       });
 
     if (memberError) {
-      return { success: false, error: memberError.message };
+      return { success: false, error: safeError("aceptarInvitacion", memberError) };
     }
 
     // Marcar invitación como usada
@@ -269,7 +270,7 @@ export async function aceptarInvitacion(
 
     return { success: true, orgNombre: org.nombre };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al aceptar invitación. Intenta de nuevo." };
   }
 }
 
@@ -288,9 +289,9 @@ export async function cancelarInvitacion(
       .eq("id", invitacionId)
       .eq("organizacion_id", ctx.orgId);
 
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeError("cancelarInvitacion", error) };
     return { success: true };
   } catch (error: unknown) {
-    return { success: false, error: error instanceof Error ? error.message : "Error" };
+    return { success: false, error: "Error al cancelar invitación. Intenta de nuevo." };
   }
 }

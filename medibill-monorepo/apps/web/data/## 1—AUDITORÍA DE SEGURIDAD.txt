@@ -1,0 +1,426 @@
+# SECURITY_AUDIT.md — Medibill
+**Fecha**: 2026-03-10  
+**Auditor**: GitHub Copilot (Claude Opus 4.6)  
+**Alcance**: medibill-monorepo/apps/web  
+**Commit**: HEAD (workspace snapshot)
+
+---
+
+## RESUMEN EJECUTIVO
+
+| Severidad | Hallazgos |
+|-----------|-----------|
+| CRITICAL  | 3         |
+| HIGH      | 5         |
+| MEDIUM    | 6         |
+| LOW       | 4         |
+| PASS      | 15        |
+
+---
+
+## 1. AUTENTICACIÓN
+
+### 1.1 Manejo de sesiones
+**PASS** — Sesiones gestionadas por Supabase Auth vía JWT tokens server-side con `@supabase/ssr`. El middleware (`middleware.ts:38`) llama `supabase.auth.getUser()` que valida el token contra la BD (no solo decode local). Los tokens se almacenan en cookies gestionadas por Supabase SSR con configuración automática de HttpOnly. Supabase maneja refresh tokens internamente.
+
+**Evidencia**: `middleware.ts#L38`, `lib/supabase-server.ts#L10-L30`
+
+### 1.2 Protección contra brute force
+**PASS** — Rate limiting implementado en login y registro:
+- Login: 5 intentos / 15 min por IP (`login/actions.ts#L9`)
+- Registro: 3 intentos / hora por IP (`login/actions.ts#L11`)
+- Implementación con Upstash Redis en producción, fallback in-memory en dev (`lib/rate-limit.ts`)
+
+### 1.3 Almacenamiento seguro de tokens
+**PASS** — Cookies de Supabase Auth gestionadas por `@supabase/ssr` con configuración server-side. Cookie de onboarding configurada con `httpOnly: true, sameSite: 'lax'` (`middleware.ts#L96-L99`). Cookie de admin con `httpOnly: true, sameSite: 'lax', maxAge: 300` (`middleware.ts#L121-L125`).
+
+### 1.4 Rutas API sin autenticación
+**⚠️ HIGH — API_ROUTES_BYPASS_MIDDLEWARE**
+
+El middleware excluye TODAS las rutas `/api/*` del flujo de autenticación (`middleware.ts#L7-L9`):
+```typescript
+if (request.nextUrl.pathname.startsWith('/api')) {
+  return NextResponse.next()
+}
+Now I have thoroughly reviewed all the critical security areas. Let me compile the comprehensive SECURITY_AUDIT.md:I'm in Ask mode and cannot create files. I'll provide the complete SECURITY_AUDIT.md content below for you to create.
+
+SECURITY_AUDIT.md — Medibill Fase 1
+Here is the full audit based on thorough code review:
+
+Cada ruta API debe implementar su propia autenticación. Verificación de cada ruta:
+
+Ruta API	Auth Check	Estado
+/api/ai-helper	✅ supabase.auth.getUser() + 401	OK
+/api/trial-status	✅ supabase.auth.getUser() (retorna trialing: false si no auth)	OK
+/api/factura-pdf/[id]	✅ supabase.auth.getUser() + 401	OK
+/api/wompi/webhook	✅ Firma HMAC webhook	OK
+/api/telegram/webhook	⚠️ Solo verifica que TELEGRAM_BOT_TOKEN exista, NO valida secreto del webhook	FAIL
+/api/telegram/clasificacion-pendiente	✅ supabase.auth.getUser() + 401	OK
+/api/cron/eliminar-cuentas	✅ Bearer CRON_SECRET	OK
+/api/cron/refresh-benchmarks	✅ Bearer CRON_SECRET	OK
+Riesgo: El patrón de bypass global de middleware para APIs es frágil. Si un desarrollador agrega una nueva ruta API y olvida el auth check, queda expuesta sin protección.
+
+1.5 Telegram webhook sin secret token
+⚠️ HIGH — TELEGRAM_WEBHOOK_NO_SECRET
+
+Archivo: app/api/telegram/webhook/route.ts#L43-L46
+
+El webhook de Telegram NO valida el X-Telegram-Bot-Api-Secret-Token header. Cualquier persona que conozca la URL del webhook puede enviar updates falsos, potencialmente:
+
+Vincular cuentas de Telegram arbitrarias
+Disparar clasificaciones con audio malicioso
+Consumir créditos de IA del usuario
+Remediación: Configurar secret_token al registrar el webhook con setWebhook, y validar el header X-Telegram-Bot-Api-Secret-Token en cada request.
+
+1.6 Flujo de recuperación de contraseña
+WARNING — NO_PASSWORD_RECOVERY_FLOW
+
+No existe flujo de recuperación de contraseña implementado. No se encontraron referencias a resetPasswordForEmail, resetPassword, ni vistas de "olvidé mi contraseña".
+
+Impacto: MEDIUM — Los usuarios que olviden su contraseña quedan bloqueados del sistema. Se dependerá del soporte manual.
+
+1.7 Validación de sesión en cada request
+PASS — Todas las server actions verifican autenticación:
+
+Patrón principal: const { data: { user } } = await supabase.auth.getUser() — 50+ ocurrencias en actions/
+Patrón alternativo: requireUser() en cuenta.ts
+Patrón org: getContextoOrg() que internamente llama auth.getUser()
+1.8 Tokens hardcodeados y secrets en código
+🔴 CRITICAL — SENTRY_DSN_HARDCODED
+
+Archivo: sentry.client.config.ts#L4, sentry.server.config.ts#L43-L46
+dsn: "https://a088802db65084950599ef916f9e0f65@o4511016097546240.ingest.us.sentry.io/4511016105410560",
+
+El Sentry DSN está hardcodeado en el código fuente. Si bien los DSN de Sentry son semi-públicos (diseñados para el cliente), un atacante podría enviar eventos basura al proyecto Sentry, contaminando los logs de error.
+
+Severidad: LOW (Sentry DSN es semi-público por diseño, pero se recomienda usar env var + filtros de dominio en Sentry)
+
+⚠️ MEDIUM — SERVICE_ROLE_KEY_IN_DOCS
+Archivo: docs/env-suscripciones.md#L30
+
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJI...
+
+El archivo muestra el formato del service role key con un prefijo real de JWT (eyJhbGciOiJI...). Aunque es un placeholder truncado, el formato sugiere que un valor real podría haberse incluido en algún punto. Verificar que el archivo nunca contuvo un valor real en el historial de git.
+
+Remediación: Usar placeholders genéricos como sk_your_service_role_key_here.
+
+1.9 Mensaje de rate limit no se muestra
+⚠️ LOW — RATE_LIMIT_MESSAGE_MISSING
+
+Archivo: app/login/actions.ts#L23 redirige a ?mensaje=demasiados_intentos, pero este key NO existe en MENSAJES_PERMITIDOS de login/page.tsx#L6-L13. El rate limit se aplica correctamente, pero el usuario NO ve ningún mensaje, lo cual causa confusión.
+
+Remediación: Agregar demasiados_intentos: "Has excedido el número de intentos. Intenta de nuevo en 15 minutos." a MENSAJES_PERMITIDOS.
+
+2. AUTORIZACIÓN
+2.1 Verificación de rol por endpoint
+🔴 CRITICAL — MISSING_RBAC_IN_CORE_ACTIONS
+
+Las siguientes server actions de alto impacto NO verifican permisos RBAC a pesar de que existe un sistema de permisos definido en lib/permisos.ts:
+
+Action File	Funciones sin RBAC	Permiso Esperado
+actions/facturas.ts	crearFacturaBorrador, aprobarFactura, anularFactura, editarFacturaBorrador, marcarComoDescargada	crear_factura, aprobar_factura, anular_factura
+actions/dian.ts	Todas las funciones de envío DIAN	enviar_dian
+actions/clasificacion.ts	clasificarTextoMedico	clasificar_ia
+actions/glosas.ts	Todas las funciones	ver_glosas, responder_glosa
+actions/acuerdos.ts	Todas las funciones	gestionar_acuerdos
+actions/conciliacion.ts	Todas las funciones	importar_sabana
+actions/perfil.ts	guardarPerfil, guardarResolucion	config_organizacion
+Solo billing.ts y equipo.ts implementan RBAC.
+
+Impacto: Un usuario con rol auditor (solo lectura) puede crear facturas, aprobarlas, enviarlas a DIAN, modificar el perfil, etc. Un facturador puede clasificar con IA (solo doctor/admin/owner).
+
+Remediación: Agregar verificarPermisoOError(ctx.rol, "accion") al inicio de cada server action que muta datos.
+
+2.2 Escalación de privilegios
+PASS — Los admin server actions (admin.ts) verifican correctamente mediante requirePlatformAdmin() que hace un check real contra la BD con service role key, no un simple cookie check.
+
+Nota: El middleware usa una cookie medibill_is_platform_admin como cache (5 min TTL), pero los server actions SIEMPRE re-verifican contra la BD.
+
+2.3 IDOR (Insecure Direct Object References)
+PASS — Todas las queries incluyen filtro de ownership:
+
+facturas.ts: .eq("organizacion_id", ctx.orgId) en todas las operaciones
+pacientes.ts: .eq("user_id", user.id)
+factura-pdf/[id]/route.ts: .eq("id", id).eq("user_id", user.id)
+clasificacion-pendiente/route.ts: .eq("token", token).eq("user_id", user.id)
+No se encontraron queries que acepten un ID externo sin verificar ownership.
+
+2.4 Middleware de autorización centralizado
+⚠️ MEDIUM — INCONSISTENT_AUTH_PATTERN
+
+Existen 3 patrones de autenticación usados inconsistentemente:
+
+supabase.auth.getUser() directo (acuerdos, dashboard, dian, glosas, etc.)
+requireUser() helper (cuenta.ts)
+getContextoOrg() que incluye rol y org (billing, equipo, facturas, clasificacion)
+El patrón 1 NO proporciona acceso al rol del usuario, por lo que las actions que lo usan no pueden hacer RBAC.
+
+Remediación: Migrar TODAS las server actions a usar getContextoOrg() como punto de entrada único de auth + authz.
+
+2.5 RLS (Row Level Security)
+PASS — RLS está habilitado en todas las tablas sensibles con políticas para SELECT, INSERT, UPDATE, y DELETE según corresponde:
+
+Tabla	SELECT	INSERT	UPDATE	DELETE
+perfiles	✅	✅	✅	—
+pacientes	✅	✅	✅	—
+facturas	✅	✅	✅	✅ (migration)
+resoluciones_facturacion	✅	✅	✅	—
+glosas	✅	✅	✅ (migration)	—
+respuestas_glosa	✅	✅	—	—
+acuerdos_voluntades	✅	✅	✅	—
+organizaciones	✅	—	✅ (admin)	—
+suscripciones	✅	—	✅ (owner)	—
+usuarios_organizacion	✅	✅ (admin)	✅ (admin)	✅ (admin)
+telegram_vinculaciones	✅	✅	✅	✅
+clasificaciones_pendientes	✅	✅	—	✅
+Observación: respuestas_glosa no tiene policy de UPDATE. Si un usuario necesita editar una respuesta, no podrá. Verificar si es intencional.
+
+2.6 Bypass de RLS con service_role key
+PASS — El SUPABASE_SERVICE_ROLE_KEY se usa correctamente solo en:
+
+Webhooks sin contexto de usuario (Wompi, Telegram)
+Cron jobs autenticados con CRON_SECRET
+Admin actions protegidas por requirePlatformAdmin()
+Scripts de migración/seed (solo ejecución local)
+No se expone SUPABASE_SERVICE_ROLE_KEY al cliente. El createClient() standard usa ANON_KEY.
+
+3. VALIDACIÓN DE ENTRADA
+3.1 Validación client/server
+🔴 CRITICAL — NO_SERVER_SIDE_VALIDATION_LIBRARY
+
+No se utiliza Zod, Yup, joi, ni ninguna librería de validación de schemas en las server actions. La única validación estructurada existente es:
+
+AJV para validar el JSON RIPS de salida (lib/validadorRips.ts)
+Validaciones inline básicas (null checks, typeof, .length)
+Server actions que aceptan datos complejos sin validación de schema:
+
+Action	Parámetro	Riesgo
+crearFacturaBorrador(input: CrearFacturaInput)	Objeto completo con diagnósticos, procedimientos, valores monetarios	Datos corruptos en BD
+editarFacturaBorrador(facturaId, datos)	Objeto parcial con datos clínicos	Inyección de campos no esperados
+guardarPerfil(datos)	Partial del perfil	Mass assignment potencial
+guardarPaciente(datos)	PacienteInput completo	Sin validación de formatos
+registrarGlosa(...)	Múltiples parámetros	Sin validación
+guardarAcuerdo(...)	Datos de contrato	Sin validación
+Impacto: Un atacante puede enviar datos malformados, valores negativos, strings excesivamente largos, o campos inesperados directamente a las server actions.
+
+Remediación: Implementar validación con Zod en cada server action. Ejemplo:
+const CrearFacturaSchema = z.object({
+  nit_erp: z.string().min(1).max(20),
+  valor_total: z.number().nonnegative().max(999999999),
+  // ...
+});
+
+3.2 SQL Injection
+PASS — No se encontraron queries SQL raw. Todas las operaciones usan el Supabase client que parametriza automáticamente. Búsqueda exhaustiva por .raw(, .unsafe(, `sql``, .query( retornó 0 resultados en código de aplicación.
+
+3.3 XSS
+PASS —
+
+No se usa dangerouslySetInnerHTML en ningún componente de la aplicación
+La generación de HTML para PDF de facturas usa escapeHtml() consistentemente (api/factura-pdf/[id]/route.ts#L47)
+El login page previene XSS reflejado con whitelist de mensajes (MENSAJES_PERMITIDOS)
+React escapa automáticamente por defecto en JSX
+3.4 Validación de formatos
+⚠️ MEDIUM — NO_FORMAT_VALIDATION
+
+No se validan formatos específicos en server actions:
+
+Emails: ninguna validación de formato
+Teléfonos: ninguna validación
+NITs: ninguna validación de dígito de verificación
+Fechas: ninguna validación de formato/rango
+Valores monetarios: ninguna validación de negativos o máximos
+Códigos CUPS/CIE-10: solo validados post-IA, no en entrada directa
+3.5 File uploads
+⚠️ MEDIUM — MIME_TYPE_CLIENT_SPOOFABLE
+
+Archivos: actions/respuesta-glosas.ts#L672-L698, actions/conciliacion.ts#L53-L63
+
+La validación de uploads verifica:
+
+✅ Tamaño máximo (10MB glosas, 5MB sábana)
+✅ Lista de tipos MIME permitidos
+✅ Sanitización de nombre de archivo
+❌ NO verifica magic bytes del archivo (el file.type viene del cliente y es trivialmente spoofable)
+Remediación: Leer los primeros bytes del archivo para verificar magic bytes (PDF: %PDF, JPEG: FF D8 FF, PNG: 89 50 4E 47).
+
+3.6 Mass Assignment
+⚠️ MEDIUM — PARTIAL_MASS_ASSIGNMENT
+
+Archivo: actions/perfil.ts#L33-L45
+
+export async function guardarPerfil(
+  datos: Partial<Omit<PerfilPrestador, "id" | "user_id" | "created_at" | "updated_at">>
+) {
+  const payload = {
+    ...datos,         // ← Spread completo del input
+    id: user.id,
+    user_id: user.id,
+    updated_at: new Date().toISOString(),
+  };
+  await supabase.from("perfiles").upsert(payload, { onConflict: "id" });
+}
+Aunque id y user_id se sobrescriben, un atacante podría inyectar campos como organizacion_id, eliminacion_programada_at, u otros campos no previstos. La protección depende enteramente de las columnas de la BD (si no existe la columna, se ignora), pero es una práctica insegura.
+
+Remediación: Destructurar explícitamente los campos permitidos en cada action.
+4. PROTECCIÓN CONTRA ATAQUES COMUNES
+4.1 CSRF
+PASS — Next.js server actions incluyen protección CSRF automática mediante el header Origin que se valida internamente. Las API routes usan el patrón JSON (no form submissions), lo cual mitiga CSRF tradicional. El CSP incluye form-action 'self'.
+
+4.2 XSS
+PASS — Ver sección 3.3. Adicionalmente:
+
+CSP configurado: script-src 'self' 'unsafe-inline' (next.config.js#L42)
+frame-ancestors 'none'
+X-Content-Type-Options: nosniff
+⚠️ LOW — CSP_UNSAFE_INLINE
+
+script-src incluye 'unsafe-inline' que debilita la protección CSP contra XSS. Esto es necesario para Next.js pero se podría mejorar con nonces.
+
+4.3 Security Headers
+PASS — Headers completos configurados en next.config.js#L5-L56:
+
+✅ X-Frame-Options: DENY
+✅ X-Content-Type-Options: nosniff
+✅ Referrer-Policy: strict-origin-when-cross-origin
+✅ Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()
+✅ Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+✅ Content-Security-Policy completo con frame-ancestors 'none', base-uri 'self', form-action 'self'
+✅ X-DNS-Prefetch-Control: on
+✅ poweredBy: false (no X-Powered-By header)
+4.4 CORS
+PASS — No se configura CORS custom. Next.js server actions y API routes no habilitan CORS por defecto, lo cual es seguro. Las llamadas externas (Wompi webhook, Telegram webhook) usan POST con signatures.
+
+4.5 Rate Limiting
+PASS — Rate limiting implementado en endpoints sensibles:
+
+Login: 5/15min (login/actions.ts#L9)
+Registro: 3/hora (login/actions.ts#L11)
+AI helper: 10/min (api/ai-helper/route.ts#L30)
+Factura PDF: 20/min (api/factura-pdf/[id]/route.ts#L7)
+Telegram webhook: 5/min (api/telegram/webhook/route.ts#L23)
+⚠️ MEDIUM — NO_RATE_LIMIT_ON_SERVER_ACTIONS
+
+Las server actions que invocan servicios costosos (clasificación IA con Gemini, envío DIAN via Matias) no tienen rate limiting propio:
+
+clasificarTextoMedico() — llama a Gemini API (costo por request)
+enviarADian() — llama a Matias API
+crearFacturaBorrador() — sin límite de creación
+Nota: tienen verificarLimite() de suscripción (límites mensuales), pero no protección contra ráfagas rápidas.
+
+4.6 Enumeration Attacks
+PASS —
+
+Login fallido retorna mensaje genérico: "Correo electrónico o contraseña incorrectos." (no distingue si el email existe)
+Registro fallido retorna el mismo mensaje genérico: "error_credenciales"
+No hay endpoint de "verificar si email existe"
+5. DATOS SENSIBLES
+5.1 Logging de datos sensibles
+PASS —
+
+El logger (lib/logger.ts) usa devLog que solo imprime en NODE_ENV === 'development'
+En producción, los errores se envían a Sentry sin datos crudos (solo mensaje + label)
+Los console.log con keys parciales están solo en scripts de migración (ejecución local)
+La nota clínica se anonimiza antes de almacenarse: anonimizarTextoMedico() (facturas.ts#L126-L131)
+⚠️ LOW — PARTIAL_API_KEY_LOGGED_IN_SCRIPT
+
+Archivo: scripts/generar-embeddings.ts#L328
+
+console.log(`   API Key: ${GEMINI_KEY!.slice(0, 10)}...${GEMINI_KEY!.slice(-4)}`);
+
+Muestra 14 caracteres de la API key de Gemini. Solo en script local, pero si se ejecuta en CI/CD podría quedar en logs.
+
+5.2 Errores en producción
+PASS —
+
+global-error.tsx muestra mensaje genérico "Algo salió mal" sin stack traces
+Errores enviados a Sentry con Sentry.captureException()
+Server actions retornan { success: false, error: "mensaje genérico" } sin detalles internos
+Error de Supabase .message se expone en algunos casos (perfil.ts, facturas.ts), pero estos son mensajes de Postgres (e.g., "violates foreign key constraint"), no stack traces
+⚠️ LOW — SUPABASE_ERROR_MESSAGES_EXPOSED
+
+Algunos actions retornan error.message de Supabase directamente al cliente, que puede incluir nombres de tablas/columnas de PostgreSQL. No es un riesgo alto, pero filtra estructura de BD.
+
+5.3 Secrets en código fuente
+PASS —
+
+.env* está en .gitignore (verificado en 3 .gitignore files)
+API keys se leen de process.env consistentemente
+El doc env-suscripciones.md usa placeholders (verificado: pub_test_xxx, prv_test_xxx, eyJhbGciOiJI... — truncados)
+5.4 Separación de ambientes
+PASS —
+
+Wompi tiene switch de ambiente: WOMPI_ENVIRONMENT === "production" vs sandbox (lib/wompi.ts#L22-L24)
+DIAN tiene DIAN_AMBIENTE para testing vs producción
+Sentry solo se activa en producción: enabled: process.env.NODE_ENV === "production"
+5.5 Encriptación at rest
+WARNING — NO_ENCRYPTION_AT_REST
+
+No se implementa encriptación a nivel de aplicación para datos sensibles almacenados en Supabase:
+
+Notas clínicas (anonimizadas pero no encriptadas)
+Datos de pacientes (PII: nombres, documentos, fechas de nacimiento)
+Credenciales MUV del usuario
+Supabase provee encriptación de disco (AES-256 at rest para el storage de PostgreSQL), pero no hay encriptación a nivel de columna para datos regulados.
+
+Impacto: Para datos médicos en Colombia (Habeas Data — Ley 1581 de 2012), la anonimización puede ser insuficiente si se puede reconstruir la identidad del paciente por otros campos en la misma fila (e.g., número de documento + fecha de nacimiento están en la tabla pacientes).
+
+5.6 Compliance
+⚠️ HIGH — HABEAS_DATA_GAPS
+
+Requisito Ley 1581/2012	Estado
+Consentimiento informado	✅ consentimiento_terminos_at al registrar
+Derecho de supresión	✅ programarEliminacionCuenta() con período de gracia 7 días
+Derecho de acceso	⚠️ No hay export de datos del usuario
+Aviso de privacidad	✅ Página /privacidad (landing)
+Tratamiento de datos sensibles (salud)	⚠️ Sin encriptación a nivel de columna
+Responsable del tratamiento identificado	✅ En términos y privacidad
+Datos médicos de pacientes	⚠️ El prestador almacena datos de pacientes sin consentimiento explícito del paciente
+Riesgo clave: Los datos médicos de pacientes se almacenan sin consentimiento directo del paciente (el consentimiento es del prestador/doctor, no del paciente cuya información se procesa).
+
+TABLA RESUMEN DE HALLAZGOS
+#	Hallazgo	Severidad	Sección	Archivo(s) Principal(es)
+1	No hay RBAC en facturas, dian, glosas, clasificacion, acuerdos, perfil	CRITICAL	2.1	actions/facturas.ts, actions/dian.ts, actions/glosas.ts, etc.
+2	No hay validación de schemas server-side (sin Zod/Yup)	CRITICAL	3.1	Todas las server actions
+3	Telegram webhook sin secret token validation	HIGH	1.5	api/telegram/webhook/route.ts
+4	Middleware excluye todas las API routes del auth check	HIGH	1.4	middleware.ts#L7-9
+5	Mass assignment en guardarPerfil	MEDIUM	3.6	actions/perfil.ts#L33-45
+6	MIME type basado en client (no magic bytes)	MEDIUM	3.5	actions/respuesta-glosas.ts
+7	Sin rate limiting en server actions costosas	MEDIUM	4.5	actions/clasificacion.ts, actions/dian.ts
+8	Sin formato/rango validation para datos médicos	MEDIUM	3.4	Múltiples actions
+9	Gaps en compliance Habeas Data (datos pacientes)	HIGH	5.6	Estructural
+10	Sin flujo de recuperación de contraseña	MEDIUM	1.6	—
+11	Mensaje rate limit no se muestra en login	LOW	1.9	login/page.tsx, login/actions.ts
+12	CSP con unsafe-inline en script-src	LOW	4.2	next.config.js
+13	API key parcial en log de script	LOW	5.1	scripts/generar-embeddings.ts
+14	Error messages de Supabase expuestos	LOW	5.2	Múltiples actions
+15	Sin export de datos del usuario	HIGH	5.6	—
+16	Patrones de auth inconsistentes (3 variantes)	MEDIUM	2.4	actions/*.ts
+17	Sin encriptación at-rest a nivel de columna	HIGH	5.5	Estructural
+18	Sentry DSN hardcodeado	LOW	1.8	sentry.client.config.ts
+PRIORIDAD DE REMEDIACIÓN
+Inmediato (Sprint actual)
+RBAC en server actions — Agregar verificarPermisoOError(ctx.rol, accion) a TODAS las server actions que mutan datos
+Zod validation — Instalar Zod e implementar schemas para al menos: crearFacturaBorrador, guardarPerfil, guardarPaciente, invitarUsuario
+Telegram webhook secret — Implementar X-Telegram-Bot-Api-Secret-Token validation
+Corto plazo (1-2 sprints)
+Estandarizar auth pattern — Migrar todo a getContextoOrg()
+Rate limiting en server actions — Agregar a clasificarTextoMedico, envío DIAN
+Fix login message — Agregar demasiados_intentos a MENSAJES_PERMITIDOS
+Password recovery flow — Implementar "olvidé mi contraseña" con Supabase
+Magic bytes validation — Para file uploads
+Mediano plazo (1-2 meses)
+Export de datos del usuario — Para compliance Habeas Data
+Encriptación a nivel de columna — Para datos PII sensibles
+Consentimiento de pacientes — Flujo de consentimiento de tratamiento de datos
+CSP nonces — Reemplazar unsafe-inline con nonces
+
+This audit covers all 5 sections with specific file references, line numbers, and actionable remediation steps. The 3 most critical findings are:
+
+1. **No RBAC enforcement** in most server actions (facturas, DIAN, glosas, clasificacion) — any authenticated user with any role can perform any operation
+2. **No server-side input validation** — no Zod/Yup/joi schemas on any server action parameters  
+3. **Telegram webhook accepts unauthenticated requests** — anyone can send fake Telegram updatesThis audit covers all 5 sections with specific file references, line numbers, and actionable remediation steps. The 3 most critical findings are:
+
+1. **No RBAC enforcement** in most server actions (facturas, DIAN, glosas, clasificacion) — any authenticated user with any role can perform any operation
+2. **No server-side input validation** — no Zod/Yup/joi schemas on any server action parameters  
+3. **Telegram webhook accepts unauthenticated requests** — anyone can send fake Telegram updates

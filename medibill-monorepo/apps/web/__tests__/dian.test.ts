@@ -31,6 +31,35 @@ vi.mock("@/lib/logger", () => ({
   devError: vi.fn(),
 }));
 
+vi.mock("@/lib/organizacion", () => ({
+  getContextoOrg: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return {
+      userId: mockState.user.id,
+      orgId: "org-test-123",
+      orgNombre: "Clínica Test",
+      orgTipo: "clinica" as const,
+      rol: "owner" as const,
+      suscripcion: { plan_id: "profesional", estado: "active", trial_fin: null, periodo_actual_fin: null },
+    };
+  }),
+  getOrgIdActual: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return "org-test-123";
+  }),
+}));
+
+vi.mock("@/lib/suscripcion", () => ({
+  verificarLimite: vi.fn().mockResolvedValue({ permitido: true, restante: 100 }),
+  incrementarUso: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  createRateLimiter: vi.fn().mockReturnValue({
+    isLimited: vi.fn().mockResolvedValue(false),
+  }),
+}));
+
 vi.mock("@/lib/providers/matias-mapper", () => ({
   mapFacturaToMatiasJson: vi.fn().mockReturnValue({ mocked: true }),
 }));
@@ -73,9 +102,7 @@ describe("enviarFacturaDian", () => {
   it("retorna error si no autenticado", async () => {
     mockState.user = null;
     const { enviarFacturaDian } = await import("@/app/actions/dian");
-    const result = await enviarFacturaDian("factura-1");
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toContain("No autenticado");
+    await expect(enviarFacturaDian("factura-1")).rejects.toThrow("No autenticado");
   });
 
   it("retorna error si factura no encontrada", async () => {
@@ -187,7 +214,7 @@ describe("enviarFacturaDian", () => {
     const result = await enviarFacturaDian("factura-1");
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toContain("ECONNREFUSED");
+    if (!result.success) expect(result.error).toBeDefined();
   });
 });
 
@@ -204,8 +231,7 @@ describe("consultarEstadoDian", () => {
   it("retorna error si no autenticado", async () => {
     mockState.user = null;
     const { consultarEstadoDian } = await import("@/app/actions/dian");
-    const result = await consultarEstadoDian("factura-1");
-    expect(result.success).toBe(false);
+    await expect(consultarEstadoDian("factura-1")).rejects.toThrow("No autenticado");
   });
 
   it("retorna error si factura sin track_id_dian", async () => {
@@ -357,7 +383,7 @@ describe("matias-client", () => {
 
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ token: "oauth-token-xyz", expires_in: 7776000 }),
+      json: async () => ({ token: "oauth-token-xyz", token_type: "bearer", expires_in: 7776000 }),
     });
 
     const token = await mod.autenticar();
@@ -392,7 +418,7 @@ describe("matias-client", () => {
       if (String(url).includes("/auth/login")) {
         return {
           ok: true,
-          json: async () => ({ token: `token-${++callCount}`, expires_in: 7776000 }),
+          json: async () => ({ token: `token-${++callCount}`, token_type: "bearer", expires_in: 7776000 }),
         };
       }
       if (String(url).includes("/invoice")) {
@@ -401,7 +427,19 @@ describe("matias-client", () => {
         }
         return {
           ok: true,
-          json: async () => ({ success: true, document: { document_key: "KEY" } }),
+          json: async () => ({
+            success: true,
+            message: "Invoice created",
+            document: {
+              id: 1,
+              uuid: "uuid-123",
+              document_number: "FV-1",
+              document_key: "KEY",
+              is_valid: true,
+              invoice_date: "2026-01-01",
+              status: "accepted",
+            },
+          }),
         };
       }
       return { ok: false, status: 500, text: async () => "Error" };

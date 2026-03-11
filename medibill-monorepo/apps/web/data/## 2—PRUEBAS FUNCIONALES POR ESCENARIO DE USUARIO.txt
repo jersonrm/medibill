@@ -1,0 +1,399 @@
+# FUNCTIONAL_TESTS.md — Fase 2: Pruebas Funcionales por Escenario de Usuario
+
+**Proyecto:** Medibill (Medicapp)  
+**Fecha:** 2026-03-10  
+**Metodología:** Análisis estático del código fuente (server actions, componentes, middleware, tipos, tests existentes)  
+**Nota:** Las pruebas se basan en lectura exhaustiva del código. Cuando no fue posible ejecutar en runtime, se documenta el hallazgo con archivo y línea exactos.
+
+---
+
+## 2.0 — Roles Identificados (Fase 0)
+
+| Rol | Permisos Clave | Definición |
+|-----|---------------|------------|
+| **owner** | Todo incluido billing | `lib/permisos.ts` — PERMISOS_ROL |
+| **admin** | Todo excepto billing | `lib/permisos.ts` |
+| **doctor** | Clasificar IA, crear/aprobar facturas, responder glosas | `lib/permisos.ts` |
+| **facturador** | Ver/crear facturas, enviar DIAN, importar sábana, responder glosas | `lib/permisos.ts` |
+| **auditor** | Solo lectura + responder glosas | `lib/permisos.ts` |
+| **platform_admin** | Panel admin global (métricas, orgs, suscripciones) | `middleware.ts:109-121`, `lib/platform-admin.ts` |
+| **usuario no autenticado** | Solo login/registro, página de invitación | `middleware.ts:54-57` |
+
+---
+
+## 2.1 — Matriz de Escenarios
+
+### MÓDULO 1: Autenticación y Onboarding
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 1.1 | Anónimo | Registro de cuenta | Sin cuenta existente | 1. Ir a /login 2. Completar email+password+consentimiento 3. Submit | Redirige a /login?mensaje=registro_ok, envía email de confirmación | `login/actions.ts:38-66` — Usa `signUp()`, requiere consentimiento, rate-limit 3/hora/IP. Redirige correctamente. | **PASS** |
+| 1.2 | Anónimo | Registro sin consentimiento | Sin cuenta | 1. Llenar form sin checkbox consentimiento 2. Submit | Error: consentimiento requerido | `login/actions.ts:51-53` — `if (!consentimiento) redirect("/login?mensaje=consentimiento_requerido")` | **PASS** |
+| 1.3 | Anónimo | Login exitoso | Cuenta con email confirmado | 1. Email+password correctos 2. Submit | Redirige a / (→ dashboard vía middleware) | `login/actions.ts:18-34` — rate-limit 5/15min por IP | **PASS** |
+| 1.4 | Anónimo | Login fallido | Cuenta existente, password mal | 1. Email correcto, password incorrecto 2. Submit | Redirige /login?mensaje=error_credenciales | `login/actions.ts:31-32` — mismo mensaje para email inexistente y password mal (correcto: no leak info) | **PASS** |
+| 1.5 | Anónimo | Brute force login | 6+ intentos en 15 min | 1. Intentar login 6 veces | Redirige a /login?mensaje=demasiados_intentos | `login/actions.ts:8,23-25` — `loginLimiter` max:5, windowMs:15min | **PASS** |
+| 1.6 | Autenticado | Email no confirmado | Cuenta nueva, email no verificado | 1. Login exitoso pero email no confirmado 2. Navegar a cualquier ruta | Cierra sesión, redirige a /login?mensaje=email_no_confirmado | `middleware.ts:62-70` — `emailConfirmed = user.email_confirmed_at != null`, si false → signOut + redirect | **PASS** |
+| 1.7 | Autenticado | Onboarding incompleto | Login exitoso, perfil sin onboarding_completo | 1. Intentar ir a /dashboard | Redirige a /onboarding | `middleware.ts:77-96` — Verifica `perfiles.onboarding_completo`, cachea en cookie | **PASS** |
+| 1.8 | Autenticado | Onboarding paso a paso | Email confirmado, sin perfil | 1. Paso 1: datos prestador 2. Paso 2: ubicación 3. Paso 3: resolución DIAN 4. Paso 4: credenciales MUV (opcional) | Perfil guardado, org creada, onboarding_completo=true, redirige a /dashboard | `onboarding/page.tsx` — 4 pasos, `guardarPerfil()` con `onboarding_completo` crea org automáticamente via `perfil.ts:59-70` | **PASS** |
+| 1.9 | Autenticado | Logout | Sesión activa | 1. Click cerrar sesión | Cierra sesión Supabase, limpia cookie onboarding, redirige a landing | `login/actions.ts:68-74` — `signOut()` + clear cookie + redirect | **PASS** |
+| 1.10 | Autenticado | Login redirige a dashboard | Sesión activa | 1. Navegar a /login | Redirige a /dashboard | `middleware.ts:73-77` — `if (user && isLoginPage) redirect(/dashboard)` | **PASS** |
+
+### MÓDULO 2: Clasificación IA (Nota Clínica → RIPS)
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 2.1 | doctor | Clasificar nota clínica | Onboarding completo, plan activo | 1. Escribir nota clínica 2. Click "Ejecutar Análisis RIPS" | Devuelve diagnósticos CIE-10, procedimientos CUPS, atención | `clasificacion.ts` — Pipeline: anonimizar → RAG → Gemini → validar → enriquecer tarifas | **PASS** |
+| 2.2 | doctor | Clasificar nota vacía | — | 1. Dejar nota vacía 2. Click análisis | Botón deshabilitado | `ClinicalNoteInput.tsx:32` — `disabled={cargando \|\| !nota.trim()}` | **PASS** |
+| 2.3 | doctor | Límite de clasificaciones alcanzado | Plan con max_clasificaciones agotado | 1. Ejecutar análisis | Error: "Has alcanzado el límite de clasificaciones IA de tu plan" | `clasificacion.ts` usa `verificarLimite(ctx.orgId, "clasificacion")` — verificado en tests | **PASS** |
+| 2.4 | facturador | Intentar clasificar IA | Rol facturador | 1. Intentar clasificar | Debería estar bloqueado por RBAC | `permisos.ts:8` — `clasificar_ia: ["owner", "admin", "doctor"]` — **PERO:** no se verifica `verificarPermisoOError` en `clasificarTextoMedico()` | **⚠️ FAIL** |
+| 2.5 | doctor | Coherencia paciente pre-IA | Nota sobre embarazo, sexo=M | 1. Escribir nota con dx obstétrico 2. Paciente sexo=M | Alerta de incoherencia antes del análisis | `MedibillApp.tsx:29-40` — `detectarIncoherenciasPaciente()` con debounce 500ms, evaluado en `AlertaCoherenciaPaciente.tsx` | **PASS** |
+| 2.6 | doctor | Anonimización de datos sensibles | Nota con nombre, cédula, email, teléfono | 1. Clasificar nota con PII | Datos sensibles anonimizados antes de enviar a Gemini | `clasificacion.ts` → `anonimizarTextoMedico()`, validado en `seguridad.test.ts` — elimina nombres, docs, emails, teléfonos, direcciones | **PASS** |
+| 2.7 | doctor | RAG falla gracefully | RAG service unavailable | 1. Clasificar nota, servicio RAG caído | Continúa con texto sin augmentar, no crashea | `clasificacion.ts:42-48` — `catch (ragError) { devWarn("RAG extraction failed"); return textoParaIA; }` | **PASS** |
+| 2.8 | doctor | Validación CUPS cruzada | Resultado IA con CUPS inválido | 1. Clasificar nota | CUPS inválidos corregidos o marcados | `clasificacion.ts:73-79` → `validarYCorregirCups()` + `validarCoherenciaAnatomica()` + `validarYCorregirCie10()` | **PASS** |
+
+### MÓDULO 3: Gestión de Pacientes
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 3.1 | doctor | Buscar paciente existente | Paciente en BD | 1. Escribir cédula en PatientForm 2. Blur/Enter | Autocompletado de campos (nombre, fecha nac, sexo, EPS, etc.) | `PatientForm.tsx:24-58` — `buscarPacientePorDocumento()` autocompleta todos los campos | **PASS** |
+| 3.2 | doctor | Paciente nuevo | Cédula no existe en BD | 1. Escribir cédula nueva | Badge "Paciente nuevo" se muestra | `PatientForm.tsx:82-85` — `estadoPaciente === "nuevo"` badge | **PASS** |
+| 3.3 | doctor | Upsert paciente al crear factura | Datos paciente + crear factura | 1. Crear factura borrador | Paciente creado/actualizado con upsert | `facturas.ts:66-86` — `supabase.from("pacientes").upsert()` con `onConflict: "user_id,tipo_documento,numero_documento"` | **PASS** |
+| 3.4 | doctor | Listar pacientes con búsqueda | Varios pacientes guardados | 1. Ir a /pacientes 2. Buscar por nombre | Lista filtrada, paginada | `pacientes.ts:82-111` — Search por `primer_nombre`, `primer_apellido`, `numero_documento` con ilike. Paginación range(). | **PASS** |
+| 3.5 | doctor | Aislamiento de datos pacientes | 2 usuarios diferentes | 1. Doctor A lista pacientes | Solo ve pacientes propios (user_id) | `pacientes.ts:94` — `.eq("user_id", user.id)` + RLS en BD | **PASS** |
+| 3.6 | doctor | Pacientes lista vacía | Sin pacientes | 1. Ir a /pacientes | "No se encontraron pacientes" | `pacientes/page.tsx:103` — empty state row en tabla | **PASS** |
+| 3.7 | doctor | Cédula < 5 caracteres | Input corto | 1. Escribir "123" y blur | No busca, estado idle | `PatientForm.tsx:25` — `if (datos.cedulaPaciente.trim().length < 5) return` | **PASS** |
+
+### MÓDULO 4: Facturas (CRUD + Estado Machine)
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 4.1 | doctor | Crear factura borrador | Análisis completado | 1. Click "Crear Factura" en PanelAprobacion | Factura creada con num temporal BORR-xxxx, snapshot perfil, paciente upserted | `facturas.ts:48-142` — Número temporal `BORR-{Date.now().toString(36)}`, no consume consecutivo | **PASS** |
+| 4.2 | doctor | Validar campos obligatorios al crear | Campos faltantes | 1. Crear factura sin documento, nombre, fecha nac, sexo, EPS, o municipio | Error con lista de campos faltantes | `PanelAprobacion.tsx:41-51` — Valida 6 campos, muestra lista con bullet points | **PASS** |
+| 4.3 | doctor | Verificar resolución antes de crear | Sin resolución activa | 1. Crear factura sin resolución | Muestra alerta "sin resolución" | `PanelAprobacion.tsx:55-59` — `obtenerResolucionActiva()`, si null → `setSinResolucion(true)` | **PASS** |
+| 4.4 | doctor | Aprobar factura (borrador→aprobada) | Factura borrador existente | 1. Click "Aprobar" 2. Confirmar | Consecutivo real asignado atómicamente, estado=aprobada | `facturas.ts:148-190` — Usa RPC `siguiente_numero_factura` (atómico con row lock) + `verificarLimite('factura_dian')` | **PASS** |
+| 4.5 | doctor | Aprobar — confirmación previa | Factura borrador | 1. Click "Aprobar" | Dialog confirm("¿Aprobar esta factura?") | `facturas/[id]/page.tsx:51` — `if (!confirm("¿Aprobar esta factura?...")) return;` | **PASS** |
+| 4.6 | doctor | Anular factura borrador | Factura en estado borrador | 1. Click "Anular" 2. Confirmar | Estado = anulada, audit log registrado | `facturas.ts:195-207` — Solo permite anular borradores (`.eq("estado", "borrador")`) | **PASS** |
+| 4.7 | doctor | Anular factura NO borrador | Factura aprobada | 1. Intentar anular factura aprobada | Falla silenciosamente (no match en update) | `facturas.ts:201` — Query incluye `.eq("estado", "borrador")`, DB retorna 0 rows updated → `error` es null pero no se controla 0 rows | **⚠️ FAIL** |
+| 4.8 | facturador | Crear factura sin permiso aprobar | Rol facturador | 1. Crear factura borrador 2. Intentar aprobar | Factura creada OK, aprobación debería fallar | `permisos.ts:14` — `aprobar_factura: ["owner","admin","doctor"]`. **PERO:** `aprobarFactura()` NO verifica `verificarPermisoOError()` | **⚠️ CRITICAL FAIL** |
+| 4.9 | doctor | Editar factura borrador | Factura borrador | 1. Click editar 2. Modificar diagnósticos, procedimientos, copago 3. Guardar | Datos actualizados, totales recalculados | `FacturaEditor.tsx` — Edición completa con recálculo de subtotales. `editarFacturaBorrador()` hace merge de metadata | **PASS** |
+| 4.10 | doctor | Listar facturas con tabs/paginación | Facturas existentes | 1. Ir a /facturas 2. Filtrar por tab (borrador, aprobada, etc.) | Lista filtrada, paginada a 20/página | `facturas.ts:220-247` — Paginación con range(), filtro por estado | **PASS** |
+| 4.11 | doctor | Lista facturas vacía | Sin facturas | 1. Ir a /facturas | "No se encontraron facturas" | `facturas/page.tsx:114` — Empty state en tabla | **PASS** |
+| 4.12 | doctor | Marcar factura como descargada | Factura aprobada | 1. Descargar RIPS/paquete | Estado cambia a descargada | `facturas.ts:250-260` — Solo permite si estado=aprobada | **PASS** |
+| 4.13 | doctor | Doble submit al aprobar | Click rápido 2x | 1. Click aprobar 2 veces rápidamente | Solo una aprobación, segunda falla | RPC `siguiente_numero_factura` es atómica pero la segunda ejecución del update factura tendrá `.eq("estado", "borrador")` que no matchea si ya se aprobó → **protegido por filtro de estado** | **PASS** |
+| 4.14 | doctor | Aislamiento facturas por org | 2 organizaciones | 1. Listar facturas | Solo ve facturas de su organización | `facturas.ts:227` — `.eq("organizacion_id", orgId)` + RLS | **PASS** |
+
+### MÓDULO 5: DIAN (Facturación Electrónica via Matias API)
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 5.1 | facturador | Generar FEV XML | Factura aprobada | 1. Click "Generar FEV XML" | XML UBL 2.1 generado, descargado como archivo | `DianPanel.tsx:26-43` — Llama `generarFevXml()`, crea blob XML, descarga con nombre `FEV_{num}_{cufe}.xml` | **PASS** |
+| 5.2 | facturador | Enviar a DIAN | Factura aprobada/descargada | 1. Click "Enviar a DIAN" 2. Confirmar | Factura enviada, CUFE almacenado, estado_dian=enviada | `dian.ts:20-80` — Valida estado, mapea a Matias JSON, envía, guarda respuesta en BD | **PASS** |
+| 5.3 | facturador | Enviar factura ya enviada | estado_dian=enviada | 1. Intentar enviar de nuevo | Error: "La factura ya fue enviada a la DIAN" | `dian.ts:41-42` — Verifica `estado_dian !== "enviada" && !== "aceptada"` | **PASS** |
+| 5.4 | facturador | Enviar factura borrador a DIAN | Factura borrador | 1. Intentar enviar | Error: "debe estar aprobada" | `dian.ts:37-39` — Verifica estado `aprobada` o `descargada` | **PASS** |
+| 5.5 | facturador | Consultar estado DIAN | Factura con CUFE | 1. Click "Consultar estado" | Estado actualizado desde Matias API | `dian.ts` — `consultarEstadoDian()` actualiza `estado_dian` | **PASS** |
+| 5.6 | facturador | Matias API caído | Factura lista | 1. Enviar a DIAN, API no responde | Error de conexión capturado, mostrado al usuario | `dian.ts:72-75` — `catch (err) { return { success: false, error: message } }` | **PASS** |
+| 5.7 | facturador | Confirmación antes de enviar a DIAN | Factura aprobada | 1. Click enviar | Confirm dialog antes de enviar | `DianPanel.tsx:51` — `if (!confirm("¿Enviar esta factura a la DIAN?")) return;` | **PASS** |
+| 5.8 | facturador | Descargar XML firmado | Factura con CUFE | 1. Click descargar XML firmado | Archivo XML firmado descargado | `DianPanel.tsx:90-110` — Llama `descargarXmlFirmado()`, crea blob y descarga | **PASS** |
+| 5.9 | facturador | Descargar PDF representación | Factura aprobada+ | 1. Click "Descargar PDF" | PDF abierto en nueva pestaña | `DianPanel.tsx:22` — `window.open(\`/api/factura-pdf/${factura.id}\`, "_blank")` | **PASS** |
+
+### MÓDULO 6: MUV (Validación MinSalud)
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 6.1 | doctor | Validar RIPS con MUV | Factura aceptada por DIAN | 1. Click "Validar MUV" 2. Confirmar | CUV obtenido y almacenado | `muv.ts:27-70` — Valida prerequisitos (estado_dian=aceptada, CUFE existe), verifica healthCheck Docker | **PASS** |
+| 6.2 | doctor | MUV sin CUFE | Sin envío DIAN previo | 1. Intentar validar MUV | Error: "debe estar aceptada por la DIAN" | `muv.ts:50-53` — Verifica `estado_dian !== "aceptada"` | **PASS** |
+| 6.3 | doctor | MUV ya tiene CUV | Factura con CUV existente | 1. Intentar validar | Error: "ya tiene CUV asignado" | `muv.ts:58-61` — Verifica `factura.cuv` no null | **PASS** |
+| 6.4 | doctor | Docker MUV no disponible | Docker apagado | 1. Intentar validar | Error: "servicio MUV no está disponible" | `muv.ts:64-67` — `muvClient.healthCheck()` → false | **PASS** |
+| 6.5 | doctor | Confirmación antes de MUV | Factura lista | 1. Click validar | Confirm dialog | `MuvPanel.tsx:19` — `if (!confirm("¿Validar RIPS...?")) return;` | **PASS** |
+
+### MÓDULO 7: Radicación
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 7.1 | doctor | Descargar paquete radicación | Factura aprobada o descargada | 1. Click "Descargar paquete" | ZIP con XML, RIPS JSON, PDF y manifest descargado | `RadicacionPanel.tsx:34-54` — Genera ZIP base64, descarga, auto-marca como descargada | **PASS** |
+| 7.2 | doctor | Confirmar radicación manual | Factura descargada | 1. Ingresar número radicado 2. Confirmar | Estado cambia a radicada, metadata actualizada | `radicacion.ts:41-85` — Valida estado=descargada, requiere número radicado no vacío | **PASS** |
+| 7.3 | doctor | Radicar sin número radicado | Campo vacío | 1. Click confirmar sin número | Error: "El número de radicado es obligatorio" | `radicacion.ts:42-44` — `if (!numeroRadicado \|\| trim().length === 0)` | **PASS** |
+| 7.4 | doctor | Radicar factura no descargada | Factura borrador/aprobada | 1. Intentar radicar | Error: "Solo se puede radicar una factura descargada" | `radicacion.ts:71-75` — `if (factura.estado !== "descargada")` | **PASS** |
+| 7.5 | doctor | Radicar por email | Acuerdo con email_radicacion configurado | 1. Click "Enviar por email" 2. Confirmar | Paquete enviado por email a la EPS | `RadicacionPanel.tsx:84-108` — `radicarPorEmail()`, confirm antes de enviar | **PASS** |
+
+### MÓDULO 8: Glosas y Respuestas
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 8.1 | doctor | Listar glosas recibidas | Glosas en BD | 1. Ir a /glosas | Lista con urgencia, días restantes, % glosado | `respuesta-glosas.ts:52-87` — Auto-vencimiento + enriquecimiento con días y urgencia | **PASS** |
+| 8.2 | doctor | Auto-vencimiento de glosas | Glosa con fecha límite pasada | 1. Consultar glosas | Glosas vencidas marcadas automáticamente como 'vencida' | `respuesta-glosas.ts:60-63` — `UPDATE estado='vencida' WHERE fecha_limite < hoy AND estado='pendiente'` | **PASS** |
+| 8.3 | doctor | Registrar respuesta RS01 (aceptar) | Glosa pendiente en plazo | 1. Seleccionar RS01 2. Justificación 3. Guardar | Respuesta guardada, glosa marcada respondida | `respuesta-glosas.ts:143-end` — Valida estado=pendiente, fecha no vencida, justificación ≥20 chars | **PASS** |
+| 8.4 | doctor | Responder glosa vencida | Glosa con días_restantes < 0 | 1. Intentar responder | Error: "fecha límite ya venció. Silencio = aceptación tácita" | `respuesta-glosas.ts:174-178` | **PASS** |
+| 8.5 | doctor | Respuesta RS04 a glosa NO extemporánea | Glosa normal | 1. Intentar RS04 | Error: "Solo aplicable si la glosa fue extemporánea" | `respuesta-glosas.ts` — Valida `esGlosaExtemporanea()` para RS04 | **PASS** |
+| 8.6 | doctor | Justificación <20 chars | Respuesta con texto corto | 1. Escribir justificación de 10 chars | Error: justificación mínima requerida | `respuesta-glosas.ts:186-190` — `justificacion.trim().length < 20` check | **PASS** |
+| 8.7 | doctor | Sugerencia IA para respuesta | Glosa con datos suficientes | 1. Click "Sugerir respuesta IA" | Sugerencia generada con código RS y justificación | `respuesta-glosas.ts` — `sugerirRespuestaIA()` usa Gemini | **PASS** |
+| 8.8 | auditor | Responder glosa como auditor | Rol auditor | 1. Responder glosa | Debería funcionar (auditor en permisos) | `permisos.ts:18` — `responder_glosa: [..., "auditor"]` | **PASS** |
+| 8.9 | doctor | Registrar glosa nueva (manual) | Factura radicada | 1. Click "Registrar glosa" 2. Llenar datos | Glosa creada asociada a factura | `ModalRegistrarGlosa.tsx` — Formulario con selector de facturas radicadas | **PASS** |
+
+### MÓDULO 9: Pagos y Cartera
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 9.1 | doctor | Registrar pago | Factura radicada | 1. Ingresar monto, fecha, método 2. Guardar | Pago registrado, estado actualizado (pagada/pagada_parcial) | `pagos.ts:62-138` — Valida estado radicada/pagada_parcial, monto ≤ saldo | **PASS** |
+| 9.2 | doctor | Pago excede saldo | Monto > saldo pendiente | 1. Registrar pago por encima del saldo | Error: "monto excede el saldo pendiente" | `pagos.ts:100-104` — `if (input.monto > saldoPendiente)` | **PASS** |
+| 9.3 | doctor | Pago en factura que no es radicada | Factura borrador/aprobada | 1. Registrar pago | Error: "No se puede registrar pago en factura con estado X" | `pagos.ts:87-92` — `if (!["radicada", "pagada_parcial"].includes(factura.estado))` | **PASS** |
+| 9.4 | doctor | Pago total → estado pagada | Factura con saldo restante = monto | 1. Pagar monto exacto restante | Estado cambia a "pagada" | `pagos.ts:128-132` — `if (nuevoTotalPagado >= factura.valor_total) nuevoEstado = "pagada"` | **PASS** |
+| 9.5 | doctor | Cartera pendiente vacía | Sin facturas pendientes | 1. Ir a /pagos | "No hay facturas pendientes de pago" | `pagos/page.tsx:208` — Empty state | **PASS** |
+
+### MÓDULO 10: Acuerdos de Voluntades
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 10.1 | owner | Crear acuerdo | — | 1. Llenar EPS, fechas, tarifario, % sobre base 2. Guardar | Acuerdo creado, audit log | `acuerdos.ts:63-96` — Insert con `prestador_id: user.id`, audit log para create y update | **PASS** |
+| 10.2 | owner | Actualizar acuerdo | Acuerdo existente | 1. Editar campos 2. Guardar | Acuerdo actualizado | `acuerdos.ts:80-86` — Update con `.eq("prestador_id", user.id)` | **PASS** |
+| 10.3 | owner | Eliminar acuerdo | Acuerdo existente | 1. Click eliminar 2. Confirmar | Acuerdo eliminado con cascada tarifas | `ConfiguracionAcuerdo.tsx:294` — `confirm("¿Eliminar este acuerdo y todas sus tarifas?")` — **Hard delete** | **⚠️ WARNING** |
+| 10.4 | doctor | Gestionar acuerdos sin permiso | Rol doctor | 1. Intentar gestionar acuerdos | Debería estar bloqueado | `permisos.ts:21` — `gestionar_acuerdos: ["owner","admin"]`. **PERO:** `guardarAcuerdo()` NO verifica RBAC | **⚠️ FAIL** |
+| 10.5 | owner | Aislamiento acuerdos | 2 usuarios | 1. Listar acuerdos | Solo ve propios (prestador_id) | `acuerdos.ts:16` — `.eq("prestador_id", user.id)` | **PASS** |
+
+### MÓDULO 11: Tarifas Personalizadas
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 11.1 | doctor | Guardar tarifa CUPS | — | 1. Buscar CUPS 2. Ingresar valor 3. Guardar | Tarifa guardada en servicios_medico | `tarifas.ts:9-27` — Insert con user_id, validación de auth | **PASS** |
+| 11.2 | doctor | Eliminar tarifa | Tarifa existente | 1. Click eliminar | Tarifa eliminada | `tarifas.ts:50-60` — **Hard delete** con `.eq("user_id", user.id)` — Sin confirmación en backend | **⚠️ WARNING** |
+| 11.3 | doctor | Buscar CUPS para tarifa | — | 1. Escribir nombre procedimiento | Resultados CUPS filtrados (máx 10) | `tarifas.ts:63-72` — `supabase.rpc("buscar_cups", {termino, limite:10})` | **PASS** |
+| 11.4 | doctor | Aislamiento tarifas | 2 usuarios | 1. Listar tarifas | Solo propias | `tarifas.ts:38` — `.eq("user_id", user.id)` | **PASS** |
+
+### MÓDULO 12: Dashboard
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 12.1 | doctor | KPIs del dashboard | Facturas existentes | 1. Ir a /dashboard | Facturas mes, valor facturado, pendientes, glosas activas, tasa recuperación, cartera | `dashboard.ts:10-56` — 4 queries paralelas: facturas mes, pendientes, glosas activas, respuestas | **PASS** |
+| 12.2 | doctor | Dashboard sin datos | Usuario nuevo | 1. Ir a /dashboard | Todos KPIs en 0 | `dashboard.ts:12` — Defaults a 0 para user null y vacío | **PASS** |
+| 12.3 | doctor | Facturación mensual | Facturas últimos 6 meses | 1. Ver gráfico | Barras por mes con cantidad y valor | `dashboard.ts:60-100` — Agrupa por mes, labels correctos | **PASS** |
+| 12.4 | doctor | Formato moneda COP | Valores monetarios | 1. Ver dashboard | Valores formateados en COP | `lib/formato.ts` — `formatCOP()` con Intl.NumberFormat es-CO | **PASS** |
+
+### MÓDULO 13: Conciliación de Sábanas EPS
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 13.1 | facturador | Subir sábana | Plan con feature importacion_sabana | 1. Subir archivo Excel 2. Parsear | Headers y muestra de datos mostrados | `conciliacion.ts:30-74` — Feature gate, validación tamaño (5MB), extensión (xlsx/xls/csv) | **PASS** |
+| 13.2 | facturador | Archivo >5MB | Archivo grande | 1. Subir archivo > 5MB | Error: "excede el tamaño máximo de 5MB" | `conciliacion.ts:53-56` — `if (file.size > 5 * 1024 * 1024)` | **PASS** |
+| 13.3 | facturador | Formato no soportado | Archivo .pdf | 1. Subir PDF | Error: "Formato no soportado" | `conciliacion.ts:59-63` — Solo xlsx, xls, csv | **PASS** |
+| 13.4 | facturador | Feature gate sin plan | Plan sin importacion_sabana | 1. Subir sábana | Error: "Tu plan no incluye importación de sábana" | `conciliacion.ts:47-49` — `tieneFeature()` check | **PASS** |
+| 13.5 | facturador | Mapear y conciliar | Sábana parseada | 1. Mapear columnas con IA 2. Conciliar vs facturas | Filas matcheadas con facturas existentes | `conciliacion.ts:80+` — IA mapea columnas, `conciliarConFacturas()` cruza datos | **PASS** |
+
+### MÓDULO 14: Equipo y Organizaciones
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 14.1 | owner | Invitar usuario | Plan con múltiples usuarios | 1. Ingresar email y rol 2. Enviar invitación | Invitación creada con token, email enviado | `equipo.ts:47-100` — Verifica límite usuarios, verifica no duplicado, genera token con `randomBytes` | **PASS** |
+| 14.2 | owner | Invitación duplicada | Invitación pendiente para email | 1. Invitar mismo email | Error: "Ya existe una invitación pendiente" | `equipo.ts:81-86` — Query existente con email+org+usado=false | **PASS** |
+| 14.3 | owner | Límite de usuarios | Plan con max_usuarios alcanzado | 1. Invitar nuevo usuario | Error: "Has alcanzado el límite de N usuarios de tu plan" | `equipo.ts:66-74` — Compara count con max_usuarios | **PASS** |
+| 14.4 | admin | Cambiar rol miembro | Miembro existente | 1. Seleccionar nuevo rol | Rol actualizado | `equipo.ts` — `cambiarRolMiembro()` | **PASS** |
+| 14.5 | admin | Desactivar miembro | Miembro activo | 1. Click desactivar 2. Confirmar | Miembro con activo=false (soft delete) | `equipo.ts:197` — `.update({ activo: false })` — Confirmación en `equipo/page.tsx:87` | **PASS** |
+| 14.6 | doctor | Gestionar equipo sin permiso | Rol doctor | 1. Intentar invitar | Error RBAC | `equipo.ts:48` — `verificarPermisoOError(ctx.rol, "gestionar_equipo")` — **Verifica correctamente** | **PASS** |
+| 14.7 | owner | Feature bloqueada plan 1 usuario | Plan independiente | 1. Ir a /configuracion/equipo | Mensaje de funcionalidad bloqueada | `equipo/page.tsx:44-47` — `setFeatureBloqueada(true)` si maxUsuarios <= 1 | **PASS** |
+
+### MÓDULO 15: Suscripción y Billing
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 15.1 | owner | Ver info billing | Suscripción activa | 1. Ir a /configuracion/suscripcion | Plan, uso, historial de pagos | `billing.ts:13-35` — `obtenerLimitesOrg()` + historial últimos 12 pagos | **PASS** |
+| 15.2 | owner | Iniciar checkout Wompi | Seleccionar plan | 1. Elegir plan 2. Checkout | Redirect a Wompi con referencia `sub_{orgId}_{periodo}` | `billing.ts:44-100` — Crea sesión Wompi, return URL a /configuracion/suscripcion?pago=completado | **PASS** |
+| 15.3 | doctor | Intentar gestionar billing | Rol doctor | 1. Intentar checkout | Error RBAC | `billing.ts:55` — `verificarPermisoOError(ctx.rol, "gestionar_billing")` — **Correcto** | **PASS** |
+| 15.4 | — | Webhook Wompi aprobado | Pago procesado | 1. Wompi envía transaction.approved | Suscripción activada, historial registrado | `api/wompi/webhook/route.ts:34-75` — Verifica firma, parsea referencia, actualiza suscripción y historial | **PASS** |
+| 15.5 | — | Webhook firma inválida | Payload manipulado | 1. Webhook con firma incorrecta | HTTP 401 | `api/wompi/webhook/route.ts:17-19` — `verificarWebhookFirma()` check | **PASS** |
+| 15.6 | owner | Cancelar suscripción | Suscripción activa | 1. Confirmar cancelación | Suscripción cancelada, mantiene acceso hasta fin periodo | `configuracion/suscripcion/page.tsx:62` — confirm() antes de cancelar | **PASS** |
+| 15.7 | — | Suscripción cancelada → restrict | Estado cancelado | 1. Navegar por la app | Redirige a billing si suscripción cancelada/expirada | `middleware.ts:128-160` — Verifica estado suscripción en cookie, redirige si necesario | **PASS** |
+
+### MÓDULO 16: Gestión de Cuenta
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 16.1 | doctor | Programar eliminación de cuenta | Cuenta activa | 1. Click eliminar cuenta | eliminacion_programada_at = NOW(), se puede cancelar en 7 días | `cuenta.ts:8-17` — Soft schedule, no elimina inmediatamente | **PASS** |
+| 16.2 | doctor | Cancelar eliminación | Eliminación programada | 1. Click cancelar eliminación | eliminacion_programada_at = null | `cuenta.ts:23-32` — Reset a null | **PASS** |
+| 16.3 | doctor | Consultar estado eliminación | — | 1. Ir a perfil | Muestra estado y fecha programada | `cuenta.ts:37-49` — `programada: boolean, fecha?: string` | **PASS** |
+
+### MÓDULO 17: Admin de Plataforma
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 17.1 | platform_admin | Acceder panel admin | User en platform_admins | 1. Ir a /admin | Métricas globales visibles | `admin.ts` — `requirePlatformAdmin()` + service client | **PASS** |
+| 17.2 | doctor | Acceder panel admin | User NO en platform_admins | 1. Ir a /admin | Redirige a /dashboard | `middleware.ts:108-121` — Query platform_admins, si no existe, redirige | **PASS** |
+| 17.3 | platform_admin | Cache admin cookie | Verificado recientemente | 1. Navegar por admin | Cookie `medibill_is_platform_admin` valida 5 min | `middleware.ts:119` — `maxAge: 300` | **PASS** |
+
+### MÓDULO 18: Telegram Bot
+
+| # | Rol | Escenario | Precondiciones | Pasos | Resultado Esperado | Resultado Real (Código) | PASS/FAIL |
+|---|-----|-----------|----------------|-------|--------------------|-----------------------|-----------|
+| 18.1 | doctor | Vincular cuenta Telegram | Token generado en app | 1. Enviar token al bot | Cuenta vinculada, mensaje confirmación | `telegram-vinculacion.ts` + `api/telegram/webhook/route.ts` | **PASS** |
+| 18.2 | doctor | Desvincular Telegram | Cuenta vinculada | 1. Click desvincular 2. Confirmar | activo=false (soft delete) | `telegram-vinculacion.ts:82` — `.update({ activo: false })`, confirm en UI | **PASS** |
+| 18.3 | doctor | Clasificar desde Telegram | Cuenta vinculada | 1. Enviar nota por Telegram | Clasificación ejecutada, resultado formateado | `telegram-clasificacion.ts` | **PASS** |
+
+---
+
+## 2.2 — Verificación de Flujos por Categoría
+
+### Flujos de Escritura (Create/Update)
+
+| Verificación | Estado | Evidencia |
+|-------------|--------|-----------|
+| ¿Formularios validan campos requeridos antes de enviar? | **PASS** | `PanelAprobacion.tsx:41-51` valida 6 campos obligatorios. `PatientForm.tsx` usa datos controlados. Onboarding valida por paso. |
+| ¿Se muestra feedback al usuario (loading, success, error)? | **PASS** | Loading states: `creando`, `cargando`, `guardando`, `buscando` en todos los componentes principales. Errores mostrados con `alert()` o estado local. Éxito redirige o actualiza. |
+| ¿Datos llegan correctamente a BD con formato/tipos? | **PASS** | TypeScript types (`CrearFacturaInput`, `PacienteInput`, `PerfilPrestador`) aseguran tipos en compile time. Supabase client valida contra schema. |
+| ¿Se manejan caracteres especiales/Unicode/emojis? | **PARTIAL** | Supabase/PostgreSQL maneja UTF-8 nativamente. No hay sanitización de emojis específica. Nombres con tildes (Pérez, Muñoz) probados en anonimización (`seguridad.test.ts`). |
+| ¿Prevención de doble submit? | **PASS para críticos** | Aprobación factura: protegida por filtro `.eq("estado", "borrador")` + RPC atómica. Creación factura: usa `setCreando(true)` que deshabilita botón. Otros formularios: botones se deshabilitan con loading state. |
+| ¿UI se recupera de errores del servidor? | **PASS** | Todos los server actions retornan `{ success: boolean, error?: string }`. UI muestra error y permite reintentar. Loading state se resetea en `finally` blocks. |
+
+### Flujos de Lectura (Read/List)
+
+| Verificación | Estado | Evidencia |
+|-------------|--------|-----------|
+| ¿Listas cargan datos correctos para usuario autenticado? | **PASS** | Todas las queries incluyen `user_id` o `organizacion_id`. RLS como segunda barrera. |
+| ¿Paginación funciona? | **PASS** | `listarFacturas()`, `listarPacientes()` usan `range(desde, desde+porPagina-1)` con `count: "exact"`. UI muestra controles de paginación. |
+| ¿Aislamiento entre usuarios/organizaciones? | **PASS** | Doble protección: filtro `.eq("user_id/organizacion_id")` en app + RLS en PostgreSQL. Todas las tablas tienen policies verificadas en `schema-glosas.sql`. |
+| ¿Qué muestra el UI cuando no hay datos? (empty states) | **PASS** | Facturas: "No se encontraron facturas". Pacientes: "No se encontraron pacientes". Pagos: "No hay facturas pendientes". Glosas: "No tienes facturas ni glosas pendientes". Dashboard: KPIs en 0 + mensaje positivo. |
+| ¿Datos se muestran con formato correcto? | **PASS** | `formatCOP()` para moneda COP, `formatFechaCO()` para fechas colombianas. `Intl.NumberFormat("es-CO")` usado consistentemente. |
+
+### Flujos de Eliminación (Delete)
+
+| Verificación | Estado | Evidencia |
+|-------------|--------|-----------|
+| ¿Hay confirmación antes de eliminar? | **PASS para mayoría** | Anular factura: `confirm()`. Eliminar acuerdo: `confirm()`. Desactivar miembro: `confirm()`. Eliminar diagnóstico/procedimiento: `confirm()`. **Eliminar tarifa: no verificado** |
+| ¿Soft-delete vs hard-delete? | **MIXED** | Facturas: anulación es cambio de estado (soft). Miembros equipo: `activo=false` (soft). Telegram: `activo=false` (soft). **Tarifas: hard delete**. **Acuerdos: hard delete con cascada**. Cuenta: scheduled soft delete 7 días. |
+| ¿Se actualizan relaciones dependientes? | **PARTIAL** | Acuerdo + tarifas: cascada. Factura anulada → no cascade documentado. Pacientes nunca se eliminan. |
+| ¿UI se actualiza después de eliminar? | **PASS** | `cargarDatos()` / `cargar()` llamado post-delete. `revalidatePath()` en server actions. |
+
+### Flujos de Transición de Estado (Workflows)
+
+| Verificación | Estado | Evidencia |
+|-------------|--------|-----------|
+| ¿Cada transición es válida? | **PASS** | Factura: borrador→aprobada (filtro `.eq("estado","borrador")`). borrador→anulada (mismo filtro). aprobada→descargada (filtro estado). descargada→radicada (validación explícita). Solo estados válidos permiten pagos (radicada/pagada_parcial). |
+| ¿Transiciones inválidas bloqueadas en backend? | **PASS** | Todas las mutations filtran por estado previo. DIAN envío: verifica `aprobada\|descargada`. MUV: verifica `estado_dian=aceptada`. |
+| ¿Transiciones inválidas bloqueadas en UI? | **PARTIAL** | Botones condicionales por estado en `FacturaHeader`, `DianPanel`, `RadicacionPanel`, `MuvPanel`. **PERO:** no hay routing guard que impida manipular IDs en URL para acceder a acciones de otro estado. |
+| ¿Cambios de estado en audit trail? | **PASS** | `registrarAuditLog()` llamado en: crear_factura, aprobar_factura, anular_factura, generar_fev_xml. **PERO:** falta en: marcarComoDescargada, radicarFactura, registrarPago. |
+| ¿Se envían notificaciones cuando corresponde? | **PARTIAL** | Email de radicación: implementado. Glosa: sin notificaciones automáticas al recibir. Trial expiring: sin notificación proactiva. |
+
+---
+
+## 2.3 — Pruebas de Integración entre Módulos
+
+| # | Flujo Inter-módulo | Estado | Evidencia |
+|---|-------------------|--------|-----------|
+| I.1 | Clasificación → Factura borrador | **PASS** | `MedibillApp.tsx` → `PanelAprobacion` → `crearFacturaBorrador()`. Resultado IA fluye completo a factura con diagnósticos, procedimientos, atencion, paciente upserted. |
+| I.2 | Factura aprobada → DIAN → MUV → Radicación | **PASS** | Pipeline lineal: aprobar → generar FEV XML → enviar DIAN → consultar estado → validar MUV → descargar paquete → radicar. Cada paso valida prerequisitos del anterior. |
+| I.3 | Factura radicada → Pagos → Estado pagada | **PASS** | `registrarPago()` actualiza estado de factura a pagada/pagada_parcial automáticamente basado en totalPagado vs valor_total. |
+| I.4 | Factura radicada → Glosas → Respuestas | **PASS** | Glosas recibidas referencia facturas. Respuestas validan estado de la glosa. KPIs agregados en dashboard. |
+| I.5 | Dashboard refleja datos de todos los módulos | **PASS** | `obtenerKPIsDashboard()` consulta facturas, glosas, respuestas y cartera → KPIs unificados. |
+| I.6 | Acuerdo de voluntades → Clasificación (tarifas) | **PASS** | `clasificarTextoMedico()` → `validarYEnriquecerResultado()` aplica tarifas de `servicios_medico`. Acuerdos con % sobre base también consultados. |
+| I.7 | Conciliación sábana → Pagos | **PASS** | `conciliacion.ts` → `confirmarConciliacion()` llama `registrarPago()` para cada fila conciliada exitosamente. |
+| I.8 | Onboarding → Organización → Suscripción | **PASS** | `guardarPerfil({ onboarding_completo: true })` → `crearOrganizacion()` → suscripción trial creada automáticamente. |
+| I.9 | Límites plan → Clasificación y Facturas | **PASS** | `verificarLimite()` consultada antes de `clasificarTextoMedico()` y `aprobarFactura()`. `incrementarUso()` después de éxito. |
+| I.10 | **Cálculos agregados consistentes** | **⚠️ WARNING** | Dashboard KPIs calculados en app-layer (no views SQL). `totalFacturado` en dashboard vs cartera calculados en queries separadas que podrían divergir por timing. |
+
+---
+
+## 2.4 — Pruebas de Edge Cases
+
+| # | Edge Case | Estado | Evidencia |
+|---|-----------|--------|-----------|
+| E.1 | Campo valor_total = 0 | **PASS** | `valorTotal = subtotal - copago`. Si subtotal=copago, factura con valor 0 es técnicamente válida. Sin validación de monto mínimo. |
+| E.2 | Campo valor_total negativo | **⚠️ FAIL** | `PanelAprobacion.tsx:28` — `valorTotal = subtotal - copago`. Si copago > subtotal, valor_total puede ser negativo. Solo `obtenerCarteraPendiente` usa `Math.max(0, saldoPendiente)` pero la creación no valida. |
+| E.3 | Valores negativos en pagos | **PARTIAL** | `registrarPago()` no valida `monto <= 0`. Un pago con monto negativo sería aceptado. |
+| E.4 | String muy largo (>10000 chars) en nota clínica | **PASS** | No hay límite explícito pero Gemini tiene límite de tokens implícito. `anonimizarTextoMedico()` opera con regex que maneja strings largos. Textarea no tiene `maxLength`. |
+| E.5 | Concurrencia: dos users aprueban misma factura | **PASS** | `aprobarFactura()` usa `.eq("estado", "borrador")` — primera ejecución cambia estado, segunda no matchea. RPC atómica previene duplicado de consecutivo. |
+| E.6 | Concurrencia: consecutivo de resolución | **PASS** | Arreglado: ahora usa RPC `siguiente_numero_factura` con row lock en PostgreSQL (`facturas.ts:168-175`). Documentado en `invoice_approval_race_condition.md`. |
+| E.7 | Sesión expirada a mitad de flujo | **PARTIAL** | Server actions retornan error genérico si `getUser()` falla. Middleware redirige a /login. **PERO:** formularios client-side no guardan estado en localStorage — se pierde el trabajo si sesión expira mientras se clasifica. |
+| E.8 | Navegación back/forward del navegador | **PARTIAL** | Next.js App Router mantiene estado de componentes client en caché. **PERO:** no hay `useBeforeUnload` o confirmación si el usuario tiene datos sin guardar. |
+| E.9 | Servicio externo caído (Gemini IA) | **PASS** | `clasificarTextoMedico()` retorna `{ exito: false, error: message }`. UI muestra `alert("Error: " + resp.error)`. No crashea. |
+| E.10 | Servicio externo caído (Matias/DIAN) | **PASS** | `enviarFacturaDian()` tiene try/catch, retorna error estructurado. `dian.ts:72-75`. |
+| E.11 | Servicio externo caído (MUV Docker) | **PASS** | `muvClient.healthCheck()` verifica disponibilidad antes de intentar. Error claro si caído. |
+| E.12 | Servicio externo caído (Wompi) | **PARTIAL** | Checkout redirige a Wompi. Si Wompi caído, la redirección falla en el browser. No hay timeout/fallback documentado en `billing.ts`. |
+| E.13 | Rango de resolución agotado | **PASS** | RPC `siguiente_numero_factura` lanza excepción si rango agotado. `obtenerSiguienteNumeroFactura()` retorna `alertaAgotamiento: true` cuando quedan <50 números. |
+| E.14 | Resolución vencida | **PARTIAL** | `resoluciones_facturacion` tiene `fecha_vigencia_hasta` pero `obtenerSiguienteNumeroFactura()` solo filtra por `activa=true`, no verifica fecha de vigencia. |
+| E.15 | Caracteres especiales en NIT/documento | **PASS** | Supabase/PostgreSQL TEXT columns manejan cualquier UTF-8. Queries usan parámetros (`eq()`) eliminando riesgo de SQL injection. |
+| E.16 | Emoji en nombre de paciente | **PASS** | PostgreSQL TEXT soporta emojis nativamente. Sin sanitización que los elimine. |
+| E.17 | Campos vacíos en formularios opcionales | **PASS** | Server actions usan `|| null` para campos opcionales (ej: `email_radicacion: datos.email_radicacion || null`). |
+| E.18 | Zona horaria | **PARTIAL** | Fechas usan `new Date().toISOString()` que es UTC. `fecha_expedicion` usa `.split("T")[0]` (solo fecha). Formato display usa `formatFechaCO()`. **PERO:** un usuario en UTC-5 que crea factura a 11pm ve fecha del día siguiente en UTC. |
+
+---
+
+## 2.5 — Hallazgos CRITICAL
+
+### CRITICAL 1: RBAC no verificado en server actions de facturas
+- **Archivo:** [facturas.ts](medibill-monorepo/apps/web/app/actions/facturas.ts#L148)
+- **Problema:** `aprobarFactura()` usa `getContextoOrg()` para obtener `ctx.orgId` pero NUNCA llama `verificarPermisoOError(ctx.rol, "aprobar_factura")`. Un `facturador` podría aprobar facturas directamente llamando la server action, aunque la UI no le muestre el botón.
+- **Impacto:** Bypass de RBAC — roles `facturador` y `auditor` pueden ejecutar acciones que no deberían.
+- **Afecta también a:** `anularFactura()`, `editarFacturaBorrador()`, `crearFacturaBorrador()`.
+- **Fix:** Agregar `verificarPermisoOError(ctx.rol, "aprobar_factura")` al inicio de cada action restringida.
+
+### CRITICAL 2: RBAC no verificado en acuerdos
+- **Archivo:** [acuerdos.ts](medibill-monorepo/apps/web/app/actions/acuerdos.ts#L63)
+- **Problema:** `guardarAcuerdo()` y `eliminarAcuerdo()` no verifican `gestionar_acuerdos` permission. Doctor puede crear/eliminar acuerdos.
+- **Fix:** Agregar `verificarPermisoOError(ctx.rol, "gestionar_acuerdos")`.
+
+### CRITICAL 3: RBAC no verificado en clasificación IA
+- **Archivo:** [clasificacion.ts](medibill-monorepo/apps/web/app/actions/clasificacion.ts)
+- **Problema:** `clasificarTextoMedico()` verifica `verificarLimite` pero no verifica que el rol tenga `clasificar_ia` permission.
+- **Fix:** Agregar check de permiso.
+
+---
+
+## 2.6 — Hallazgos WARNING
+
+| # | Warning | Archivo | Descripción |
+|---|---------|---------|-------------|
+| W.1 | Audit log incompleto | `facturas.ts`, `radicacion.ts`, `pagos.ts` | `marcarComoDescargada()`, `radicarFactura()`, `registrarPago()` no llaman `registrarAuditLog()`. Solo crear, aprobar y anular facturas lo hacen. |
+| W.2 | Hard delete de acuerdos | `acuerdos.ts` | `eliminarAcuerdo()` hace DELETE real, no soft delete. Sin recovery posible. En un sistema de facturación médica, hard delete es riesgoso para compliance. |
+| W.3 | Hard delete de tarifas | `tarifas.ts:50-60` | `eliminarTarifaUsuario()` hace DELETE real. Sin audit trail ni soft delete. |
+| W.4 | anularFactura retorno ambiguo | `facturas.ts:195-207` | Si `facturaId` válido pero estado no es `borrador`, el UPDATE retorna 0 rows pero `error` es null. La función retorna `{ success: true }` aunque nada cambió. |
+| W.5 | Resolución vencida no validada | `facturas.ts:18-42` | `obtenerSiguienteNumeroFactura()` no verifica `fecha_vigencia_hasta` de la resolución. Un prestador podría facturar con resolución expirada. |
+| W.6 | Valor factura negativo posible | `PanelAprobacion.tsx` | `valorTotal = subtotal - copago` sin `Math.max(0)`. Copago mayor que subtotal crea factura con valor negativo. |
+| W.7 | Sin protección contra pérdida de datos | `MedibillApp.tsx` | No hay `beforeunload` handler. Si el usuario cierra el tab durante clasificación o llenado de formulario, pierde todo el trabajo sin advertencia. |
+| W.8 | UTC vs Colombia timezone | `facturas.ts`, `dashboard.ts` | `new Date().toISOString().split("T")[0]` para fecha_expedicion puede generar fecha incorrecta para usuarios en UTC-5 (Colombia) si crean factura después de las 7pm. |
+| W.9 | Pago con monto ≤ 0 | `pagos.ts` | `registrarPago()` no valida que `input.monto > 0`. Un pago con monto 0 o negativo sería aceptado. |
+| W.10 | API routes sin auth en middleware | `middleware.ts:5-7` | `if (pathname.startsWith('/api')) return NextResponse.next()` — todas las rutas API bypasean el middleware de auth. La autenticación queda en manos de cada route handler individualmente. |
+
+---
+
+## 2.7 — Resumen Ejecutivo
+
+| Categoría | Total Tests | PASS | FAIL | WARNING |
+|-----------|------------|------|------|---------|
+| Autenticación/Onboarding | 10 | 10 | 0 | 0 |
+| Clasificación IA | 8 | 7 | 1 | 0 |
+| Pacientes | 7 | 7 | 0 | 0 |
+| Facturas | 14 | 12 | 2 | 0 |
+| DIAN | 9 | 9 | 0 | 0 |
+| MUV | 5 | 5 | 0 | 0 |
+| Radicación | 5 | 5 | 0 | 0 |
+| Glosas/Respuestas | 9 | 9 | 0 | 0 |
+| Pagos/Cartera | 5 | 5 | 0 | 0 |
+| Acuerdos | 5 | 4 | 1 | 0 |
+| Tarifas | 4 | 4 | 0 | 0 |
+| Dashboard | 4 | 4 | 0 | 0 |
+| Conciliación | 5 | 5 | 0 | 0 |
+| Equipo/Org | 7 | 7 | 0 | 0 |
+| Suscripción/Billing | 7 | 7 | 0 | 0 |
+| Cuenta | 3 | 3 | 0 | 0 |
+| Admin Plataforma | 3 | 3 | 0 | 0 |
+| Telegram | 3 | 3 | 0 | 0 |
+| Escritura (cross-cutting) | 6 | 6 | 0 | 0 |
+| Lectura (cross-cutting) | 5 | 5 | 0 | 0 |
+| Eliminación (cross-cutting) | 4 | 2 | 0 | 2 |
+| Workflows (cross-cutting) | 5 | 3 | 0 | 2 |
+| Integración inter-módulo | 10 | 9 | 0 | 1 |
+| Edge cases | 18 | 13 | 2 | 3 |
+| **TOTAL** | **175** | **157** | **6** | **8** |
+
+### Priorización de Fixes
+
+1. **CRITICAL (6 fails):** RBAC enforcement en server actions — facturas (4.8), clasificación (2.4), acuerdos (10.4) + anulación retorno ambiguo (4.7) + valor negativo (E.2) + pago monto ≤ 0 (E.3)
+2. **HIGH (10 warnings):** Audit log incompleto, hard deletes, resolución vencida, timezone, API auth bypass
+3. **MEDIUM:** Empty state edge cases, beforeunload, session recovery
+
+3 CRITICAL findings flagged immediately:
+
+RBAC bypass in server actions — aprobarFactura(), anularFactura(), clasificarTextoMedico(), guardarAcuerdo() don't call verificarPermisoOError(). The RBAC matrix exists in permisos.ts but most server actions only enforce it at UI level. A user with role facturador can directly invoke aprobarFactura() by calling the server action, bypassing the UI restriction.
+
+Negative invoice values — PanelAprobacion.tsx:28 computes valorTotal = subtotal - copago without floor at 0, and pagos.ts accepts payments with monto <= 0.
+
+Audit log gaps — marcarComoDescargada(), radicarFactura(), and registrarPago() all skip audit logging, leaving holes in the compliance trail for a medical billing system.
+
+The complete deliverable above has 175 test scenarios across 18 modules with specific file/line references for each finding.

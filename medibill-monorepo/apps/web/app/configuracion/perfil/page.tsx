@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { obtenerPerfil, guardarPerfil, obtenerResolucionActiva, guardarResolucion, obtenerResoluciones, activarResolucion } from "@/app/actions/perfil";
-import { programarEliminacionCuenta, cancelarEliminacionCuenta, estadoEliminacionCuenta } from "@/app/actions/cuenta";
+import { obtenerPerfil, guardarPerfil, obtenerResolucionActiva, guardarResolucion, obtenerResoluciones, activarResolucion, obtenerConsentimientoDatos, toggleConsentimientoDatos } from "@/app/actions/perfil";
+import { programarEliminacionCuenta, cancelarEliminacionCuenta, estadoEliminacionCuenta, exportarDatosUsuario } from "@/app/actions/cuenta";
 import { obtenerCredencialesMuv, guardarCredencialesMuv } from "@/app/actions/muv";
 import { DEPARTAMENTOS, MUNICIPIOS } from "@/lib/data/divipola";
 import type { PerfilPrestador, TipoPrestador, RegimenFiscal, ResolucionFacturacion } from "@/lib/types/perfil";
@@ -27,6 +27,9 @@ export default function PerfilPage() {
   });
   const [muvExiste, setMuvExiste] = useState(false);
   const [guardandoMuv, setGuardandoMuv] = useState(false);
+  const [compartirDatos, setCompartirDatos] = useState(false);
+  const [guardandoCompartir, setGuardandoCompartir] = useState(false);
+  const [exportando, setExportando] = useState(false);
 
   const cargarResoluciones = async () => {
     const lista = await obtenerResoluciones();
@@ -53,6 +56,8 @@ export default function PerfilPage() {
         });
         setMuvExiste(true);
       }
+      const consent = await obtenerConsentimientoDatos();
+      setCompartirDatos(consent);
       setCargando(false);
     })();
   }, []);
@@ -615,6 +620,85 @@ export default function PerfilPage() {
             className="px-6 py-2.5 text-sm font-bold text-white bg-medi-primary rounded-lg hover:bg-medi-accent shadow-md transition-all disabled:opacity-50"
           >
             {guardandoMuv ? "Guardando..." : muvExiste ? "Actualizar credenciales MUV" : "Guardar credenciales MUV"}
+          </button>
+        </div>
+      </div>
+
+      {/* Inteligencia Colectiva — Compartir datos */}
+      <div className={`${sectionClasses} mt-6`}>
+        <h2 className="text-md font-bold text-medi-deep">Inteligencia Colectiva</h2>
+        <p className="text-sm text-medi-dark/60">
+          Comparte tus datos anonimizados para obtener benchmarks comparativos de tu EPS: tasas de glosa, tiempos de pago y tarifas de referencia.
+        </p>
+
+        <div className="flex items-start gap-4 p-4 rounded-xl border border-medi-light/50 bg-medi-light/10">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={compartirDatos}
+            disabled={guardandoCompartir}
+            onClick={async () => {
+              setGuardandoCompartir(true);
+              const nuevoValor = !compartirDatos;
+              const res = await toggleConsentimientoDatos(nuevoValor);
+              if (res.success) {
+                setCompartirDatos(nuevoValor);
+                setMensaje({ tipo: "ok", texto: nuevoValor ? "Datos compartidos activados" : "Datos compartidos desactivados" });
+              } else {
+                setMensaje({ tipo: "error", texto: res.error ?? "Error al cambiar preferencia" });
+              }
+              setGuardandoCompartir(false);
+            }}
+            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-medi-primary/30 disabled:opacity-50 ${
+              compartirDatos ? "bg-medi-primary" : "bg-gray-200"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                compartirDatos ? "translate-x-5" : "translate-x-0"
+              }`}
+            />
+          </button>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-medi-deep">
+              Compartir mis datos anonimizados para benchmarks
+            </p>
+            <p className="text-xs text-medi-dark/50 mt-1">
+              Tus datos se agregan anónimamente. Nunca se comparte información individual. Se necesitan al menos 3 usuarios por EPS para generar comparativas.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Exportar datos — Habeas Data */}
+      <div className={`${sectionClasses} mt-6`}>
+        <h2 className="text-md font-bold text-medi-deep">Mis datos personales</h2>
+        <p className="text-sm text-medi-dark/60">
+          De acuerdo con la Ley 1581 de 2012 (Habeas Data), puedes descargar una copia de todos tus datos almacenados en Medibill.
+        </p>
+        <div className="flex justify-end">
+          <button
+            onClick={async () => {
+              setExportando(true);
+              const res = await exportarDatosUsuario();
+              if (res.success && res.data) {
+                const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `medibill-datos-${new Date().toISOString().split("T")[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                setMensaje({ tipo: "ok", texto: "Datos exportados correctamente" });
+              } else {
+                setMensaje({ tipo: "error", texto: res.error ?? "Error al exportar datos" });
+              }
+              setExportando(false);
+            }}
+            disabled={exportando}
+            className="px-6 py-2.5 text-sm font-bold text-medi-primary border-2 border-medi-primary rounded-lg hover:bg-medi-primary hover:text-white transition-all disabled:opacity-50"
+          >
+            {exportando ? "Exportando..." : "Descargar mis datos"}
           </button>
         </div>
       </div>

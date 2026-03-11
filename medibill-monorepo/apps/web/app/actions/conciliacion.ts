@@ -7,6 +7,9 @@ import { parsearArchivoSabana } from "@/lib/sabana-parser";
 import { mapearColumnasSabana, aplicarMapeo } from "@/lib/sabana-mapper";
 import { conciliarConFacturas } from "@/lib/conciliacion-service";
 import { registrarPago } from "@/app/actions/pagos";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
+import { validateFileMagicBytes } from "@/lib/file-validation";
 import type {
   ResultadoParseo,
   ResultadoMapeoIA,
@@ -29,21 +32,12 @@ export async function parsearSabana(formData: FormData): Promise<{
   error?: string;
   data?: ResultadoParseo;
 }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "importar_sabana");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   // Feature gate: requiere importacion_sabana
-  const { data: memb } = await supabase
-    .from("usuarios_organizacion")
-    .select("organizacion_id")
-    .eq("user_id", user.id)
-    .eq("activo", true)
-    .limit(1)
-    .single();
-  if (!memb || !await tieneFeature(memb.organizacion_id, "importacion_sabana")) {
+  if (!await tieneFeature(ctx.orgId, "importacion_sabana")) {
     return { success: false, error: "Tu plan no incluye importación de sábana. Actualiza tu plan para usar esta funcionalidad." };
   }
 
@@ -67,8 +61,21 @@ export async function parsearSabana(formData: FormData): Promise<{
     };
   }
 
+  // Validar magic bytes del contenido (previene spoofeo de extensión)
+  const buffer = await file.arrayBuffer();
+  const allowedMimes = [
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+  ];
+  // CSV no tiene magic bytes — solo validar magic bytes para archivos binarios
+  if (ext !== "csv") {
+    const detectedMime = validateFileMagicBytes(buffer, allowedMimes);
+    if (!detectedMime) {
+      return { success: false, error: "El contenido del archivo no corresponde a un archivo Excel válido." };
+    }
+  }
+
   try {
-    const buffer = await file.arrayBuffer();
     const resultado = parsearArchivoSabana(buffer, file.name);
     return { success: true, data: resultado };
   } catch (err) {
@@ -91,21 +98,12 @@ export async function mapearYConciliar(
   filasNormalizadas?: FilaNormalizada[];
   conciliacion?: ResultadoConciliacion;
 }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "importar_sabana");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   // Feature gate: requiere importacion_sabana
-  const { data: memb2 } = await supabase
-    .from("usuarios_organizacion")
-    .select("organizacion_id")
-    .eq("user_id", user.id)
-    .eq("activo", true)
-    .limit(1)
-    .single();
-  if (!memb2 || !await tieneFeature(memb2.organizacion_id, "importacion_sabana")) {
+  if (!await tieneFeature(ctx.orgId, "importacion_sabana")) {
     return { success: false, error: "Tu plan no incluye importación de sábana." };
   }
 
@@ -115,7 +113,7 @@ export async function mapearYConciliar(
     const mapeo = await mapearColumnasSabana(
       headers,
       muestra,
-      user.id,
+      ctx.orgId,
       nitEps,
       epsNombre
     );
@@ -150,7 +148,7 @@ export async function mapearYConciliar(
     // 3. Conciliar contra facturas en BD
     const conciliacion = await conciliarConFacturas(
       filasNormalizadas,
-      user.id
+      ctx.orgId
     );
 
     return {
@@ -177,21 +175,11 @@ export async function reconciliarConMapeoManual(
   filasNormalizadas?: FilaNormalizada[];
   conciliacion?: ResultadoConciliacion;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "importar_sabana");
 
   // Feature gate: requiere importacion_sabana
-  const { data: memb3 } = await supabase
-    .from("usuarios_organizacion")
-    .select("organizacion_id")
-    .eq("user_id", user.id)
-    .eq("activo", true)
-    .limit(1)
-    .single();
-  if (!memb3 || !await tieneFeature(memb3.organizacion_id, "importacion_sabana")) {
+  if (!await tieneFeature(ctx.orgId, "importacion_sabana")) {
     return { success: false, error: "Tu plan no incluye importación de sábana." };
   }
 
@@ -208,7 +196,7 @@ export async function reconciliarConMapeoManual(
 
     const conciliacion = await conciliarConFacturas(
       filasNormalizadas,
-      user.id
+      ctx.orgId
     );
 
     return { success: true, filasNormalizadas, conciliacion };
@@ -229,27 +217,11 @@ export async function confirmarConciliacion(
   pagos_registrados: number;
   errores: string[];
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user)
-    return {
-      success: false,
-      error: "No autenticado",
-      pagos_registrados: 0,
-      errores: [],
-    };
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "importar_sabana");
 
   // Feature gate: requiere importacion_sabana
-  const { data: memb4 } = await supabase
-    .from("usuarios_organizacion")
-    .select("organizacion_id")
-    .eq("user_id", user.id)
-    .eq("activo", true)
-    .limit(1)
-    .single();
-  if (!memb4 || !await tieneFeature(memb4.organizacion_id, "importacion_sabana")) {
+  if (!await tieneFeature(ctx.orgId, "importacion_sabana")) {
     return { success: false, error: "Tu plan no incluye importación de sábana.", pagos_registrados: 0, errores: [] };
   }
 
@@ -285,8 +257,9 @@ export async function confirmarConciliacion(
 
   // Crear registro de importación
   try {
+    const supabase = await createClient();
     await supabase.from("importaciones_sabana").insert({
-      user_id: user.id,
+      user_id: ctx.userId,
       nit_eps: meta.nit_eps,
       eps_nombre: meta.eps_nombre,
       nombre_archivo: meta.nombre_archivo,
@@ -319,16 +292,13 @@ export async function confirmarConciliacion(
 
 /** Lista historial de importaciones del usuario */
 export async function listarImportaciones(): Promise<ImportacionSabanaDB[]> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
 
   const { data } = await supabase
     .from("importaciones_sabana")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.userId)
     .order("created_at", { ascending: false })
     .limit(20);
 

@@ -2,9 +2,12 @@
 
 import { createClient } from "@/lib/supabase-server";
 import { devError } from "@/lib/logger";
+import { safeError } from "@/lib/safe-error";
 import { generarJsonRipsMVP } from "@/app/actions/rips";
 import * as matiasClient from "@/lib/providers/matias-client";
 import * as muvClient from "@/lib/providers/muv-client";
+import { getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
 import type { EstadoMuv, MuvError, CredencialesMuvInput, CredencialesMuv } from "@/lib/types/muv";
 import { encrypt, decrypt } from "@/lib/muv-crypto";
 
@@ -31,16 +34,16 @@ export async function validarRipsYObtenerCuv(
   | { success: true; cuv: string }
   | { success: false; error: string; errores?: MuvError[] }
 > {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "enviar_dian");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
 
   // 1. Obtener factura con paciente
   const { data: factura, error: errFactura } = await supabase
     .from("facturas")
     .select("*, pacientes(*)")
     .eq("id", facturaId)
-    .eq("user_id", user.id)
+    .eq("organizacion_id", ctx.orgId)
     .single();
 
   if (errFactura || !factura) {
@@ -105,14 +108,14 @@ export async function validarRipsYObtenerCuv(
       updated_at: new Date().toISOString(),
     })
     .eq("id", facturaId)
-    .eq("user_id", user.id);
+    .eq("organizacion_id", ctx.orgId);
 
   // 7. Obtener credenciales MUV del prestador (si existen)
   let muvCredenciales: import("@/lib/types/muv").MuvCredencialesRequest | undefined;
   const { data: creds } = await supabase
     .from("credenciales_muv")
     .select("tipo_usuario, tipo_identificacion, numero_identificacion, contrasena_encrypted, nit_prestador")
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.userId)
     .eq("activo", true)
     .single();
 
@@ -149,7 +152,7 @@ export async function validarRipsYObtenerCuv(
           updated_at: new Date().toISOString(),
         })
         .eq("id", facturaId)
-        .eq("user_id", user.id);
+        .eq("organizacion_id", ctx.orgId);
 
       if (errUpdate) {
         devError("Error actualizando factura post-MUV", errUpdate);
@@ -166,7 +169,7 @@ export async function validarRipsYObtenerCuv(
           updated_at: new Date().toISOString(),
         })
         .eq("id", facturaId)
-        .eq("user_id", user.id);
+        .eq("organizacion_id", ctx.orgId);
 
       const resumen = resultado.errores
         .filter(e => e.severidad === "error")
@@ -188,7 +191,7 @@ export async function validarRipsYObtenerCuv(
         updated_at: new Date().toISOString(),
       })
       .eq("id", facturaId)
-      .eq("user_id", user.id);
+    .eq("organizacion_id", ctx.orgId);
 
     const message = err instanceof Error ? err.message : "Error de conexión con el MUV";
     return { success: false, error: message };
@@ -203,16 +206,9 @@ export async function validarRipsYObtenerCuv(
 export async function guardarCredencialesMuv(
   input: CredencialesMuvInput,
 ): Promise<{ success: boolean; error?: string }> {
+  const ctx = await getContextoOrg();
+  verificarPermisoOError(ctx.rol, "enviar_dian");
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "No autenticado" };
-
-  // Obtener org del usuario
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("organizacion_id")
-    .eq("user_id", user.id)
-    .single();
 
   let contrasenaEncrypted: string;
   try {
@@ -223,8 +219,8 @@ export async function guardarCredencialesMuv(
   }
 
   const payload = {
-    user_id: user.id,
-    organizacion_id: perfil?.organizacion_id ?? null,
+    user_id: ctx.userId,
+    organizacion_id: ctx.orgId,
     tipo_usuario: input.tipo_usuario,
     tipo_identificacion: input.tipo_identificacion,
     numero_identificacion: input.numero_identificacion,
@@ -240,7 +236,7 @@ export async function guardarCredencialesMuv(
 
   if (error) {
     devError("Error guardando credenciales MUV", error);
-    return { success: false, error: error.message };
+    return { success: false, error: safeError("guardarCredencialesMuv", error) };
   }
 
   return { success: true };
@@ -248,14 +244,13 @@ export async function guardarCredencialesMuv(
 
 /** Obtener credenciales MUV del usuario (sin contraseña) */
 export async function obtenerCredencialesMuv(): Promise<CredencialesMuv | null> {
+  const ctx = await getContextoOrg();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
 
   const { data, error } = await supabase
     .from("credenciales_muv")
     .select("id, user_id, organizacion_id, tipo_usuario, tipo_identificacion, numero_identificacion, nit_prestador, activo, created_at, updated_at")
-    .eq("user_id", user.id)
+    .eq("user_id", ctx.userId)
     .single();
 
   if (error || !data) return null;

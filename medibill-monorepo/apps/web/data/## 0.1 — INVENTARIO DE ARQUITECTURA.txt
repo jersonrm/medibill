@@ -1,0 +1,916 @@
+# AUDIT_MAP.md — Medibill Reconocimiento y Mapeo Completo (Fase 0)
+
+> Generado: 2026-03-10  
+> Aplicación principal: `medibill-monorepo/apps/web`  
+> Framework: Next.js 16.1.5 (App Router) + React 19.2.0 + TypeScript 5.9.2
+
+---
+
+## 0.1 — INVENTARIO DE ARQUITECTURA
+
+### Stack Tecnológico
+
+| Componente | Tecnología | Versión |
+|---|---|---|
+| Framework | Next.js (App Router) | 16.1.5 |
+| UI Library | React | 19.2.0 |
+| Language | TypeScript | 5.9.2 |
+| CSS | Tailwind CSS | 3.x |
+| Database | Supabase (PostgreSQL 15+) | @supabase/supabase-js 2.97.0 |
+| Auth | Supabase Auth (email/password) | @supabase/ssr 0.8.0 |
+| ORM/Client | Supabase JS Client (no ORM) | — |
+| Build Tool | Turborepo + pnpm | turbo 2.8.10 / pnpm 9.0.0 |
+| Node | >=18 | — |
+| Testing | Vitest | 4.0.18 |
+| Monitoreo | Sentry | @sentry/nextjs 10.42.0 |
+| Rate Limiting | Upstash Redis + fallback in-memory | @upstash/ratelimit 2.0.8 |
+| Infra (preparada) | AWS CDK (vacío, no desplegado) | — |
+| MUV Proxy | Containerizado Node.js para Cloud Run | node:20-alpine |
+
+### Estructura del Monorepo
+medibill-monorepo/
+├── apps/
+│ ├── web/ ← App principal (facturación electrónica)
+│ ├── landing/ ← Landing page (medibill.co)
+│ └── docs/ ← Documentación (Next.js + Nextra-style)
+├── packages/
+│ ├── ui/ ← Componentes compartidos
+│ ├── eslint-config/
+│ └── typescript-config/
+infra/
+├── bin/infra.ts ← CDK stack (vacío)
+└── muv-docker/ ← Servicio MUV para Cloud Run
+
+### Variables de Entorno (Completas)
+
+| Variable | Scope | Descripción |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Public | URL del proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public | Clave anónima Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Secret | Service role key (webhooks, cron, admin) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Secret | API key para Gemini (clasificación IA, embeddings, sábana mapper) |
+| `RESEND_API_KEY` | Secret | API key para envío de emails (radicación) |
+| `UPSTASH_REDIS_REST_URL` | Secret | URL de Upstash Redis (rate limiting) |
+| `UPSTASH_REDIS_REST_TOKEN` | Secret | Token de Upstash Redis |
+| `MATIAS_API_URL` | Secret | URL del proveedor Matias (facturación electrónica DIAN) |
+| `MATIAS_API_EMAIL` | Secret | Email para auth en Matias API |
+| `MATIAS_API_PASSWORD` | Secret | Password para auth en Matias API |
+| `MATIAS_PAT_TOKEN` | Secret | Personal Access Token de Matias |
+| `MUV_DOCKER_URL` | Secret | URL del servicio MUV proxy (Cloud Run) |
+| `MUV_ENCRYPTION_KEY` | Secret | Clave AES-256-GCM para cifrar credenciales MUV |
+| `DIAN_AMBIENTE` | Secret | "1" = producción, "2" = pruebas (default "2") |
+| `WOMPI_PUBLIC_KEY` | Public | Llave pública Wompi (checkout widget) |
+| `WOMPI_PRIVATE_KEY` | Secret | Llave privada Wompi |
+| `WOMPI_EVENTS_SECRET` | Secret | Secreto para verificar firma de webhooks Wompi |
+| `WOMPI_INTEGRITY_KEY` | Secret | Llave para generar firma de integridad |
+| `WOMPI_ENVIRONMENT` | Secret | "sandbox" o "production" |
+| `TELEGRAM_BOT_TOKEN` | Secret | Token del bot de Telegram |
+| `NEXT_PUBLIC_APP_URL` | Public | URL de la app (para deep links, checkout) |
+| `NEXT_PUBLIC_LANDING_URL` | Public | URL del landing page |
+| `CRON_SECRET` | Secret | Bearer token para proteger cron endpoints |
+| `SENTRY_ORG` | Secret | Organización Sentry |
+| `SENTRY_PROJECT` | Secret | Proyecto Sentry |
+| `SENTRY_DSN` | Public | DSN de Sentry (hardcoded en client config) |
+| `ENABLE_HYBRID_SEARCH` | Secret | Feature flag: búsqueda híbrida CUPS/CIE-10 |
+| `ENABLE_SEMANTIC_SEARCH` | Secret | Feature flag: búsqueda semántica (default true) |
+
+### Mapa de Dependencias
+
+#### (a) Core del Framework
+| Paquete | Versión | Uso |
+|---|---|---|
+| next | 16.1.5 | Framework principal |
+| react | ^19.2.0 | UI library |
+| react-dom | ^19.2.0 | React DOM rendering |
+| typescript | 5.9.2 | Lenguaje |
+| turbo | ^2.8.10 | Monorepo orchestration |
+
+#### (b) Autenticación / Seguridad
+| Paquete | Versión | Uso |
+|---|---|---|
+| @supabase/ssr | ^0.8.0 | Supabase server-side auth con cookies |
+| @supabase/supabase-js | ^2.97.0 | Cliente Supabase (DB + Auth) |
+| @upstash/ratelimit | ^2.0.8 | Rate limiting distribuido |
+| @upstash/redis | ^1.36.4 | Redis client para rate limiting |
+| @sentry/nextjs | ^10.42.0 | Error tracking & monitoring |
+
+#### (c) UI
+| Paquete | Versión | Uso |
+|---|---|---|
+| tailwindcss | 3.x | CSS utility framework |
+| recharts | ^3.7.0 | Gráficos del dashboard |
+| autoprefixer | ^10.4.24 | PostCSS plugin |
+| postcss | ^8.5.6 | CSS processing |
+
+#### (d) Utilidades
+| Paquete | Versión | Uso |
+|---|---|---|
+| ajv | ^8.18.0 | Validación JSON Schema (RIPS) |
+| xlsx | ^0.18.5 | Exportación Excel |
+| jszip | ^3.10.1 | Generación ZIP (paquetes radicación) |
+| xmlbuilder2 | ^3.1.1 | Generación XML UBL 2.1 (FEV DIAN) |
+| dotenv | ^17.3.1 | Variables de entorno en scripts |
+| vitest | ^4.0.18 | Testing framework |
+
+#### (e) Servicios Externos
+| Paquete | Versión | Servicio |
+|---|---|---|
+| @google/generative-ai | ^0.24.1 | Google Gemini (clasificación IA + embeddings + mapper sábana) |
+| resend | ^6.9.3 | Email transaccional (radicación por email) |
+| @sentry/nextjs | ^10.42.0 | Monitoreo de errores (Sentry) |
+
+### Servicios Externos Integrados
+
+1. **Supabase** — Base de datos PostgreSQL, Auth, Storage (soportes-glosas bucket), RLS
+2. **Google Gemini AI** — Clasificación médica (CIE-10/CUPS), sugerencias de respuesta a glosas, mapper de sábanas EPS
+3. **Matias API** — Facturación electrónica DIAN (envío, consulta estado, descarga XML/PDF firmados)
+4. **MUV (MinSalud)** — Mecanismo Único de Validación para RIPS → CUV (proxy en Cloud Run)
+5. **Wompi** — Pasarela de pagos Colombia (PSE, Nequi, tarjetas)
+6. **Resend** — Envío de emails transaccionales (radicación)
+7. **Upstash Redis** — Rate limiting distribuido
+8. **Sentry** — Monitoreo de errores en producción
+9. **Telegram Bot API** — Bot para clasificación por audio
+
+---
+
+## 0.2 — MAPEO DE RUTAS Y ENDPOINTS
+
+### Páginas (App Router)
+
+| Ruta | Protección | Acceso | Descripción |
+|---|---|---|---|
+| `/login` | Solo NO autenticados | Público | Login/Registro con email/password |
+| `/onboarding` | Autenticado sin perfil completo | Todos | Onboarding 3 pasos (perfil, ubicación, resolución) |
+| `/` | Redirect | — | Redirige a `/dashboard` |
+| `/dashboard` | Auth + Onboarding + Suscripción | Todos los roles | Dashboard KPIs (facturas, glosas, cartera) |
+| `/facturas` | Auth + Onboarding + Suscripción | Todos los roles | Lista de facturas + crear nueva |
+| `/facturas/[id]` | Auth + Onboarding + Suscripción | Todos los roles | Detalle de factura (ver, aprobar, DIAN, RIPS) |
+| `/factura/desde-telegram` | Auth + Onboarding + Suscripción | Todos los roles | Crear factura desde clasificación Telegram |
+| `/glosas` | Auth + Onboarding + Suscripción | Todos los roles | Gestión de glosas recibidas + respuestas |
+| `/pacientes` | Auth + Onboarding + Suscripción | Todos los roles | Lista y gestión de pacientes |
+| `/pagos` | Auth + Onboarding + Suscripción | Todos los roles | Cartera, pagos recibidos, KPIs |
+| `/pagos/importar` | Auth + Onboarding + Suscripción | Todos los roles | Importar sábana EPS (conciliación) |
+| `/validar-factura` | Auth + Onboarding + Suscripción | Todos los roles | Validador pre-radicación |
+| `/configuracion/perfil` | Auth + Onboarding + Suscripción | Todos los roles | Editar perfil del prestador + resoluciones |
+| `/configuracion/acuerdos` | Auth + Onboarding + Suscripción | owner, admin | Acuerdos de voluntades (IPS↔EPS) |
+| `/configuracion/equipo` | Auth + Onboarding + Suscripción | owner, admin | Gestión de equipo (invitar, roles) |
+| `/configuracion/suscripcion` | Auth + Onboarding (sin check suscripción) | Todos los roles | Dashboard de billing y plan |
+| `/configuracion/suscripcion/seleccionar-plan` | Auth + Onboarding | Todos los roles | Selección de plan con Wompi checkout |
+| `/configuracion/telegram` | Auth + Onboarding + Suscripción | Todos los roles | Vincular/desvincular Telegram |
+| `/invitacion/[token]` | Público o Auth | Invitados | Aceptar invitación a organización |
+| `/ayuda` | Auth + Onboarding + Suscripción | Todos | Centro de ayuda (clasificación IA, configuración, facturas, glosas, pagos, primeros pasos) |
+| `/admin` | Auth + Platform Admin | platform_admins | Panel admin: métricas globales |
+| `/admin/organizaciones` | Auth + Platform Admin | platform_admins | Lista de organizaciones |
+| `/admin/organizaciones/[id]` | Auth + Platform Admin | platform_admins | Detalle de organización |
+
+### API Routes
+
+| Ruta | Método | Protección | Descripción |
+|---|---|---|---|
+| `/api/ai-helper` | POST | Auth + Rate limit (10/min) | Búsqueda CUPS asistida por IA |
+| `/api/factura-pdf/[id]` | GET | Auth + Rate limit (20/min) + user_id check | Genera PDF HTML de una factura |
+| `/api/trial-status` | GET | Auth | Estado del trial para banner UI |
+| `/api/wompi/webhook` | POST | Firma Wompi (x-event-checksum) | Webhook de pagos Wompi |
+| `/api/telegram/webhook` | POST | Rate limit (5/min por telegram_user_id) | Webhook del bot Telegram |
+| `/api/telegram/clasificacion-pendiente` | GET | Auth + token + user_id check | Clasificación pendiente para deep link |
+| `/api/cron/eliminar-cuentas` | GET | Bearer CRON_SECRET | Purga cuentas tras 7 días de gracia |
+| `/api/cron/refresh-benchmarks` | GET | Bearer CRON_SECRET | Refresca vistas materializadas + limpia expirados |
+
+**NOTA**: El middleware excluye `/api/*` del flujo de autenticación. Las rutas API implementan su propia auth internamente.
+
+### Server Actions (25 archivos, ~120 funciones)
+
+| Archivo | Funciones Exported | Protección |
+|---|---|---|
+| `facturas.ts` | `obtenerSiguienteNumeroFactura`, `crearFacturaBorrador`, `aprobarFactura`, `anularFactura`, `obtenerFactura`, `listarFacturas`, `marcarComoDescargada`, `editarFacturaBorrador` | Auth (getUser / getContextoOrg) |
+| `clasificacion.ts` | `clasificarTextoMedico`, `obtenerHistorialAuditorias`, `buscarPacientePorCedula` | Auth + límite suscripción |
+| `dian.ts` | `enviarFacturaDian`, `consultarEstadoDian`, `descargarXmlFirmado`, `descargarPdfDian` | Auth |
+| `fev.ts` | `generarFevXml` | Auth |
+| `rips.ts` | `generarJsonRipsMVP` | Auth |
+| `muv.ts` | `validarRipsYObtenerCuv`, `guardarCredencialesMuv`, `obtenerCredencialesMuv`, `tieneCredencialesMuv` | Auth |
+| `glosas.ts` | `obtenerMisPendientes`, `validarFacturaPorId`, `obtenerFacturasPendientesValidacion`, `obtenerHistorialValidaciones` | Auth |
+| `respuesta-glosas.ts` | `obtenerGlosasRecibidas`, `obtenerGlosaPorId`, `registrarRespuestaGlosa`, `obtenerHistorialRespuestas`, `obtenerResumenGlosasRecibidas`, `sugerirRespuestaParaGlosa`, `registrarGlosaRecibida`, `obtenerFacturaDeGlosa`, `obtenerFacturasParaGlosas`, `subirSoporteGlosa` | Auth |
+| `perfil.ts` | `obtenerPerfil`, `guardarPerfil`, `verificarOnboarding`, `obtenerResolucionActiva`, `guardarResolucion`, `obtenerResoluciones`, `activarResolucion`, `obtenerConsentimientoDatos`, `toggleConsentimientoDatos` | Auth |
+| `pacientes.ts` | `buscarPacientePorDocumento`, `guardarPaciente`, `listarPacientes`, `obtenerHistorialPaciente` | Auth |
+| `pagos.ts` | `registrarPago`, `listarPagosPorFactura`, `obtenerCarteraPendiente`, `obtenerKPICartera`, `listarEPSUsuario`, `obtenerAlertasCartera` | Auth |
+| `dashboard.ts` | `obtenerKPIsDashboard`, `obtenerFacturacionMensual`, `obtenerDistribucionEPS`, `obtenerItemsAtencion`, `obtenerBadgesSidebar` | Auth |
+| `acuerdos.ts` | `obtenerAcuerdos`, `obtenerAcuerdoConTarifas`, `guardarAcuerdo`, `guardarTarifasAcuerdo`, `eliminarAcuerdo` | Auth |
+| `tarifas.ts` | `guardarTarifaUsuario`, `obtenerTarifasUsuario`, `eliminarTarifaUsuario`, `buscarCupsParaTarifa`, `buscarTarifaProcedimiento` | Auth |
+| `conciliacion.ts` | `parsearSabana`, `mapearYConciliar`, `reconciliarConMapeoManual`, `confirmarConciliacion`, `listarImportaciones` | Auth |
+| `radicacion.ts` | `generarPaqueteDescarga`, `radicarFactura`, `obtenerEmailRadicacion`, `radicarPorEmail` | Auth |
+| `billing.ts` | `obtenerInfoBilling`, `obtenerPlanesDisponibles`, `iniciarCheckout`, `cambiarPlan`, `cancelarSuscripcion` | Auth (getContextoOrg) |
+| `equipo.ts` | `listarMiembros`, `invitarUsuario`, `cambiarRolMiembro`, `desactivarMiembro`, `aceptarInvitacion`, `cancelarInvitacion` | Auth + RBAC |
+| `busqueda-codigos.ts` | `buscarCie10Action`, `buscarCie10PorCodigoAction`, `buscarCupsAction`, `buscarCupsPorCodigoAction` | Auth |
+| `cuenta.ts` | `programarEliminacionCuenta`, `cancelarEliminacionCuenta`, `estadoEliminacionCuenta` | Auth |
+| `benchmarks.ts` | `obtenerBenchmarkEPS`, `obtenerTarifaReferencia`, `obtenerResumenBenchmarks` | Auth |
+| `admin.ts` | `obtenerMetricasGlobales`, `listarOrganizaciones`, `detalleOrganizacion`, `cambiarPlanOrg`, `suspenderOrg` | Auth + `requirePlatformAdmin()` |
+| `telegram-clasificacion.ts` | `clasificarAudioTelegram`, `buscarPacienteTelegram`, `guardarClasificacionPendiente` | Service role (webhook) |
+| `telegram-vinculacion.ts` | `generarCodigoVinculacion`, `obtenerEstadoVinculacion`, `desvincularTelegram` | Auth |
+| `login/actions.ts` | `iniciarSesion`, `registrarCuenta`, `cerrarSesion` | Rate limited por IP |
+
+### Rutas Potencialmente Huérfanas
+
+| Ruta | Observación |
+|---|---|
+| `/configuracion/page.tsx` | Página raíz de configuración — probablemente redirige a subpáginas |
+| `/ayuda/layout.tsx` + subpáginas | Centro de ayuda con 6 secciones — funcional pero ¿enlazado desde la UI? |
+| `actions/index.ts` | Re-exporta pero **no incluye** todos los actions (falta `dian.ts`, `muv.ts`, `billing.ts`, `equipo.ts`, `admin.ts`, `cuenta.ts`, `benchmarks.ts`, `conciliacion.ts`, `pagos.ts`, `telegram-*.ts`) |
+
+---
+
+## 0.3 — MODELO DE DATOS COMPLETO
+
+### Tablas del Sistema
+
+#### 1. `perfiles` — Perfil del prestador médico
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | = auth.users.id |
+| user_id | UUID | FK → auth.users | Dueño |
+| organizacion_id | UUID | FK → organizaciones | Org asociada |
+| tipo_documento | TEXT | | CC, NIT, CE, etc. |
+| numero_documento | TEXT | | Número de documento |
+| digito_verificacion | TEXT | | DV para NIT |
+| razon_social | TEXT | | Razón social |
+| nombre_comercial | TEXT | | Nombre comercial |
+| codigo_habilitacion | TEXT | | Código de habilitación en salud |
+| tipo_prestador | TEXT | CHECK IN (profesional_independiente, clinica) | |
+| direccion | TEXT | | |
+| municipio_codigo/nombre | TEXT | | DIVIPOLA |
+| departamento_codigo/nombre | TEXT | | DIVIPOLA |
+| telefono | TEXT | | |
+| email_facturacion | TEXT | | |
+| responsable_iva | BOOLEAN | | |
+| regimen_fiscal | TEXT | CHECK IN (simplificado, comun, no_responsable) | |
+| especialidad_principal | TEXT | | |
+| registro_medico | TEXT | | |
+| logo_url | TEXT | | |
+| onboarding_completo | BOOLEAN | | Controla acceso a la app |
+| eliminacion_programada_at | TIMESTAMPTZ | nullable | Soft delete con 7d gracia |
+| created_at/updated_at | TIMESTAMPTZ | | |
+| **RLS**: SELECT/INSERT/UPDATE por `auth.uid() = user_id` | | | |
+
+#### 2. `resoluciones_facturacion` — Resoluciones DIAN para numeración
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | FK → auth.users | |
+| organizacion_id | UUID | FK → organizaciones | |
+| numero_resolucion | TEXT | | |
+| fecha_resolucion | TEXT | | |
+| prefijo | TEXT | | Prefijo de factura (ej: "FEV") |
+| rango_desde/hasta | INT | | Rango autorizado por DIAN |
+| consecutivo_actual | INT | | Último consecutivo usado |
+| fecha_vigencia_desde/hasta | TEXT | | Vigencia de la resolución |
+| clave_tecnica | TEXT | nullable | Para CUFE |
+| activa | BOOLEAN | | Solo una activa por usuario |
+| created_at | TIMESTAMPTZ | | |
+| **RLS**: SELECT/INSERT/UPDATE por `auth.uid() = user_id` | | | |
+
+#### 3. `facturas` — Facturas electrónicas
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | NOT NULL | Prestador dueño |
+| organizacion_id | UUID | FK → organizaciones | |
+| num_factura | TEXT | UNIQUE | Número de factura |
+| num_fev | TEXT | | Número FEV |
+| nit_prestador | TEXT | NOT NULL | |
+| nit_erp | TEXT | NOT NULL | NIT de la EPS |
+| fecha_expedicion | TIMESTAMPTZ | NOT NULL | |
+| fecha_radicacion | TIMESTAMPTZ | | |
+| fecha_limite_rad | TIMESTAMPTZ | | +22 días hábiles |
+| valor_total | NUMERIC(18,2) | DEFAULT 0 | |
+| valor_glosado | NUMERIC(18,2) | DEFAULT 0 | |
+| valor_aceptado | NUMERIC(18,2) | DEFAULT 0 | |
+| estado | TEXT | CHECK IN (borrador, aprobada, descargada, anulada, radicada, devuelta, glosada, respondida, conciliada, pagada, pagada_parcial) | |
+| subtotal | NUMERIC(18,2) | | |
+| copago | NUMERIC(18,2) | | |
+| cuota_moderadora | NUMERIC(18,2) | | |
+| descuentos | NUMERIC(18,2) | | |
+| diagnosticos | JSONB | DEFAULT '[]' | Array de {codigo_cie10, descripcion, rol} |
+| procedimientos | JSONB | DEFAULT '[]' | Array de {codigo_cups, descripcion, cantidad, valor_unitario} |
+| paciente_id | UUID | FK → pacientes | |
+| resolucion_id | UUID | | |
+| perfil_prestador_snapshot | JSONB | | Snapshot del perfil al momento |
+| fev_rips_json | JSONB | | JSON completo Res. 2275 |
+| metadata | JSONB | DEFAULT '{}' | eps_nombre, atencion, nota_clinica_original, etc. |
+| cufe | TEXT | | Código Único Facturación Electrónica |
+| estado_dian | TEXT | CHECK IN (NULL, pendiente, enviada, aceptada, rechazada) | |
+| track_id_dian | TEXT | | Track ID de Matias/DIAN |
+| fecha_envio_dian | TIMESTAMPTZ | | |
+| respuesta_dian_json | JSONB | | |
+| cuv | TEXT | | Código Único Validación (MUV) |
+| estado_muv | TEXT | CHECK IN (NULL, pendiente, validando, validado, rechazado) | |
+| fecha_envio_muv | TIMESTAMPTZ | | |
+| respuesta_muv_json | JSONB | | |
+| created_at/updated_at | TIMESTAMPTZ | | |
+| **RLS**: SELECT/INSERT/UPDATE por `auth.uid() = user_id` | | | |
+| **Índices**: user_id, estado, nit_erp, fecha_expedicion+fecha_radicacion, organizacion_id, estado_dian, cufe, track_id_dian, cuv, estado_muv | | | |
+
+#### 4. `pacientes` — Pacientes registrados
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | FK → auth.users | |
+| organizacion_id | UUID | FK → organizaciones | |
+| tipo_documento | TEXT | | CC, TI, RC, CE, PA, etc. |
+| numero_documento | TEXT | | |
+| primer_nombre/segundo_nombre | TEXT | | |
+| primer_apellido/segundo_apellido | TEXT | | |
+| fecha_nacimiento | TEXT | nullable | YYYY-MM-DD |
+| sexo | TEXT | nullable | M, F, I |
+| tipo_usuario | TEXT | nullable | 01-08 según régimen |
+| eps_codigo/eps_nombre | TEXT | nullable | |
+| zona_territorial | TEXT | | |
+| municipio/departamento | TEXT | nullable | DIVIPOLA |
+| telefono/email/direccion | TEXT | nullable | |
+| activo | BOOLEAN | | |
+| created_at/updated_at | TIMESTAMPTZ | | |
+| **RLS**: SELECT/INSERT/UPDATE por `auth.uid() = user_id` | | | |
+
+#### 5. `catalogo_causales_glosa` — Catálogo normativo (público/inmutable)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| tipo | TEXT | CHECK IN (devolucion, glosa) | |
+| concepto | TEXT | | FA, TA, SO, AU, PE, SC, DE |
+| concepto_desc | TEXT | | |
+| codigo | TEXT | UNIQUE | Ej: FA0101, DE5601 |
+| descripcion | TEXT | | |
+| codigo_padre | TEXT | FK → self(codigo) | Jerarquía |
+| afecta | TEXT | CHECK IN (total, parcial) | |
+| capa_medibill | SMALLINT | CHECK 1-3 | |
+| prevenible | BOOLEAN | DEFAULT true | |
+| accion_medibill | TEXT | | |
+| notas | TEXT | | |
+| **RLS**: DESHABILITADO — datos normativos públicos | | | |
+
+#### 6. `acuerdos_voluntades` — Contratos IPS ↔ EPS
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| prestador_id | UUID | NOT NULL | = user.id del prestador |
+| organizacion_id | UUID | FK → organizaciones | |
+| eps_codigo | TEXT | NOT NULL | NIT de la EPS |
+| nombre_eps | TEXT | | |
+| fecha_inicio/fin | DATE | NOT NULL | Vigencia |
+| requiere_autorizacion | BOOLEAN | DEFAULT true | |
+| tarifario_base | TEXT | DEFAULT 'SOAT' | SOAT, ISS, propio |
+| porcentaje_sobre_base | NUMERIC(6,2) | DEFAULT 100 | |
+| email_radicacion | TEXT | | Email EPS para radicación automática |
+| observaciones | TEXT | | |
+| activo | BOOLEAN | DEFAULT true | |
+| created_at/updated_at | TIMESTAMPTZ | | |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `auth.uid() = prestador_id` | | | |
+
+#### 7. `acuerdo_tarifas` — Tarifas por CUPS en cada acuerdo
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| acuerdo_id | UUID | FK → acuerdos_voluntades CASCADE | |
+| cups_codigo | TEXT | | |
+| valor_pactado | NUMERIC(18,2) | NOT NULL | |
+| incluye_honorarios/materiales | BOOLEAN | | |
+| es_paquete | BOOLEAN | DEFAULT false | |
+| servicios_incluidos_paquete | TEXT[] | | Array de CUPS si es paquete |
+| observaciones | TEXT | | |
+| **RLS**: Transitiva vía acuerdos_voluntades (prestador_id) | | | |
+| **UNIQUE**: (acuerdo_id, cups_codigo) | | | |
+
+#### 8. `reglas_coherencia` — Reglas de validación dx↔procedimiento (público)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| tipo | TEXT | CHECK IN (sexo_diagnostico, sexo_procedimiento, edad_diagnostico, diagnostico_procedimiento) | |
+| codigo_referencia | TEXT | | CIE-10 o CUPS |
+| condicion | JSONB | | {"sexo":"F"} o {"edad_min":0,"edad_max":14} |
+| mensaje_error | TEXT | | |
+| severidad | TEXT | CHECK IN (error, warning) | |
+| activo | BOOLEAN | DEFAULT true | |
+| **RLS**: DESHABILITADO — datos normativos públicos | | | |
+
+#### 9. `glosas` — Glosas (schema original, posiblemente legacy)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| factura_id | UUID | FK → facturas CASCADE | |
+| codigo_causal | TEXT | FK → catalogo_causales_glosa(codigo) | |
+| tipo | TEXT | CHECK IN (devolucion, glosa) | |
+| descripcion_erp | TEXT | | Texto libre de la EPS |
+| valor_glosado | NUMERIC(18,2) | DEFAULT 0 | |
+| cups_afectado/cie10_afectado | TEXT | | |
+| num_autorizacion | TEXT | | |
+| fecha_servicio | DATE | | |
+| fecha_formulacion/fecha_limite_resp | TIMESTAMPTZ | | |
+| capa_medibill | SMALLINT | CHECK 1-3 | |
+| prevenible | BOOLEAN | DEFAULT true | |
+| sugerencia_auto | TEXT | | |
+| estado | TEXT | CHECK IN (pendiente, en_revision, respondida, aceptada, rechazada_erp, conciliada) | |
+| metadata | JSONB | DEFAULT '{}' | |
+| **RLS**: SELECT/INSERT transitiva vía facturas (user_id) | | | |
+
+#### 10. `glosas_recibidas` — Glosas recibidas (tabla activa usada por el código)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| Estructura similar a `glosas` pero con columnas adicionales | | | |
+| user_id | UUID | FK → auth.users, NOT NULL | Backfilled desde facturas |
+| eps_codigo | TEXT | | Para benchmarks |
+| codigo_glosa | TEXT | | Para benchmarks |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `auth.uid() = user_id` | | | |
+| **NOTA**: Creada fuera de schema-glosas.sql (posiblemente en Supabase Dashboard) | | | |
+
+#### 11. `respuestas_glosas` — Respuestas del prestador a glosas
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| glosa_id | UUID | FK → glosas_recibidas | |
+| user_id | UUID | FK → auth.users, NOT NULL | |
+| codigo_respuesta | VARCHAR(4) | CHECK IN (RS01-RS05) | |
+| justificacion | TEXT | | |
+| fundamento_legal | TEXT | | |
+| valor_aceptado/controvertido/nota_credito | NUMERIC(15,2) | | |
+| soportes | JSONB | DEFAULT '[]' | Array de {nombre, tipo, url?} |
+| origen_respuesta | VARCHAR(15) | CHECK IN (manual, automatica, ia) | |
+| numero_registro_respuesta | TEXT | | |
+| fecha_respuesta | DATE | DEFAULT CURRENT_DATE | |
+| **RLS**: SELECT/INSERT/UPDATE por `auth.uid() = user_id` | | | |
+
+#### 12. `validaciones_pre_radicacion` — Hallazgos del validador
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| factura_id | UUID | FK → facturas CASCADE | |
+| codigo_causal | TEXT | FK → catalogo_causales_glosa(codigo) | |
+| severidad | TEXT | CHECK IN (error, advertencia, info) | |
+| mensaje | TEXT | | |
+| campo_afectado/valor_encontrado/valor_esperado | TEXT | | |
+| resuelta | BOOLEAN | DEFAULT false | |
+| resuelta_en | TIMESTAMPTZ | | |
+| resuelta_por | UUID | | |
+| **RLS**: SELECT/INSERT/DELETE transitiva vía facturas (user_id) | | | |
+
+#### 13. `auditoria_plazos` — Control de plazos legales
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| entidad | TEXT | CHECK IN (factura, glosa, respuesta) | |
+| entidad_id | UUID | | ID polimórfico |
+| tipo_plazo | TEXT | CHECK IN (radicacion_soportes, devolucion_erp, formulacion_glosa, respuesta_prestador, decision_erp) | |
+| fecha_inicio/limite | TIMESTAMPTZ | | |
+| dias_habiles_total/rest | SMALLINT | | |
+| alerta_enviada/vencido/silencio_admin | BOOLEAN | | |
+| consecuencia_silencio | TEXT | | 'prestador' o 'erp' |
+| **RLS**: SELECT/INSERT con resolución polimórfica (factura→glosa→respuesta) | | | |
+
+#### 14. `pagos` — Pagos recibidos por facturas
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| factura_id | UUID | FK → facturas CASCADE | |
+| user_id | UUID | FK → auth.users CASCADE | |
+| monto | NUMERIC(18,2) | CHECK > 0 | |
+| fecha_pago | DATE | DEFAULT CURRENT_DATE | |
+| metodo_pago | TEXT | CHECK IN (transferencia, cheque, efectivo, consignacion, compensacion, otro) | |
+| referencia/notas | TEXT | | |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `auth.uid() = user_id` | | | |
+
+#### 15. `autorizaciones` — Autorizaciones de EPS
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | FK → auth.users CASCADE | |
+| factura_id | UUID | FK → facturas, nullable | |
+| numero_autorizacion | TEXT | NOT NULL | |
+| eps_nit | TEXT | NOT NULL | |
+| fecha_desde/hasta | DATE | NOT NULL | |
+| estado | TEXT | CHECK IN (vigente, vencida, anulada) | |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `auth.uid() = user_id` | | | |
+
+#### 16. `servicios_medico` — Tarifas personalizadas por CUPS
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| (inferido del código) usuario_id | UUID | FK → auth.users | |
+| codigo/descripcion | TEXT | | CUPS |
+| valor | NUMERIC | | Tarifa personalizada |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `auth.uid() = usuario_id` | | | |
+
+#### 17. `auditorias_rips` — Historial de clasificaciones IA
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| user_id | UUID | FK → auth.users | |
+| organizacion_id | UUID | FK → organizaciones | |
+| (otros campos de auditoría) | | | |
+| **RLS**: SELECT/INSERT por `auth.uid() = user_id` (inmutable) | | | |
+
+#### 18. `audit_log` — Log de auditoría del sistema
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID o BIGINT | PK | Dos schemas posibles (migration vs schema) |
+| user_id | UUID | NOT NULL | |
+| accion / action | TEXT | NOT NULL | 'crear_factura', 'aprobar_factura', etc. |
+| tabla | TEXT | | 'facturas', 'acuerdos_voluntades', etc. |
+| registro_id | UUID | nullable | |
+| metadata | JSONB | DEFAULT '{}' | |
+| created_at | TIMESTAMPTZ | DEFAULT now() | |
+| **RLS**: SELECT/INSERT por `auth.uid() = user_id` (inmutable, no UPDATE/DELETE) | | | |
+
+#### 19. `rate_limits` — Rate limiting distribuido (tabla de soporte)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| key | TEXT | PK | Identificador del rate limit |
+| hit_count | INTEGER | DEFAULT 1 | |
+| window_start | TIMESTAMPTZ | DEFAULT NOW() | |
+| **RLS**: Habilitado SIN políticas (acceso solo vía RPC SECURITY DEFINER) | | | |
+
+### Tablas de Suscripciones y Multi-Tenancy
+
+#### 20. `organizaciones` — Tenant principal
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| nombre | TEXT | NOT NULL | |
+| nit | TEXT | | |
+| tipo | TEXT | CHECK IN (independiente, clinica) | |
+| logo_url | TEXT | | |
+| email_billing | TEXT | NOT NULL | |
+| wompi_customer_id | TEXT | UNIQUE | |
+| wompi_payment_source | TEXT | | Token tarjeta tokenizada |
+| max_usuarios | INT | DEFAULT 1 | |
+| max_clasificaciones | INT | nullable (NULL = ilimitado) | |
+| max_facturas_dian | INT | nullable | |
+| storage_gb | NUMERIC(6,2) | DEFAULT 1 | |
+| compartir_datos_anonimos | BOOLEAN | DEFAULT false | Opt-in benchmarks |
+| **RLS**: SELECT/UPDATE por `get_user_org_id()` | | | |
+
+#### 21. `planes` — Catálogo de planes (público)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | TEXT | PK | starter, profesional, clinica |
+| nombre | TEXT | | |
+| precio_cop_mensual/anual | NUMERIC(12,2) | | |
+| max_usuarios | INT | DEFAULT 1 | |
+| max_clasificaciones/facturas_dian | INT | nullable | |
+| storage_gb | NUMERIC(6,2) | DEFAULT 1 | |
+| bot_telegram | BOOLEAN | DEFAULT false | |
+| ia_sugerencias_glosas | BOOLEAN | | |
+| importacion_sabana/masiva | BOOLEAN | | |
+| soporte_nivel | TEXT | CHECK IN (email, email_chat, prioritario, dedicado) | |
+| activo | BOOLEAN | DEFAULT true | |
+| **RLS**: SELECT público (true) | | | |
+
+#### 22. `suscripciones` — Una por organización
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| organizacion_id | UUID | UNIQUE, FK → organizaciones CASCADE | |
+| plan_id | TEXT | FK → planes | |
+| estado | TEXT | CHECK IN (trialing, active, past_due, canceled, paused, incomplete) | |
+| periodo | TEXT | CHECK IN (mensual, anual) | |
+| wompi_subscription_id | TEXT | UNIQUE | |
+| trial_inicio/fin | TIMESTAMPTZ | | |
+| periodo_actual_inicio/fin | TIMESTAMPTZ | | |
+| cancelada_al_final | BOOLEAN | DEFAULT false | |
+| cantidad_seats | INT | DEFAULT 1 | |
+| **RLS**: SELECT por `get_user_org_id()`, UPDATE solo owner | | | |
+
+#### 23. `usuarios_organizacion` — Relación user ↔ org
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| organizacion_id | UUID | FK → organizaciones CASCADE | |
+| user_id | UUID | FK → auth.users CASCADE | |
+| rol | TEXT | CHECK IN (owner, admin, doctor, facturador, auditor) | |
+| activo | BOOLEAN | DEFAULT true | |
+| invitado_por | UUID | FK → auth.users | |
+| invitado_email | TEXT | | |
+| accepted_at | TIMESTAMPTZ | | |
+| **UNIQUE**: (organizacion_id, user_id) | | | |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `get_user_org_id()` (manage requiere admin+) | | | |
+
+#### 24. `invitaciones` — Invitaciones pendientes
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| organizacion_id | UUID | FK → organizaciones CASCADE | |
+| email | TEXT | | |
+| rol | TEXT | DEFAULT 'doctor' | |
+| token | TEXT | UNIQUE | |
+| invitado_por | UUID | FK → auth.users | |
+| expira_at | TIMESTAMPTZ | DEFAULT now() + 7 days | |
+| usado | BOOLEAN | DEFAULT false | |
+| **UNIQUE**: (organizacion_id, email) | | | |
+| **RLS**: SELECT/INSERT por `get_user_org_id()` (insert requiere admin+) | | | |
+
+#### 25. `uso_mensual` — Tracking de límites
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| organizacion_id | UUID | FK → organizaciones CASCADE | |
+| periodo | TEXT | 'YYYY-MM' | |
+| clasificaciones_ia | INT | DEFAULT 0 | |
+| facturas_dian | INT | DEFAULT 0 | |
+| storage_usado_mb | NUMERIC(12,2) | DEFAULT 0 | |
+| usuarios_activos | INT | DEFAULT 0 | |
+| facturas_adicionales | INT | DEFAULT 0 | |
+| costo_adicional_cop | NUMERIC(12,2) | DEFAULT 0 | |
+| **UNIQUE**: (organizacion_id, periodo) | | | |
+| **RLS**: SELECT por `get_user_org_id()` | | | |
+
+#### 26. `historial_pagos` — Transacciones Wompi (suscripción, NO pagos EPS)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| organizacion_id | UUID | FK → organizaciones CASCADE | |
+| wompi_transaction_id | TEXT | UNIQUE | |
+| monto_cop | NUMERIC(12,2) | | |
+| estado | TEXT | CHECK IN (paid, pending, declined, voided, error) | |
+| descripcion/periodo | TEXT | | |
+| fecha_pago | TIMESTAMPTZ | | |
+| metodo_pago | TEXT | card, pse, nequi | |
+| **RLS**: SELECT por `get_user_org_id()` | | | |
+
+#### 27. `platform_admins` — Super admins de la plataforma
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| user_id | UUID | PK, FK → auth.users CASCADE | |
+| created_at | TIMESTAMPTZ | | |
+| **RLS**: DESHABILITADO — acceso solo vía service role key | | | |
+
+### Tablas de Telegram (Fase 2)
+
+#### 28. `telegram_vinculaciones`
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| telegram_user_id | BIGINT | UNIQUE | |
+| user_id | UUID | FK → auth.users CASCADE | |
+| telegram_username | TEXT | | |
+| activo | BOOLEAN | DEFAULT true | |
+| **RLS**: SELECT/DELETE por `auth.uid() = user_id` | | | |
+
+#### 29. `telegram_codigos_vinculacion` — Códigos temporales (10 min TTL)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| codigo | TEXT | PK | 6 dígitos |
+| user_id | UUID | FK → auth.users CASCADE | |
+| expira_at | TIMESTAMPTZ | | |
+| usado | BOOLEAN | DEFAULT false | |
+| **RLS**: SELECT/INSERT por `auth.uid() = user_id` | | | |
+
+#### 30. `clasificaciones_pendientes` — Deep link clasif. (1h TTL)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| token | TEXT | UNIQUE | |
+| user_id | UUID | nullable | |
+| telegram_user_id | BIGINT | | |
+| resultado_json | JSONB | NOT NULL | Clasificación completa |
+| texto_transcrito | TEXT | | |
+| documento_paciente | TEXT | | |
+| paciente_encontrado | BOOLEAN | DEFAULT false | |
+| datos_paciente | JSONB | | |
+| expira_at | TIMESTAMPTZ | | |
+| **RLS**: SELECT por `auth.uid() = user_id` | | | |
+
+#### 31. `telegram_uso_anonimo` — Uso sin cuenta (3 gratis)
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| telegram_user_id | BIGINT | PK | |
+| clasificaciones_usadas | INT | DEFAULT 0 | |
+| primera_uso | TIMESTAMPTZ | DEFAULT now() | |
+| **RLS**: Habilitado (acceso vía service role) | | | |
+
+### Tablas de Conciliación/Sábana
+
+#### 32. `mapeos_sabana_eps` — Cache de mapeos de columnas
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | FK → auth.users CASCADE | |
+| nit_eps | TEXT | | |
+| eps_nombre | TEXT | | |
+| headers_hash | TEXT | | Hash del header del Excel |
+| mapeo_json | JSONB | | Mapeo de columnas |
+| confianza | NUMERIC(3,2) | | |
+| veces_usado | INTEGER | DEFAULT 1 | |
+| **UNIQUE**: (user_id, nit_eps, headers_hash) | | | |
+| **RLS**: SELECT/INSERT/UPDATE/DELETE por `auth.uid() = user_id` | | | |
+
+#### 33. `importaciones_sabana` — Historial de importaciones
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | FK → auth.users CASCADE | |
+| nit_eps/eps_nombre | TEXT | | |
+| nombre_archivo | TEXT | | |
+| total_filas/filas_conciliadas/filas_sin_match | INT | | |
+| monto_total_importado/glosado | NUMERIC(18,2) | | |
+| estado | TEXT | CHECK IN (pendiente, confirmada, cancelada) | |
+| mapeo_usado_id | UUID | FK → mapeos_sabana_eps | |
+| resumen_json | JSONB | | |
+| **RLS**: SELECT/INSERT/UPDATE por `auth.uid() = user_id` | | | |
+
+#### 34. `credenciales_muv` — Credenciales MUV encriptadas
+| Columna | Tipo | Constraints | Descripción |
+|---|---|---|---|
+| id | UUID | PK | |
+| user_id | UUID | UNIQUE, FK → auth.users CASCADE | |
+| organizacion_id | UUID | FK → organizaciones CASCADE | |
+| tipo_usuario | TEXT | DEFAULT '02' | |
+| tipo_identificacion | TEXT | DEFAULT 'NIT' | |
+| numero_identificacion | TEXT | | |
+| contrasena_encrypted | TEXT | | AES-256-GCM |
+| nit_prestador | TEXT | | |
+| activo | BOOLEAN | DEFAULT true | |
+| **RLS**: ALL por `auth.uid() = user_id` | | | |
+
+### Vistas Materializadas (Benchmarks — Fase 3)
+
+| Vista | Descripción | Privacidad |
+|---|---|---|
+| `mv_tasa_glosa_por_eps` | Tasa de glosa % por EPS | Mínimo 3 orgs con `compartir_datos_anonimos=true` |
+| `mv_dias_pago_por_eps` | Promedio/mediana/p90 días de pago por EPS | Mínimo 3 orgs |
+| `mv_causales_frecuentes` | Causales más frecuentes por EPS | Mínimo 3 orgs |
+| `mv_tarifa_real_por_cups` | Tarifa promedio/min/max por CUPS y EPS | Mínimo 3 orgs |
+
+### Funciones SQL Relevantes
+
+| Función | Tipo | Descripción |
+|---|---|---|
+| `dias_habiles(fecha_ini, fecha_fin)` | IMMUTABLE | Calcula días hábiles entre fechas |
+| `sumar_dias_habiles(fecha_ini, n)` | IMMUTABLE | Suma N días hábiles |
+| `dias_habiles_entre(fecha_inicio, fecha_fin)` | IMMUTABLE | Variante (excl. sáb/dom) |
+| `siguiente_numero_factura(p_user_id)` | SECURITY DEFINER | Asigna consecutivo atómico (race condition fix) |
+| `get_user_org_id()` | SECURITY DEFINER STABLE | Obtiene org_id del usuario actual |
+| `user_has_role(required_role)` | SECURITY DEFINER STABLE | Verifica jerarquía de roles |
+| `incrementar_uso_mensual(org, periodo, campo)` | SECURITY DEFINER | Incremento atómico de uso |
+| `check_rate_limit(key, max, window_ms)` | SECURITY DEFINER | Rate limiting atómico |
+| `cleanup_rate_limits()` | SECURITY DEFINER | Limpieza de entradas expiradas |
+| `refresh_benchmark_views()` | SECURITY DEFINER | Refresca las 4 vistas materializadas |
+
+### Supabase Storage
+
+| Bucket | Público | Límite Tamaño | MIME Types | RLS |
+|---|---|---|---|---|
+| `soportes-glosas` | No | 10 MB | PDF, JPEG, PNG | Por `{user_id}/` en path |
+
+### Tablas / Columnas Potencialmente No Usadas
+
+| Tabla/Columna | Observación |
+|---|---|
+| `glosas` (tabla original) | El código usa `glosas_recibidas` en su lugar. La tabla `glosas` del schema-glosas.sql puede estar obsoleta |
+| `respuestas_glosa` (tabla original del schema) | Borrada y reemplazada por `respuestas_glosas` (migración migration-respuestas-glosas.sql) |
+| `facturas.num_fev` | Columna definida pero no se ve uso claro en el código |
+| `facturas.valor_glosado` / `valor_aceptado` | Definidas en schema pero podrían no estar sincronizadas activamente |
+| `auditoria_plazos.glosa_id` | Referenciado en policy original pero no definido como columna — usa `entidad_id` polimórfico |
+
+### FK Faltantes o Gaps
+
+| Relación | Estado |
+|---|---|
+| `facturas.user_id` → `auth.users(id)` | Definida en schema como NOT NULL pero sin FK constraint explícito |
+| `facturas.resolucion_id` → `resoluciones_facturacion(id)` | Columna agregada vía migración sin FK explícito |
+| `glosas_recibidas` → Definición completa de tabla | No hay CREATE TABLE en los archivos de schema — creada externamente |
+| `auditorias_rips` → Definición completa de tabla | No hay CREATE TABLE en los archivos de schema — creada externamente |
+| `servicios_medico` → Definición completa de tabla | No hay CREATE TABLE en los archivos de schema — creada externamente |
+
+---
+
+## 0.4 — MAPA DE ROLES Y PERMISOS
+
+### Modelo de Roles
+
+El sistema tiene **dos niveles** de roles:
+
+1. **Roles de organización** (RBAC): `owner`, `admin`, `doctor`, `facturador`, `auditor`
+2. **Platform admin**: Super-admin global (tabla separada `platform_admins`)
+
+### Jerarquía de Roles
+platform_admin (super-admin global, tabla separada)
+└── owner (dueño de la organización)
+└── admin (administrador de la organización)
+├── doctor (médico)
+├── facturador (personal de facturación)
+└── auditor (solo lectura + responder glosas)
+
+### Permisos por Acción (RBAC — `lib/permisos.ts`)
+
+| Acción | owner | admin | doctor | facturador | auditor |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `ver_dashboard` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `clasificar_ia` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `ver_facturas` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `crear_factura` | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `aprobar_factura` | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `enviar_dian` | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `anular_factura` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `ver_glosas` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `responder_glosa` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `gestionar_acuerdos` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `config_organizacion` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `gestionar_equipo` | ✅ | ✅ | ❌ | ❌ | ❌ |
+| `gestionar_billing` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `importar_sabana` | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `importar_rips` | ✅ | ✅ | ❌ | ✅ | ❌ |
+
+### Permisos Platform Admin
+
+| Acción | Protección | Descripción |
+|---|---|---|
+| `/admin/*` | Middleware check `platform_admins` table, cookie cache 5min | Solo platform admins |
+| `obtenerMetricasGlobales()` | `requirePlatformAdmin()` | Métricas globales de la plataforma |
+| `listarOrganizaciones()` | `requirePlatformAdmin()` | Lista todas las orgs |
+| `detalleOrganizacion()` | `requirePlatformAdmin()` | Detalle de cualquier org |
+| `cambiarPlanOrg()` | `requirePlatformAdmin()` | Cambiar plan de una org |
+| `suspenderOrg()` | `requirePlatformAdmin()` | Suspender organización |
+
+### RLS Policies — Resumen por Tabla
+
+| Tabla | RLS | SELECT | INSERT | UPDATE | DELETE | Notas |
+|---|:---:|:---:|:---:|:---:|:---:|---|
+| perfiles | ✅ | user_id | user_id | user_id | ❌ | |
+| resoluciones_facturacion | ✅ | user_id | user_id | user_id | ❌ | |
+| facturas | ✅ | user_id | user_id | user_id | ❌ | Sin DELETE policy |
+| pacientes | ✅ | user_id | user_id | user_id | ❌ | |
+| catalogo_causales_glosa | ❌ | Público | — | — | — | Datos normativos |
+| reglas_coherencia | ❌ | Público | — | — | — | Datos normativos |
+| acuerdos_voluntades | ✅ | prestador_id | prestador_id | prestador_id | prestador_id | |
+| acuerdo_tarifas | ✅ | Transitiva (acuerdo) | Transitiva | Transitiva | Transitiva | |
+| glosas | ✅ | Transitiva (factura) | Transitiva | ✅ (Fase 5) | ❌ | |
+| glosas_recibidas | ✅ | user_id | user_id | user_id | user_id | |
+| respuestas_glosas | ✅ | user_id | user_id | user_id | ❌ | |
+| validaciones_pre_radicacion | ✅ | Transitiva (factura) | Transitiva | ❌ | Transitiva | |
+| auditoria_plazos | ✅ | Polimórfica (entidad) | Polimórfica | ❌ | ❌ | |
+| pagos | ✅ | user_id | user_id | user_id | user_id | |
+| autorizaciones | ✅ | user_id | user_id | user_id | user_id | |
+| servicios_medico | ✅ | usuario_id | usuario_id | usuario_id | usuario_id | |
+| auditorias_rips | ✅ | user_id | user_id | ❌ | ❌ | Inmutable |
+| audit_log | ✅ | user_id | user_id | ❌ | ❌ | Inmutable |
+| rate_limits | ✅ | ❌ (sin políticas) | ❌ | ❌ | ❌ | Solo vía RPC |
+| organizaciones | ✅ | get_user_org_id() | ❌ | admin+ | ❌ | |
+| planes | ✅ | Público (true) | ❌ | ❌ | ❌ | Catálogo |
+| suscripciones | ✅ | get_user_org_id() | ❌ | owner | ❌ | |
+| usuarios_organizacion | ✅ | get_user_org_id() | admin+ | admin+ | admin+ | |
+| invitaciones | ✅ | get_user_org_id() | admin+ | ❌ | ❌ | |
+| uso_mensual | ✅ | get_user_org_id() | ❌ | ❌ | ❌ | Vía RPC |
+| historial_pagos | ✅ | get_user_org_id() | ❌ | ❌ | ❌ | |
+| platform_admins | ❌ | Service role only | — | — | — | |
+| telegram_vinculaciones | ✅ | user_id | ❌ | ❌ | user_id | |
+| telegram_codigos_vinculacion | ✅ | user_id | user_id | ❌ | ❌ | |
+| clasificaciones_pendientes | ✅ | user_id | ❌ | ❌ | ❌ | |
+| telegram_uso_anonimo | ✅ | ❌ | ❌ | ❌ | ❌ | Service role |
+| credenciales_muv | ✅ | user_id | user_id | user_id | user_id | ALL policy |
+| mapeos_sabana_eps | ✅ | user_id | user_id | user_id | user_id | |
+| importaciones_sabana | ✅ | user_id | user_id | user_id | ❌ | |
+| storage: soportes-glosas | ✅ | user_id path | user_id path | ❌ | user_id path | |
+
+### Flujo de Autenticación y Middleware
+Request → Middleware
+│
+├── /api/* → PASS (API routes manejan auth internamente)
+│
+├── No user + no /login + no /invitacion → REDIRECT /login
+│
+├── User con email NO confirmado → signOut + REDIRECT /login?email_no_confirmado
+│
+├── User en /login → REDIRECT /dashboard
+│
+├── User sin onboarding (cookie miss) → CHECK DB perfiles.onboarding_completo
+│ ├── No completo → REDIRECT /onboarding
+│ └── Completo → SET cookie + PASS
+│
+├── User en /admin/* → CHECK platform_admins table
+│ ├── No admin → REDIRECT /dashboard
+│ └── Es admin → SET cookie (5min TTL) + PASS
+│
+├── User con suscripción cancelada/unpaid → REDIRECT /configuracion/suscripcion
+│ (Excluye: /login, /onboarding, /api, /configuracion/suscripcion, /invitacion, /admin)
+│
+└── Todo ok → PASS
+
+### Resumen de Seguridad
+
+| Capa | Implementación |
+|---|---|
+| Autenticación | Supabase Auth (email/password, email confirmation required) |
+| Autorización de rutas | Middleware (Next.js) |
+| Autorización de datos | RLS (PostgreSQL) — `auth.uid()` + `get_user_org_id()` |
+| Autorización de acciones | RBAC (`lib/permisos.ts`) — `verificarPermisoOError()` en server actions |
+| Rate Limiting | Upstash Redis + fallback Supabase RPC (por IP para login, por user para API) |
+| CSRF | Next.js built-in (server actions) |
+| CSP | Headers en next.config.js (sin unsafe-eval) |
+| HSTS | Strict-Transport-Security con preload |
+| Frame Protection | X-Frame-Options: DENY + frame-ancestors: 'none' |
+| Input Sanitization | Prompt injection filter (AI helper) |
+| Encryption at rest | MUV credentials: AES-256-GCM |
+| Audit Logging | `audit_log` table para acciones críticas |
+| Error Monitoring | Sentry (client + server + edge) |
+This is the complete AUDIT_MAP.md based on exhaustive analysis of all configuration files, schemas, migrations, routes, actions, middleware, types, and lib modules. Key findings:
+
+34 database tables + 4 materialized views documented with RLS
+~30 pages + 8 API routes + ~120 server actions mapped
+5 RBAC roles + platform admin fully documented
+RLS gaps identified: facturas missing DELETE policy; glosas_recibidas, servicios_medico, auditorias_rips tables lack CREATE TABLE definitions in code (created externally); glosas table potentially obsolete
+FK gaps: facturas.user_id and facturas.resolucion_id lack explicit FK constraints
+actions/index.ts doesn't re-export 12 of 25 action files (billing, equipo, admin, cuenta, dian, muv, pagos, conciliacion, benchmarks, telegram-*)

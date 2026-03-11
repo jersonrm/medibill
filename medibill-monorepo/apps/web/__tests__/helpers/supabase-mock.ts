@@ -16,6 +16,7 @@ type MockResponse = { data: unknown; error: unknown; count?: number };
 type MockSupabaseClient = {
   auth: { getUser: Mock };
   from: Mock;
+  rpc: Mock;
 };
 
 type MockSupabaseModule = {

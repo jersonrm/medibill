@@ -7,7 +7,7 @@
 // ORGANIZACIÓN
 // =====================================================================
 
-export type TipoOrganizacion = "independiente" | "clinica";
+export type TipoOrganizacion = "independiente" | "clinica" | "ips";
 
 export interface Organizacion {
   id: string;

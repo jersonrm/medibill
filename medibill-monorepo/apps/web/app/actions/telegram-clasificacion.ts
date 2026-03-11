@@ -1,29 +1,11 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { createServerClient } from "@supabase/ssr";
-import { devLog, devWarn } from "@/lib/logger";
-import {
-  validarYCorregirCups,
-  validarYCorregirCie10,
-  validarCoherenciaAnatomica,
-  ordenarDiagnosticosPorRol,
-  anonimizarTextoMedico,
-} from "@/lib/validacion-medica";
-import { buscarContextoRAG, formatearCandidatosParaPrompt, type TerminoProcedimiento } from "@/lib/rag-service";
-import { getRagExtractorAI, getMedibillAI } from "@/lib/gemini";
+import { createServiceClient } from "@/lib/supabase-server";
+import { devLog } from "@/lib/logger";
+import { anonimizarTextoMedico } from "@/lib/validacion-medica";
+import { extraerTerminosRAG, clasificarConGemini, validarYEnriquecerResultado } from "@/lib/clasificacion-pipeline";
 import type { DiagnosticoIA, ProcedimientoIA } from "@/lib/types/validacion";
-
-/**
- * Crea un cliente Supabase con service role (para uso desde webhook, sin cookies)
- */
-function createServiceClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
-  );
-}
 
 // ==========================================
 // PIPELINE DE AUDIO — Telegram Bot
@@ -39,7 +21,7 @@ export async function clasificarAudioTelegram(
   mimeType: string,
   telegramUserId: number
 ): Promise<{
-  exito: boolean;
+  success: boolean;
   datos?: {
     texto_transcrito: string;
     documento_paciente: string | null;
@@ -96,113 +78,32 @@ Responde SIEMPRE en JSON con esta estructura exacta:
     const nombrePaciente = transcripcion.nombre_paciente || null;
 
     if (!textoTranscrito || textoTranscrito.length < 10) {
-      return { exito: false, error: "No pude entender el audio. Intentá con una nota más clara." };
+      return { success: false, error: "No pude entender el audio. Intentá con una nota más clara." };
     }
 
     devLog("Telegram:transcripción", `${textoTranscrito.substring(0, 100)}...`);
 
-    // 2. Clasificar el texto transcrito con el pipeline estándar
+    // 2. Clasificar usando el pipeline compartido
     const textoParaIA = anonimizarTextoMedico(textoTranscrito, nombrePaciente || undefined, documentoPaciente || undefined);
-
-    // RAG: extraer términos y buscar candidatos
-    let promptAugmentado = textoParaIA;
-    try {
-      const extractResult = await getRagExtractorAI().generateContent(textoParaIA);
-      const extractResponse = await extractResult.response;
-      const terminos = JSON.parse(extractResponse.text());
-
-      const terminosProcRaw: unknown[] = terminos.terminos_procedimientos || [];
-      const terminosProc: TerminoProcedimiento[] = terminosProcRaw.map((t: unknown) => {
-        if (typeof t === "string") {
-          return { termino: t, categoria: "otro" as const, negado: false };
-        }
-        const obj = t as Record<string, unknown>;
-        return {
-          termino: String(obj.termino || ""),
-          categoria: (obj.categoria as TerminoProcedimiento["categoria"]) || "otro",
-          negado: Boolean(obj.negado),
-          futuro: Boolean(obj.futuro),
-        };
-      });
-      const terminosDx: string[] = terminos.terminos_diagnosticos || [];
-
-      if (terminosProc.length > 0 || terminosDx.length > 0) {
-        const contexto = await buscarContextoRAG(terminosProc, terminosDx);
-        const candidatosTexto = formatearCandidatosParaPrompt(contexto);
-        promptAugmentado = `NOTA CLÍNICA:\n${textoParaIA}\n\n${candidatosTexto}`;
-      }
-    } catch (ragError) {
-      devWarn("Telegram RAG extraction failed", ragError);
-    }
-
-    // 3. Clasificar con Gemini (modelo medibillAI con schema)
-    const classResult = await getMedibillAI().generateContent(promptAugmentado);
-    const classResponse = await classResult.response;
-    const datos = JSON.parse(classResponse.text());
-
-    // 4. Validación y enriquecimiento (reusar pipeline existente)
-    if (datos.procedimientos && datos.procedimientos.length > 0) {
-      datos.procedimientos = datos.procedimientos.map((p: ProcedimientoIA) => ({
-        ...p,
-        descripcion_ia_original: p.descripcion,
-      }));
-      datos.procedimientos = await validarYCorregirCups(datos.procedimientos);
-    }
-
-    // Dedup consulta
-    if (datos.procedimientos?.length > 0 && datos.atencion?.codConsultaCups) {
-      const codConsulta = String(datos.atencion.codConsultaCups).replace(/[.\s-]/g, "");
-      datos.procedimientos = datos.procedimientos.filter(
-        (p: ProcedimientoIA) => String(p.codigo_cups).replace(/[.\s-]/g, "") !== codConsulta
-      );
-    }
-
-    if (datos.procedimientos?.length > 0) {
-      datos.procedimientos = await validarCoherenciaAnatomica(datos.procedimientos);
-    }
-
-    if (datos.diagnosticos?.length > 0) {
-      datos.diagnosticos = await validarYCorregirCie10(datos.diagnosticos);
-      datos.diagnosticos = ordenarDiagnosticosPorRol(datos.diagnosticos);
-    }
-
-    // Corregir diagnostico_asociado
-    if (datos.procedimientos?.length > 0 && datos.diagnosticos?.length > 0) {
-      const codigosDxValidos = new Set(
-        datos.diagnosticos.map((d: DiagnosticoIA) =>
-          String(d.codigo_cie10 || "").replace(/[.\s-]/g, "").toUpperCase()
-        )
-      );
-      const dxPrincipalCodigo = datos.diagnosticos[0]?.codigo_cie10?.replace(/[.\s-]/g, "").toUpperCase() || "";
-
-      datos.procedimientos = datos.procedimientos.map((proc: ProcedimientoIA) => {
-        const dxAsoc = String(proc.diagnostico_asociado || "").replace(/[.\s-]/g, "").toUpperCase();
-        if (dxAsoc && !codigosDxValidos.has(dxAsoc)) {
-          return { ...proc, diagnostico_asociado: dxPrincipalCodigo };
-        }
-        return proc;
-      });
-    }
-
-    if (datos.atencion && !datos.atencion.tipo_servicio) {
-      datos.atencion.tipo_servicio = "consulta";
-    }
+    const promptAugmentado = await extraerTerminosRAG(textoParaIA);
+    const datos = await clasificarConGemini(promptAugmentado);
+    const datosValidados = await validarYEnriquecerResultado(datos, null);
 
     return {
-      exito: true,
+      success: true,
       datos: {
         texto_transcrito: textoTranscrito,
         documento_paciente: documentoPaciente,
         nombre_paciente: nombrePaciente,
-        diagnosticos: datos.diagnosticos || [],
-        procedimientos: datos.procedimientos || [],
-        atencion: datos.atencion || {},
+        diagnosticos: datosValidados.diagnosticos || [],
+        procedimientos: datosValidados.procedimientos || [],
+        atencion: datosValidados.atencion || {},
       },
     };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     devLog("Error en clasificarAudioTelegram", msg);
-    return { exito: false, error: "Error procesando el audio. Intentá de nuevo." };
+    return { success: false, error: "Error procesando el audio. Intentá de nuevo." };
   }
 }
 

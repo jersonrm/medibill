@@ -1,0 +1,265 @@
+# CODE_QUALITY.md — Análisis de Calidad de Código y Arquitectura
+
+> **Proyecto**: Medicapp / Medibill  
+> **Fecha**: 2026-03-10  
+> **Scope**: `medibill-monorepo/apps/web`  
+
+---
+
+## Resumen Ejecutivo
+
+| Severidad | Hallazgos |
+|-----------|-----------|
+| 🔴 Crítica | 3 |
+| 🟠 Alta | 6 |
+| 🟡 Media | 8 |
+| 🔵 Baja | 5 |
+
+El codebase tiene una base sólida: TypeScript estricto, logging estructurado con Sentry, error boundary global, rate limiting, y tipos bien definidos. Los problemas principales son **duplicación de lógica de clasificación IA** entre web y Telegram, **falta de timeouts en llamadas a Gemini**, y **queries sin paginación** en módulos de dashboard/benchmarks.
+
+---
+
+## 4.1 Análisis Estático
+
+### ✅ Sin `@ts-ignore` en código fuente
+Los ~20 `@ts-ignore` encontrados están exclusivamente en `.next/types/validator.ts` (auto-generado por Next.js). El código fuente no contiene ninguno.
+
+### ✅ Sin errores TypeScript abiertos
+`get_errors` reporta 0 errores en el workspace.
+
+### 🟡 `eslint-disable` — 3 ocurrencias (Baja)
+Solo 3 instancias de `eslint-disable`, todas justificadas con `@typescript-eslint/no-explicit-any`:
+- `app/actions/clasificacion.ts:69` — `validarYEnriquecerResultado(datos: any, ...)`
+- `components/AnalysisResults.tsx:119`
+- `lib/services/contexto-facturacion.ts:14`
+
+**Veredicto**: Aceptable. Las 3 están documentadas con el tipo de regla que desactivan.
+
+### 🟡 Uso de `any` — 28 ocurrencias (Media)
+
+| Ubicación | Cantidad | Severidad |
+|-----------|----------|-----------|
+| `scripts/seed-datos-prueba.ts` | 15 | 🔵 Baja — script de seed, no producción |
+| `scripts/generar-embeddings.ts` | 5 | 🔵 Baja — script operativo |
+| `scripts/check-schema.ts` | 4 | 🔵 Baja — script diagnóstico |
+| `scripts/importar-cups-jerarquia.ts` | 1 | 🔵 Baja — script de import |
+| `scripts/importar-cie10.ts` | 1 | 🔵 Baja — script de import |
+| `app/actions/clasificacion.ts` | 1 | 🟡 Media — pipeline IA |
+| `app/configuracion/page.tsx` | 1 | 🟡 Media — UI component |
+
+**Veredicto**: El código de producción tiene solo **2 `any`** reales. El resto está en scripts operativos. Saludable.
+
+### 🟡 Código Potencialmente Muerto (Media)
+
+1. **`lib/services/contexto-facturacion.ts`** — El directorio `lib/services/` tiene un solo archivo. Parece ser una abstracción prematura o un servicio en progreso.
+2. **`app/actions/index.ts`** — Re-exporta 13 módulos pero no incluye `dian.ts`, `equipo.ts`, `billing.ts`, `admin.ts`, `conciliacion.ts`, `pagos.ts`, `muv.ts`, `cuenta.ts`, `telegram-clasificacion.ts`, `telegram-vinculacion.ts`, `benchmarks.ts`. Si algún consumer usa el barrel export, estos módulos no estarían disponibles por esa vía.
+3. **`app/docs/`** — No se encontraron referencias desde la app web principal.
+
+---
+
+## 4.2 Manejo de Errores
+
+### ✅ Error Boundary Global — Implementado
+`app/global-error.tsx` existe con integración Sentry:
+- Captura excepciones con `Sentry.captureException(error)`
+- UI clara con botón "Intentar de nuevo"
+- Renderiza HTML minimal (no depende de layout que podría haber fallado)
+
+### ✅ Logging Estructurado — Bien implementado
+`lib/logger.ts` proporciona:
+- `devLog()` — solo en desarrollo
+- `devWarn()` — dev: console.warn, prod: JSON estructurado
+- `devError()` — dev: console.error, prod: Sentry + JSON estructurado
+- `logAudit()` — audit trail fire-and-forget en Supabase
+- **No se loguean datos sensibles** (notas médicas se anonimizan antes de pasar a IA)
+
+### ✅ Server Actions con `{ success, error }` Estandarizado
+Las ~25 server actions retornan consistentemente `{ success: boolean, error?: string }` o `{ exito: boolean, error?: string }`.
+
+### 🟠 Inconsistencia en Patrón de Auth entre Actions (Alta)
+Se usan **dos patrones distintos** para obtener el contexto del usuario:
+
+| Patrón | Módulos que lo usan |
+|--------|---------------------|
+| `getContextoOrg()` / `getOrgIdActual()` | `facturas`, `clasificacion`, `billing`, `equipo`, `dian`, `perfil`, `tarifas`, `radicacion`, `pacientes`, `glosas`, `respuesta-glosas` |
+| `supabase.auth.getUser()` directo | `conciliacion`, `benchmarks`, `acuerdos`, `dashboard`, `busqueda-codigos` |
+
+Los módulos que usan `getUser()` directo **no validan la organización** del usuario, lo que significa que consultan por `user_id` en vez de `organizacion_id`. Esto funciona para usuarios individuales pero rompe el modelo multi-tenant para equipos.
+
+### 🔴 Errores Silenciados (Crítica)
+3 instancias de `.catch(() => {})` que tragan errores completamente:
+- `app/pagos/page.tsx:51` — `listarEPSUsuario().then(setEpsList).catch(() => {})`
+- `components/Sidebar.tsx:42` — `obtenerBadgesSidebar().then(setBadges).catch(() => {})`
+- `components/Sidebar.tsx:51` — `...catch(() => {})`
+
+Si estas funciones fallan (ej: error de red, token expirado), el usuario no recibe ninguna indicación. Los badges y la lista de EPS simplemente no se cargan sin explicación.
+
+### 🟡 Sin `error.tsx` por Ruta (Media)
+No existen archivos `error.tsx` en ningún segmento de ruta. Solo existe `global-error.tsx`. Esto significa que cualquier error en un segmento de ruta (ej: `/facturas`, `/glosas`) muestra el error global en vez de uno contextual que preserve el layout circundante.
+
+### 🟡 Sin `not-found.tsx` (Media)
+No existe un `not-found.tsx` custom. URLs inexistentes renderizan la página 404 genérica de Next.js.
+
+### 🟡 Sin `loading.tsx` (Media)
+No existen archivos `loading.tsx` en ningún segmento. No hay Suspense boundaries por ruta.
+
+---
+
+## 4.3 Performance (Análisis Estático)
+
+### 🔴 Llamadas a Gemini AI sin Timeout (Crítica)
+Las llamadas a los modelos Gemini (`getMedibillAI()`, `getRagExtractorAI()`, `getHelperAI()`, `getGlosaAI()`) **no tienen timeout configurado**.
+
+En `lib/gemini.ts`, los 3 modelos se crean sin `AbortSignal.timeout()` ni `requestOptions.timeout`. Si Gemini se cuelga o responde lentamente, el server action se bloquea indefinidamente.
+
+Contraste con `lib/providers/muv-client.ts` que sí implementa timeouts:
+```typescript
+const MUV_TIMEOUT_MS = 30_000;
+signal: AbortSignal.timeout(MUV_TIMEOUT_MS)
+Impacto: Una clasificación médica o sugerencia de respuesta de glosa podría bloquear un serverless function hasta su timeout de plataforma (~60s en Vercel), consumiendo recursos.
+
+🔴 N+1 Query en Cron de Eliminación de Cuentas (Crítica)
+En app/api/cron/eliminar-cuentas/route.ts:56:
+
+for (const uid of userIds) {
+  await supabase.auth.admin.deleteUser(uid);
+}
+Cada usuario se elimina con una llamada individual dentro de un loop. Si hay 100 cuentas pendientes de eliminación, son 100 llamadas API secuenciales.
+
+Nota: supabase.auth.admin.deleteUser no soporta batch nativo, pero se podría paralelizar con Promise.allSettled().
+
+🟠 Queries sin Paginación en Dashboard (Alta)
+app/actions/dashboard.ts ejecuta múltiples queries que traen todos los registros sin limit:
+
+Línea 24: facturas.select("valor_total") — todas las facturas del mes
+Línea 42: glosas_recibidas.select("valor_glosado") — todas las glosas activas
+Línea 52: respuestas_glosas.select("estado") — todas las respuestas históricas
+Para usuarios con alta volumetría, estas queries traerán miles de registros para hacer un reduce() en JS. Estos cálculos deberían ser RPCs de PostgreSQL con SUM() / COUNT().
+
+🟠 Queries sin Paginación en Benchmarks (Alta)
+app/actions/benchmarks.ts trae facturas, glosas y pagos sin limit para comparativas de EPS:
+
+Línea 87: todas las facturas del usuario por EPS
+Línea 115: todos los pagos de esas facturas
+Otras queries similares en obtenerResumenBenchmarks() (líneas 208-280)
+🟡 Sin Lazy Loading de Componentes (Media)
+No se encontró uso de next/dynamic ni React.lazy en ningún componente. Componentes pesados como modales o gráficos se cargan en el bundle principal.
+
+🟡 Sin Uso de next/image en Web App (Media)
+La app web (apps/web) no usa next/image. Solo apps/docs lo importa. Si hay imágenes en la app web, no se están optimizando (formatos modernos, lazy loading nativo, responsive sizing).
+
+✅ Rate Limiting Implementado
+Redis (Upstash) en producción con sliding window
+Fallback in-memory en desarrollo
+Aplicado en webhook de Telegram (5 req/min)
+✅ Chunking en Queries Largas
+app/actions/pagos.ts:34 chunkea queries por factura IDs:
+for (let i = 0; i < facturaIds.length; i += CHUNK_SIZE)
+✅ listarFacturas Paginada
+La lista principal de facturas sí implementa paginación con .range() y devuelve count.
+
+4.4 Patrones y Consistencia
+🔴 Duplicación Significativa: Pipeline de Clasificación IA (Crítica)
+Archivos afectados:
+
+app/actions/clasificacion.ts — Pipeline web (funciones: extraerTerminosRAG, clasificarConGemini, validarYEnriquecerResultado)
+app/actions/telegram-clasificacion.ts — Pipeline Telegram
+El pipeline de clasificación IA está duplicado casi línea por línea en telegram-clasificacion.ts:
+
+RAG extraction (parsing de términos, búsqueda de candidatos) — ~30 líneas idénticas
+Clasificación con Gemini — idéntico
+Validación y enriquecimiento (CUPS, CIE-10, coherencia anatómica, dedup consulta, corrección de diagnostico_asociado, default tipo_servicio) — ~50 líneas idénticas
+La versión de Telegram además crea su propia instancia de GoogleGenerativeAI en vez de usar getGenAI() de lib/gemini.ts.
+
+Riesgo: Un fix o mejora en el pipeline web no se propaga al pipeline Telegram. Ya hay divergencias menores (Telegram no aplica tarifas del usuario, no registra auditoría).
+
+🟠 Inconsistencia en Nombres de Propiedades de Retorno (Alta)
+Las server actions usan dos patrones distintos para el campo de éxito:
+Patrón	Módulos
+{ success: true/false }	facturas, billing, equipo, cuenta, dian, conciliacion, admin
+{ exito: true/false }	clasificacion, acuerdos, telegram-clasificacion
+Esto obliga a los consumers a conocer cuál patrón usa cada action.
+
+✅ Estructura de Carpetas Consistente
+app/actions/     → Server actions (25 módulos)
+lib/             → Utilidades de negocio
+lib/types/       → Tipos TypeScript (13 archivos bien organizados)
+lib/hooks/       → Hooks de React
+lib/providers/   → Proveedores externos (MUV)
+lib/services/    → Servicios (1 archivo)
+components/      → Componentes UI
+La estructura es predecible y bien organizada.
+
+✅ Nombres de Archivos Consistentes
+Kebab-case para archivos: sabana-parser.ts, construir-fev-rips.ts
+PascalCase para componentes: ProceduresList.tsx, ModalBusquedaCodigo.tsx
+Nombres descriptivos en español coherente con el dominio
+✅ Separación de Concerns Clara
+Data fetching: Server actions en app/actions/
+Business logic: lib/ (validación médica, CUFE, RIPS, embedding)
+UI rendering: components/
+Types: lib/types/
+External services: lib/providers/, lib/wompi.ts, lib/email.ts, lib/telegram.ts
+✅ Centralización de Utilidades
+lib/logger.ts — logging centralizado
+lib/organizacion.ts — contexto multi-tenant
+lib/suscripcion.ts — verificación de límites
+lib/audit-log.ts — auditoría centralizada
+lib/rate-limit.ts — rate limiting centralizado
+lib/validacion-medica.ts — validaciones médicas compartidas
+✅ Uso de useCallback/useMemo
+Componentes como MedibillApp, ConfiguracionAcuerdo, DiagnosticsList, ModalBusquedaCodigo usan useCallback y useMemo donde aplica.
+
+✅ Webhook Verification
+Wompi webhook: verifica firma con x-event-checksum
+Cron endpoints: protegidos con CRON_SECRET via Bearer token
+Telegram webhook: rate limited, verifica bot token
+🟡 Sentry DSN Hardcodeado (Media)
+En sentry.client.config.ts y sentry.server.config.ts, el DSN está hardcodeado:
+dsn: "https://a088802db65084950599ef916f9e0f65@o4511016097546240.ingest.us.sentry.io/4511016105410560"
+Debería usar process.env.SENTRY_DSN o process.env.NEXT_PUBLIC_SENTRY_DSN. Aunque el DSN no es secreto (es público por diseño), hardcodearlo dificulta cambiar de proyecto Sentry.
+
+🟡 Patrón createServiceClient Duplicado (Media)
+El patrón de crear un Supabase client con service role sin cookies se repite en:
+
+app/api/telegram/webhook/route.ts
+app/actions/telegram-clasificacion.ts
+app/api/wompi/webhook/route.ts
+app/api/cron/eliminar-cuentas/route.ts
+app/actions/admin.ts
+Cada uno crea su propia instancia inline. Debería centralizarse en lib/supabase-server.ts con una función createServiceClient().
+
+Resumen de Acciones Recomendadas
+Prioridad 1 — Crítica (arreglar ya)
+Agregar timeouts a llamadas Gemini — En lib/gemini.ts, envolver las llamadas con AbortSignal.timeout(30_000)
+Extraer pipeline de clasificación a función compartida — Crear lib/clasificacion-pipeline.ts que reutilicen tanto clasificacion.ts como telegram-clasificacion.ts
+Paralelizar eliminación de cuentas — Usar Promise.allSettled() en el cron de eliminación
+Prioridad 2 — Alta (planificar esta semana)
+Migrar queries de dashboard a RPCs — Reemplazar fetch+reduce con SUM()/COUNT() en PostgreSQL
+Estandarizar auth pattern — Migrar conciliacion, benchmarks, acuerdos, dashboard a getContextoOrg()
+Estandarizar retorno de actions — Unificar en { success, error } (no { exito })
+Prioridad 3 — Media (backlog)
+Agregar error.tsx al menos en /dashboard, /facturas, /glosas
+Agregar not-found.tsx y loading.tsx globales
+Implementar next/dynamic para modales pesados
+Centralizar createServiceClient() en lib/supabase-server.ts
+Mover Sentry DSN a variable de entorno
+Reemplazar .catch(() => {}) con handlers que al menos logueen
+Prioridad 4 — Baja (oportunista)
+Tipar any restantes en clasificacion.ts y configuracion/page.tsx
+Agregar next/image si se usan imágenes en la app
+Evaluar qué exporta app/actions/index.ts vs lo que no
+
+This report covers all areas requested in Phase 4. Key findings:
+
+**The good**: Zero `@ts-ignore` in source code, structured logging with Sentry, global error boundary, well-organized types, consistent file structure, rate limiting, webhook signature verification, and standardized error returns in most server actions.
+
+**The critical**: No timeouts on Gemini AI calls (could block serverless functions), copy-pasted classification pipeline between web and Telegram (~80 lines duplicated), and N+1 queries in the account deletion cron job.
+
+**The notable**: Two different auth patterns (`getContextoOrg()` vs raw `getUser()`) create multi-tenant inconsistencies, dashboard queries fetch all records without pagination for aggregation (should be SQL RPCs), and no per-route `error.tsx`/`loading.tsx` boundaries.This report covers all areas requested in Phase 4. Key findings:
+
+**The good**: Zero `@ts-ignore` in source code, structured logging with Sentry, global error boundary, well-organized types, consistent file structure, rate limiting, webhook signature verification, and standardized error returns in most server actions.
+
+**The critical**: No timeouts on Gemini AI calls (could block serverless functions), copy-pasted classification pipeline between web and Telegram (~80 lines duplicated), and N+1 queries in the account deletion cron job.
+
+**The notable**: Two different auth patterns (`getContextoOrg()` vs raw `getUser()`) create multi-tenant inconsistencies, dashboard queries fetch all records without pagination for aggregation (should be SQL RPCs), and no per-route `error.tsx`/`loading.tsx` boundaries.

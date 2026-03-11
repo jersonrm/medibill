@@ -28,6 +28,29 @@ vi.mock("@/lib/logger", () => ({
   devError: vi.fn(),
 }));
 
+vi.mock("@/lib/organizacion", () => ({
+  getContextoOrg: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return {
+      userId: mockState.user.id,
+      orgId: "org-test-123",
+      orgNombre: "Clínica Test",
+      orgTipo: "clinica" as const,
+      rol: "owner" as const,
+      suscripcion: { plan_id: "profesional", estado: "active", trial_fin: null, periodo_actual_fin: null },
+    };
+  }),
+  getOrgIdActual: vi.fn().mockImplementation(async () => {
+    if (!mockState.user) throw new Error("No autenticado");
+    return "org-test-123";
+  }),
+}));
+
+vi.mock("@/lib/suscripcion", () => ({
+  verificarLimite: vi.fn().mockResolvedValue({ permitido: true, restante: 100 }),
+  incrementarUso: vi.fn().mockResolvedValue(undefined),
+}));
+
 const mockDescargarXml = vi.fn();
 vi.mock("@/lib/providers/matias-client", () => ({
   descargarXml: (...args: unknown[]) => mockDescargarXml(...args),
@@ -166,9 +189,7 @@ describe("validarRipsYObtenerCuv", () => {
   it("retorna error si no autenticado", async () => {
     mockState.user = null;
     const { validarRipsYObtenerCuv } = await import("@/app/actions/muv");
-    const result = await validarRipsYObtenerCuv("factura-1");
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toContain("No autenticado");
+    await expect(validarRipsYObtenerCuv("factura-1")).rejects.toThrow("No autenticado");
   });
 
   it("retorna error si factura no encontrada", async () => {

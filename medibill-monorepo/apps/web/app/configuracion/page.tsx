@@ -66,8 +66,8 @@ export default function ConfiguracionPage() {
     if (!codigo || !descripcion || valorReal <= 0) return alert("Diligencie todos los campos.");
 
     setCargando(true);
-    const respuesta = await guardarTarifaUsuario(codigo, descripcion, valorReal);
-    if (respuesta.exito) {
+    const respuesta = await guardarTarifaUsuario({ codigo, descripcion, valor: valorReal });
+    if (respuesta.success) {
       setCodigo("");
       setDescripcion("");
       setValorDisplay("");

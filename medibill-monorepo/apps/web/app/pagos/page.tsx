@@ -48,7 +48,7 @@ export default function PagosPage() {
   }, [filtroEPS, filtroEstado, filtroAntiguedad]);
 
   useEffect(() => {
-    listarEPSUsuario().then(setEpsList).catch(() => {});
+    listarEPSUsuario().then(setEpsList).catch((e) => console.error("Error cargando EPS", e));
   }, []);
 
   useEffect(() => {

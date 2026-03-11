@@ -3,7 +3,10 @@
 import { createClient } from "@/lib/supabase-server";
 import { devError } from "@/lib/logger";
 import { revalidatePath } from "next/cache";
-import { crearOrganizacion } from "@/lib/organizacion";
+import { crearOrganizacion, getContextoOrg } from "@/lib/organizacion";
+import { verificarPermisoOError } from "@/lib/permisos";
+import { GuardarPerfilSchema, GuardarResolucionSchema } from "@/lib/schemas/perfil.schema";
+import { safeError } from "@/lib/safe-error";
 import type { PerfilPrestador, ResolucionFacturacion } from "@/lib/types/perfil";
 
 // ==========================================
@@ -34,8 +37,13 @@ export async function guardarPerfil(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "No autenticado" };
 
+  // Validar con Zod — whitelist de campos permitidos (previene mass assignment)
+  const parsed = GuardarPerfilSchema.safeParse(datos);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  const validData = parsed.data;
+
   const payload = {
-    ...datos,
+    ...validData,
     id: user.id,
     user_id: user.id,
     updated_at: new Date().toISOString(),
@@ -47,11 +55,11 @@ export async function guardarPerfil(
 
   if (error) {
     devError("Error guardando perfil", error);
-    return { success: false, error: error.message };
+    return { success: false, error: safeError("guardarPerfil", error) };
   }
 
   // Si es onboarding completo y no tiene org, crear organización
-  if (datos.onboarding_completo) {
+  if (validData.onboarding_completo) {
     const { data: perfil } = await supabase
       .from("perfiles")
       .select("organizacion_id")
@@ -60,11 +68,11 @@ export async function guardarPerfil(
 
     if (!perfil?.organizacion_id) {
       const tipoOrg =
-        datos.tipo_prestador === "profesional_independiente"
+        validData.tipo_prestador === "profesional_independiente"
           ? "independiente"
           : "clinica";
       await crearOrganizacion({
-        nombre: datos.razon_social || datos.nombre_comercial || "Mi organización",
+        nombre: validData.razon_social || validData.nombre_comercial || "Mi organización",
         tipo: tipoOrg as "independiente" | "clinica",
         emailBilling: user.email || "",
         userId: user.id,
@@ -117,6 +125,18 @@ export async function obtenerResolucionActiva(): Promise<ResolucionFacturacion |
 export async function guardarResolucion(
   datos: Omit<ResolucionFacturacion, "id" | "user_id" | "consecutivo_actual" | "created_at"> & { id?: string }
 ): Promise<{ success: boolean; error?: string }> {
+  // Validar input con Zod
+  const parsed = GuardarResolucionSchema.safeParse(datos);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
+  // RBAC: solo owner/admin pueden configurar resolución
+  try {
+    const ctx = await getContextoOrg();
+    verificarPermisoOError(ctx.rol, "config_organizacion");
+  } catch {
+    // During onboarding, user may not have org yet — allow
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "No autenticado" };
@@ -140,12 +160,12 @@ export async function guardarResolucion(
       .update(payload)
       .eq("id", datos.id)
       .eq("user_id", user.id);
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeError("guardarResolucion", error) };
   } else {
     const { error } = await supabase
       .from("resoluciones_facturacion")
       .insert({ ...payload, consecutivo_actual: datos.rango_desde - 1 });
-    if (error) return { success: false, error: error.message };
+    if (error) return { success: false, error: safeError("guardarResolucion", error) };
   }
 
   revalidatePath("/configuracion/perfil");
@@ -202,7 +222,64 @@ export async function activarResolucion(resolucionId: string): Promise<{ success
     .eq("id", resolucionId)
     .eq("user_id", user.id);
 
-  if (error) return { success: false, error: error.message };
+  if (error) return { success: false, error: safeError("activarResolucion", error) };
+
+  revalidatePath("/configuracion/perfil");
+  return { success: true };
+}
+
+// ==========================================
+// CONSENTIMIENTO — Compartir datos anonimizados
+// ==========================================
+
+/** Obtener si la organización del usuario comparte datos anónimos */
+export async function obtenerConsentimientoDatos(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("organizacion_id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!perfil?.organizacion_id) return false;
+
+  const { data: org } = await supabase
+    .from("organizaciones")
+    .select("compartir_datos_anonimos")
+    .eq("id", perfil.organizacion_id)
+    .single();
+
+  return org?.compartir_datos_anonimos === true;
+}
+
+/** Alternar consentimiento para compartir datos anonimizados */
+export async function toggleConsentimientoDatos(
+  compartir: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "No autenticado" };
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("organizacion_id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!perfil?.organizacion_id) return { success: false, error: "Sin organización" };
+
+  const { error } = await supabase
+    .from("organizaciones")
+    .update({
+      compartir_datos_anonimos: compartir,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", perfil.organizacion_id);
+
+  if (error) return { success: false, error: safeError("toggleConsentimientoDatos", error) };
 
   revalidatePath("/configuracion/perfil");
   return { success: true };

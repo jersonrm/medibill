@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   crearFacturaCompleta,
   crearAtencionUI,
-  crearProcedimientoUI,
+  crearProcedimientoFactura,
   crearDiagnosticoUI,
 } from "./helpers/fixtures";
 
@@ -224,11 +224,7 @@ describe("generarXmlFev", () => {
     const factura = crearFacturaCompleta({
       fecha_expedicion: "2026-03-06",
       atencion: crearAtencionUI({ valor_consulta: 0 }),
-      procedimientos: [{
-        ...crearProcedimientoUI({ codigo_cups: "881602", valor_unitario: 45000 }),
-        manual: false,
-        fuente_tarifa: "propia" as const,
-      }],
+      procedimientos: [crearProcedimientoFactura({ codigo_cups: "881602", valor_unitario: 45000 })],
     });
 
     const result = generarXmlFev(
@@ -247,16 +243,8 @@ describe("generarXmlFev", () => {
       fecha_expedicion: "2026-03-06",
       atencion: crearAtencionUI({ valor_consulta: 0 }),
       procedimientos: [
-        {
-          ...crearProcedimientoUI({ codigo_cups: "881602", descripcion: "Radiografía", valor_unitario: 45000, cantidad: 1 }),
-          manual: false,
-          fuente_tarifa: "propia" as const,
-        },
-        {
-          ...crearProcedimientoUI({ codigo_cups: "903841", descripcion: "Hemograma", valor_unitario: 15000, cantidad: 2 }),
-          manual: false,
-          fuente_tarifa: "propia" as const,
-        },
+        crearProcedimientoFactura({ codigo_cups: "881602", descripcion: "Radiografía", valor_unitario: 45000, cantidad: 1 }),
+        crearProcedimientoFactura({ codigo_cups: "903841", descripcion: "Hemograma", valor_unitario: 15000, cantidad: 2 }),
       ],
     });
 
@@ -277,11 +265,7 @@ describe("generarXmlFev", () => {
     const factura = crearFacturaCompleta({
       fecha_expedicion: "2026-03-06",
       atencion: crearAtencionUI({ valor_consulta: 50000 }),
-      procedimientos: [{
-        ...crearProcedimientoUI({ codigo_cups: "881602", valor_unitario: 45000 }),
-        manual: false,
-        fuente_tarifa: "propia" as const,
-      }],
+      procedimientos: [crearProcedimientoFactura({ codigo_cups: "881602", valor_unitario: 45000 })],
     });
 
     const result = generarXmlFev(
@@ -375,11 +359,7 @@ describe("generarXmlFev", () => {
       descuentos: 5000,
       copago: 0,
       atencion: crearAtencionUI({ valor_consulta: 50000 }),
-      procedimientos: [{
-        ...crearProcedimientoUI({ valor_unitario: 45000, cantidad: 1 }),
-        manual: false,
-        fuente_tarifa: "propia" as const,
-      }],
+      procedimientos: [crearProcedimientoFactura({ valor_unitario: 45000, cantidad: 1 })],
     });
 
     const result = generarXmlFev(
@@ -550,8 +530,8 @@ describe("generarXmlFev", () => {
       fecha_expedicion: "2026-03-06",
       atencion: crearAtencionUI({ valor_consulta: 50000 }),
       procedimientos: [
-        { ...crearProcedimientoUI({ codigo_cups: "A" }), manual: false, fuente_tarifa: "propia" as const },
-        { ...crearProcedimientoUI({ codigo_cups: "B" }), manual: false, fuente_tarifa: "propia" as const },
+        crearProcedimientoFactura({ codigo_cups: "A" }),
+        crearProcedimientoFactura({ codigo_cups: "B" }),
       ],
     });
 

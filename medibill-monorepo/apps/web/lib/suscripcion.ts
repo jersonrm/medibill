@@ -10,6 +10,15 @@ import type {
   EstadoSuscripcion,
 } from "@/lib/types/suscripcion";
 
+// Límites absolutos para el período de trial (14 días, NO mensuales)
+const TRIAL_LIMITS = {
+  clasificacion: 10,
+  factura_dian: 0, // No se pueden aprobar facturas DIAN en trial
+} as const;
+
+// Clasificaciones con resultado completo en trial (las demás muestran códigos parciales)
+export const TRIAL_FULL_RESULTS = 3;
+
 /**
  * Verifica si la organización puede realizar una operación según su plan.
  * Retorna { permitido, restante, mensaje }.
@@ -41,6 +50,44 @@ export async function verificarLimite(
     nombre: string;
   };
 
+  // ── Trial: límites absolutos (NO mensuales) ──
+  if (sub.estado === "trialing") {
+    const trialLimite = TRIAL_LIMITS[tipo];
+
+    if (trialLimite === 0) {
+      const recurso = tipo === "clasificacion" ? "clasificaciones IA" : "facturas DIAN";
+      return {
+        permitido: false,
+        restante: 0,
+        mensaje: `La generación de ${recurso} no está disponible durante el período de prueba. Activa tu plan para continuar.`,
+      };
+    }
+
+    // Sumar uso total acumulado (todas las filas de uso_mensual, no solo el mes actual)
+    const { data: usoTotal } = await supabase
+      .from("uso_mensual")
+      .select("clasificaciones_ia, facturas_dian")
+      .eq("organizacion_id", orgId);
+
+    const usadoTotal = (usoTotal ?? []).reduce(
+      (acc, row) => acc + (tipo === "clasificacion" ? (row.clasificaciones_ia ?? 0) : (row.facturas_dian ?? 0)),
+      0
+    );
+
+    const restante = trialLimite - usadoTotal;
+
+    if (restante <= 0) {
+      return {
+        permitido: false,
+        restante: 0,
+        mensaje: `Has alcanzado el límite de ${trialLimite} ${tipo === "clasificacion" ? "clasificaciones IA" : "facturas DIAN"} de tu período de prueba. Activa tu plan para continuar.`,
+      };
+    }
+
+    return { permitido: true, restante };
+  }
+
+  // ── Plan pagado: límites mensuales normales ──
   const limite =
     tipo === "clasificacion"
       ? plan.max_clasificaciones
