@@ -19,6 +19,7 @@ interface Acuerdo {
   id: string;
   eps_codigo: string;
   nombre_eps: string | null;
+  email_radicacion: string | null;
   fecha_inicio: string;
   fecha_fin: string;
   tarifario_base: string;
@@ -47,26 +48,26 @@ interface CupsItem {
 
 // EPS más comunes de Colombia
 const EPS_LISTA = [
-  { codigo: "EPS001", nombre: "Nueva EPS" },
-  { codigo: "EPS002", nombre: "Sura EPS" },
-  { codigo: "EPS003", nombre: "Sanitas EPS" },
-  { codigo: "EPS005", nombre: "Salud Total" },
-  { codigo: "EPS008", nombre: "Compensar EPS" },
-  { codigo: "EPS010", nombre: "Famisanar" },
-  { codigo: "EPS012", nombre: "Comfenalco Valle" },
-  { codigo: "EPS013", nombre: "SOS EPS" },
-  { codigo: "EPS016", nombre: "Coosalud" },
-  { codigo: "EPS017", nombre: "Mutual Ser" },
-  { codigo: "EPS018", nombre: "Aliansalud" },
-  { codigo: "EPS023", nombre: "Cruz Blanca" },
-  { codigo: "EPS033", nombre: "Capital Salud" },
-  { codigo: "EPS037", nombre: "Cajacopi" },
-  { codigo: "EPS044", nombre: "Emssanar" },
-  { codigo: "EPS045", nombre: "Asmet Salud" },
-  { codigo: "EPS046", nombre: "Pijaos Salud" },
-  { codigo: "EPSS01", nombre: "Savia Salud" },
-  { codigo: "EPSS34", nombre: "Mallamas" },
-  { codigo: "EPSS40", nombre: "Dusakawi" },
+  { codigo: "EPS001", nombre: "Nueva EPS", emailRadicacion: "radicacionelectronica@nuevaeps.com.co" },
+  { codigo: "EPS002", nombre: "Sura EPS", emailRadicacion: "radicacion@epssura.com.co" },
+  { codigo: "EPS003", nombre: "Sanitas EPS", emailRadicacion: "radicacion@epssanitas.com" },
+  { codigo: "EPS005", nombre: "Salud Total", emailRadicacion: "radicacion@saludtotal.com.co" },
+  { codigo: "EPS008", nombre: "Compensar EPS", emailRadicacion: "radicacion@compensar.com" },
+  { codigo: "EPS010", nombre: "Famisanar", emailRadicacion: "radicacion@famisanar.com.co" },
+  { codigo: "EPS012", nombre: "Comfenalco Valle", emailRadicacion: "radicacion@comfenalcovalle.com.co" },
+  { codigo: "EPS013", nombre: "SOS EPS", emailRadicacion: "radicacion@sos.com.co" },
+  { codigo: "EPS016", nombre: "Coosalud", emailRadicacion: "radicacion@coosalud.com" },
+  { codigo: "EPS017", nombre: "Mutual Ser", emailRadicacion: "radicacion@mutualser.com" },
+  { codigo: "EPS018", nombre: "Aliansalud", emailRadicacion: "radicacion@aliansalud.com.co" },
+  { codigo: "EPS023", nombre: "Cruz Blanca", emailRadicacion: "radicacion@cruzblanca.com.co" },
+  { codigo: "EPS033", nombre: "Capital Salud", emailRadicacion: "radicacion@capitalsalud.gov.co" },
+  { codigo: "EPS037", nombre: "Cajacopi", emailRadicacion: "radicacion@cajacopi.com" },
+  { codigo: "EPS044", nombre: "Emssanar", emailRadicacion: "radicacion@emssanar.org.co" },
+  { codigo: "EPS045", nombre: "Asmet Salud", emailRadicacion: "radicacion@asmetsalud.com" },
+  { codigo: "EPS046", nombre: "Pijaos Salud", emailRadicacion: "radicacion@pijaossalud.com" },
+  { codigo: "EPSS01", nombre: "Savia Salud", emailRadicacion: "radicacion@saviasalud.com" },
+  { codigo: "EPSS34", nombre: "Mallamas", emailRadicacion: "radicacion@mallamas.com.co" },
+  { codigo: "EPSS40", nombre: "Dusakawi", emailRadicacion: "radicacion@dusakawi.com" },
 ];
 
 const TARIFARIOS = [
@@ -203,6 +204,7 @@ export default function ConfiguracionAcuerdo() {
   const [form, setForm] = useState({
     eps_codigo: "",
     nombre_eps: "",
+    email_radicacion: "",
     fecha_inicio: "",
     fecha_fin: "",
     tarifario_base: "ISS_2001",
@@ -232,6 +234,7 @@ export default function ConfiguracionAcuerdo() {
     setForm({
       eps_codigo: "",
       nombre_eps: "",
+      email_radicacion: "",
       fecha_inicio: "",
       fecha_fin: "",
       tarifario_base: "ISS_2001",
@@ -257,6 +260,7 @@ export default function ConfiguracionAcuerdo() {
       setForm({
         eps_codigo: a.eps_codigo,
         nombre_eps: a.nombre_eps || "",
+        email_radicacion: a.email_radicacion || "",
         fecha_inicio: a.fecha_inicio,
         fecha_fin: a.fecha_fin,
         tarifario_base: a.tarifario_base,
@@ -347,6 +351,7 @@ export default function ConfiguracionAcuerdo() {
       ...f,
       eps_codigo: codigo,
       nombre_eps: eps?.nombre || codigo,
+      email_radicacion: eps?.emailRadicacion || f.email_radicacion,
     }));
   };
 
@@ -604,6 +609,23 @@ export default function ConfiguracionAcuerdo() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Email de radicación */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
+                  Email de radicación EPS
+                </label>
+                <input
+                  type="email"
+                  value={form.email_radicacion}
+                  onChange={(e) => setForm((f) => ({ ...f, email_radicacion: e.target.value }))}
+                  placeholder="radicacion@eps.com.co"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-medi-primary/30 focus:border-medi-primary"
+                />
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Email para enviar automáticamente los paquetes de radicación FEV-RIPS. Se pre-llena al seleccionar la EPS.
+                </p>
               </div>
 
               {/* Fechas de vigencia */}

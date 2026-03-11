@@ -41,6 +41,7 @@ const plans = [
       "Todo lo de Starter",
       "Dashboard completo con KPIs",
       "Gestión de glosas con IA",
+      "Bot Telegram (clasificación por audio)",
       "Importación de sábana de pagos",
       "Conciliación automática",
       "Soporte por email + chat",
@@ -58,6 +59,7 @@ const plans = [
       "Facturas ilimitadas",
       "Todo lo de Profesional",
       "Hasta 20 usuarios",
+      "Bot Telegram (clasificación por audio)",
       "Gestión de equipo y roles",
       "Importación masiva de datos",
       "Acuerdos de voluntades por EPS",
@@ -121,6 +123,12 @@ const comparisonFeatures = [
         name: "Importación masiva",
         starter: false,
         profesional: false,
+        clinica: true,
+      },
+      {
+        name: "Bot Telegram (clasificación por audio)",
+        starter: false,
+        profesional: true,
         clinica: true,
       },
     ],
@@ -203,6 +211,11 @@ const pricingFaq = [
     question: "¿Ofrecen descuentos para pagos anuales?",
     answer:
       "Actualmente manejamos facturación mensual. Contáctanos si estás interesado en un acuerdo anual y evaluaremos una propuesta personalizada.",
+  },
+  {
+    question: "¿Cómo funciona el Bot de Telegram?",
+    answer:
+      "El Bot de Telegram permite clasificar notas clínicas por audio. Envías una nota de voz y recibes códigos CUPS y CIE-10 en segundos. Desde el chat puedes crear la factura directamente. Disponible en planes Profesional, Clínica e IPS. Los usuarios sin cuenta tienen 3 clasificaciones gratis para probar.",
   },
 ];
 

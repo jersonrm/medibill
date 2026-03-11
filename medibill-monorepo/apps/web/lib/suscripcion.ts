@@ -165,6 +165,7 @@ export async function obtenerLimitesOrg(orgId: string): Promise<LimitesOrg | nul
     ia_sugerencias_glosas: boolean;
     importacion_sabana: boolean;
     importacion_masiva: boolean;
+    bot_telegram: boolean;
   };
 
   const sub = subResult.data as unknown as {
@@ -189,6 +190,7 @@ export async function obtenerLimitesOrg(orgId: string): Promise<LimitesOrg | nul
       iaSugerenciasGlosas: plan.ia_sugerencias_glosas,
       importacionSabana: plan.importacion_sabana,
       importacionMasiva: plan.importacion_masiva,
+      botTelegram: plan.bot_telegram,
     },
     uso: {
       clasificaciones: usoResult.data?.clasificaciones_ia ?? 0,
@@ -237,6 +239,7 @@ export async function obtenerFeaturesUsuario(): Promise<{
     iaSugerenciasGlosas: boolean;
     importacionSabana: boolean;
     importacionMasiva: boolean;
+    botTelegram: boolean;
   };
   maxUsuarios: number;
 } | null> {
@@ -256,7 +259,7 @@ export async function obtenerFeaturesUsuario(): Promise<{
 
   const { data: sub } = await supabase
     .from("suscripciones")
-    .select("estado, plan:planes!inner(ia_sugerencias_glosas, importacion_sabana, importacion_masiva, max_usuarios)")
+    .select("estado, plan:planes!inner(ia_sugerencias_glosas, importacion_sabana, importacion_masiva, bot_telegram, max_usuarios)")
     .eq("organizacion_id", memb.organizacion_id)
     .single();
 
@@ -264,7 +267,7 @@ export async function obtenerFeaturesUsuario(): Promise<{
     return {
       orgId: memb.organizacion_id,
       rol: memb.rol,
-      features: { iaSugerenciasGlosas: false, importacionSabana: false, importacionMasiva: false },
+      features: { iaSugerenciasGlosas: false, importacionSabana: false, importacionMasiva: false, botTelegram: false },
       maxUsuarios: 1,
     };
   }
@@ -273,6 +276,7 @@ export async function obtenerFeaturesUsuario(): Promise<{
     ia_sugerencias_glosas: boolean;
     importacion_sabana: boolean;
     importacion_masiva: boolean;
+    bot_telegram: boolean;
     max_usuarios: number;
   };
 
@@ -283,6 +287,7 @@ export async function obtenerFeaturesUsuario(): Promise<{
       iaSugerenciasGlosas: plan.ia_sugerencias_glosas,
       importacionSabana: plan.importacion_sabana,
       importacionMasiva: plan.importacion_masiva,
+      botTelegram: plan.bot_telegram,
     },
     maxUsuarios: plan.max_usuarios,
   };

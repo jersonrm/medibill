@@ -106,6 +106,12 @@ const features = [
     description:
       "Indicadores clave de facturación, distribución por EPS, alertas de glosas pendientes y tendencias de tu práctica médica en un solo lugar.",
   },
+  {
+    icon: <IconChat />,
+    title: "Clasificación por Telegram",
+    description:
+      "Envía una nota de voz al Bot de Telegram y recibí los códigos CUPS y CIE-10 en segundos. Creá la factura directamente desde el chat.",
+  },
 ];
 
 const whyUs = [
@@ -193,6 +199,7 @@ const plans = [
       "Soporte email + chat",
       "Dashboard completo",
       "Gestión de glosas con IA",
+      "Bot Telegram (audio)",
       "Importación de sábana de pagos",
     ],
     highlighted: true,
@@ -208,6 +215,7 @@ const plans = [
       "Hasta 20 usuarios",
       "Soporte prioritario",
       "Todas las funcionalidades",
+      "Bot Telegram (audio)",
       "Gestión de equipo y roles",
       "Importación masiva",
     ],
@@ -270,8 +278,11 @@ const faqItems = [
     question: "¿Ofrecen período de prueba?",
     answer:
       "Sí. Al registrarte, accedes a un período de prueba gratuito con acceso a todas las funcionalidades. No necesitas ingresar datos de pago para comenzar.",
-  },
-];
+  },  {
+    question: "¿Cómo funciona el Bot de Telegram?",
+    answer:
+      "El Bot de Telegram te permite clasificar notas clínicas por audio. Enviás una nota de voz con la atención del paciente y recibís los códigos CUPS y CIE-10 en segundos. Desde el chat podés crear la factura directamente en Medibill con los datos pre-cargados. Disponible en planes Profesional, Clínica e IPS.",
+  },];
 
 /* ─────────────────────── Page ─────────────────────── */
 

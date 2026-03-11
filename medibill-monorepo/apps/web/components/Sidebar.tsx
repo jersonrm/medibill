@@ -34,6 +34,7 @@ export default function Sidebar() {
     iaSugerenciasGlosas: boolean;
     importacionSabana: boolean;
     importacionMasiva: boolean;
+    botTelegram: boolean;
     maxUsuarios: number;
   } | null>(null);
 
@@ -132,6 +133,7 @@ export default function Sidebar() {
       { href: "/configuracion", label: "Tarifas" },
       { href: "/configuracion/suscripcion", label: "Suscripción" },
       { href: "/configuracion/equipo", label: "Equipo" },
+      { href: "/configuracion/telegram", label: "Bot Telegram" },
     ],
   };
 

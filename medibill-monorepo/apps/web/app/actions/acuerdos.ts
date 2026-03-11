@@ -56,6 +56,7 @@ export async function guardarAcuerdo(datos: {
   id?: string;
   eps_codigo: string;
   nombre_eps: string;
+  email_radicacion?: string;
   fecha_inicio: string;
   fecha_fin: string;
   tarifario_base: string;
@@ -71,6 +72,7 @@ export async function guardarAcuerdo(datos: {
     prestador_id: user.id,
     eps_codigo: datos.eps_codigo,
     nombre_eps: datos.nombre_eps,
+    email_radicacion: datos.email_radicacion || null,
     fecha_inicio: datos.fecha_inicio,
     fecha_fin: datos.fecha_fin,
     tarifario_base: datos.tarifario_base,

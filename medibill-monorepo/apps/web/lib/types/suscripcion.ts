@@ -46,6 +46,7 @@ export interface Plan {
   ia_sugerencias_glosas: boolean;
   importacion_sabana: boolean;
   importacion_masiva: boolean;
+  bot_telegram: boolean;
   soporte_nivel: SoporteNivel;
   activo: boolean;
 }
@@ -187,6 +188,7 @@ export interface LimitesOrg {
     iaSugerenciasGlosas: boolean;
     importacionSabana: boolean;
     importacionMasiva: boolean;
+    botTelegram: boolean;
   };
   uso: {
     clasificaciones: number;
@@ -204,4 +206,4 @@ export interface ResultadoVerificacion {
 
 export type TipoUso = "clasificacion" | "factura_dian";
 
-export type FeatureFlag = "ia_sugerencias_glosas" | "importacion_sabana" | "importacion_masiva";
+export type FeatureFlag = "ia_sugerencias_glosas" | "importacion_sabana" | "importacion_masiva" | "bot_telegram";

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS acuerdos_voluntades (
   requiere_autorizacion   BOOLEAN NOT NULL DEFAULT true,
   tarifario_base          TEXT DEFAULT 'SOAT',                  -- SOAT, ISS, propio
   porcentaje_sobre_base   NUMERIC(6,2) DEFAULT 100,
+  email_radicacion        TEXT,                                  -- email EPS para radicación automática
   observaciones           TEXT,
   activo                  BOOLEAN NOT NULL DEFAULT true,
   created_at              TIMESTAMPTZ DEFAULT now(),

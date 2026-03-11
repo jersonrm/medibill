@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { marcarComoDescargada } from "@/app/actions/facturas";
-import { generarPaqueteDescarga, radicarFactura } from "@/app/actions/radicacion";
+import { generarPaqueteDescarga, radicarFactura, radicarPorEmail, obtenerEmailRadicacion } from "@/app/actions/radicacion";
 import type { FacturaData } from "./types";
 
 interface RadicacionPanelProps {
@@ -15,6 +16,15 @@ interface RadicacionPanelProps {
 export default function RadicacionPanel({ factura, accion, setAccion, onFacturaUpdate }: RadicacionPanelProps) {
   const [numeroRadicado, setNumeroRadicado] = useState("");
   const [radicacionMsg, setRadicacionMsg] = useState<string | null>(null);
+  const [emailInfo, setEmailInfo] = useState<{ email: string; epsNombre: string } | null>(null);
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+
+  // Cargar info de email de radicación al montar
+  useEffect(() => {
+    if (factura.estado === "descargada" && factura.cufe && factura.cuv) {
+      obtenerEmailRadicacion(factura.id).then(setEmailInfo);
+    }
+  }, [factura.id, factura.estado, factura.cufe, factura.cuv]);
 
   const handleDescargarPaquete = async () => {
     setAccion(true);
@@ -77,6 +87,39 @@ export default function RadicacionPanel({ factura, accion, setAccion, onFacturaU
     }
   };
 
+  const handleRadicarPorEmail = async () => {
+    if (!emailInfo) return;
+    if (!confirm(`¿Enviar paquete de radicación por email a ${emailInfo.email} (${emailInfo.epsNombre})?`)) return;
+    setEnviandoEmail(true);
+    setAccion(true);
+    setRadicacionMsg(null);
+    try {
+      const res = await radicarPorEmail(factura.id);
+      if (res.success) {
+        onFacturaUpdate({
+          estado: "radicada",
+          metadata: {
+            ...(factura.metadata || {}),
+            email_radicacion_enviado: emailInfo.email,
+            email_message_id: res.messageId,
+            fecha_envio_email: new Date().toISOString(),
+            numero_radicado: `EMAIL-${res.messageId}`,
+            fecha_radicacion: new Date().toISOString(),
+          },
+        });
+        setRadicacionMsg(`Email enviado exitosamente a ${emailInfo.email}`);
+      } else {
+        alert(res.error);
+      }
+    } catch (e) {
+      console.error("Error radicando por email:", e);
+      alert("Error al enviar la radicación por email.");
+    } finally {
+      setEnviandoEmail(false);
+      setAccion(false);
+    }
+  };
+
   return (
     <>
       {/* Radicación — Visible cuando tiene CUFE+CUV y estado aprobada/descargada */}
@@ -97,23 +140,56 @@ export default function RadicacionPanel({ factura, accion, setAccion, onFacturaU
               <p className="text-xs text-green-700 mb-3">{radicacionMsg}</p>
             )}
             {factura.estado === "descargada" && (
-              <div className="border-t border-purple-200 pt-4">
-                <p className="text-xs text-medi-dark/60 mb-2">Una vez radicada ante la EPS, ingrese el número de radicado:</p>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    placeholder="Número de radicado EPS"
-                    value={numeroRadicado}
-                    onChange={e => setNumeroRadicado(e.target.value)}
-                    className="flex-grow px-4 py-2 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
-                  />
-                  <button
-                    onClick={handleConfirmarRadicacion}
-                    disabled={accion || !numeroRadicado.trim()}
-                    className="px-5 py-2 bg-purple-700 text-white font-bold rounded-lg hover:bg-purple-800 transition-colors disabled:opacity-50 text-sm"
-                  >
-                    ✓ Confirmar radicación
-                  </button>
+              <div className="border-t border-purple-200 pt-4 space-y-4">
+                {/* Radicar por Email */}
+                {emailInfo ? (
+                  <div className="bg-white border border-purple-200 rounded-lg p-4">
+                    <p className="text-xs font-bold text-purple-800 mb-2">📧 Radicar por Email</p>
+                    <p className="text-xs text-medi-dark/60 mb-3">
+                      Enviar paquete ZIP a <span className="font-semibold">{emailInfo.email}</span> ({emailInfo.epsNombre})
+                    </p>
+                    <button
+                      onClick={handleRadicarPorEmail}
+                      disabled={accion || enviandoEmail}
+                      className="px-5 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 text-sm flex items-center gap-2"
+                    >
+                      {enviandoEmail ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Enviando…
+                        </>
+                      ) : (
+                        <>📧 Radicar por Email a {emailInfo.epsNombre}</>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-xs text-amber-800">
+                      📧 Para radicar por email, <Link href="/acuerdos" className="font-bold underline hover:text-amber-900">configure el email de radicación en Acuerdos de Voluntades</Link>.
+                    </p>
+                  </div>
+                )}
+
+                {/* Radicar manualmente */}
+                <div>
+                  <p className="text-xs text-medi-dark/60 mb-2">O ingrese el número de radicado manualmente:</p>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Número de radicado EPS"
+                      value={numeroRadicado}
+                      onChange={e => setNumeroRadicado(e.target.value)}
+                      className="flex-grow px-4 py-2 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    />
+                    <button
+                      onClick={handleConfirmarRadicacion}
+                      disabled={accion || !numeroRadicado.trim()}
+                      className="px-5 py-2 bg-purple-700 text-white font-bold rounded-lg hover:bg-purple-800 transition-colors disabled:opacity-50 text-sm"
+                    >
+                      ✓ Confirmar radicación
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -138,6 +214,11 @@ export default function RadicacionPanel({ factura, accion, setAccion, onFacturaU
             {!!(factura.metadata as Record<string, unknown>)?.fecha_radicacion && (
               <p className="text-xs text-green-700 mb-2">
                 Fecha radicación: {new Date(String((factura.metadata as Record<string, unknown>).fecha_radicacion)).toLocaleString("es-CO")}
+              </p>
+            )}
+            {!!(factura.metadata as Record<string, unknown>)?.email_radicacion_enviado && (
+              <p className="text-xs text-green-700 mb-2">
+                📧 Enviado a: {String((factura.metadata as Record<string, unknown>).email_radicacion_enviado)}
               </p>
             )}
             <div className="mt-3 bg-green-100 border border-green-300 rounded-lg p-3">
