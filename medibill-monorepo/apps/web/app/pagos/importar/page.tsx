@@ -9,7 +9,7 @@ import {
   confirmarConciliacion,
 } from "@/app/actions/conciliacion";
 import { listarEPSUsuario } from "@/app/actions/pagos";
-import { obtenerFeaturesUsuario } from "@/lib/suscripcion";
+import { obtenerFeaturesUsuario } from "@/app/actions/suscripcion";
 import { formatCOP } from "@/lib/formato";
 import type {
   ResultadoParseo,

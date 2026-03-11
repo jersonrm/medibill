@@ -9,7 +9,7 @@ import {
   desactivarMiembro,
   cancelarInvitacion,
 } from "@/app/actions/equipo";
-import { obtenerFeaturesUsuario } from "@/lib/suscripcion";
+import { obtenerFeaturesUsuario } from "@/app/actions/suscripcion";
 import type { UsuarioOrganizacion, Invitacion, RolOrganizacion } from "@/lib/types/suscripcion";
 
 const ROLES: { value: RolOrganizacion; label: string }[] = [

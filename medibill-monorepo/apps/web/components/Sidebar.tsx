@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cerrarSesion } from "@/app/login/actions";
 import { obtenerBadgesSidebar } from "@/app/actions/dashboard";
-import { obtenerFeaturesUsuario } from "@/lib/suscripcion";
+import { obtenerFeaturesUsuario } from "@/app/actions/suscripcion";
 import { tienePermiso } from "@/lib/permisos";
 import type { RolOrganizacion } from "@/lib/types/suscripcion";
 

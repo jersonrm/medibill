@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { iniciarCheckout, cambiarPlan, obtenerInfoBilling } from "@/app/actions/billing";
-import { obtenerPlanes } from "@/lib/suscripcion";
+import { obtenerPlanes } from "@/app/actions/suscripcion";
 import type { Plan, LimitesOrg } from "@/lib/types/suscripcion";
 
 function formatCOP(valor: number) {

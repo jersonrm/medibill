@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import GestionGlosas from "@/components/glosas/GestionGlosas";
-import { obtenerFeaturesUsuario } from "@/lib/suscripcion";
+import { obtenerFeaturesUsuario } from "@/app/actions/suscripcion";
 
 export const metadata = {
   title: "Gestión de Glosas — Medibill",

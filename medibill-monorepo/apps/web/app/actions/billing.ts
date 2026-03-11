@@ -2,7 +2,8 @@
 
 import { getContextoOrg } from "@/lib/organizacion";
 import { verificarPermisoOError } from "@/lib/permisos";
-import { obtenerLimitesOrg, obtenerPlanes } from "@/lib/suscripcion";
+import { obtenerLimitesOrg } from "@/lib/suscripcion";
+import { obtenerPlanes } from "@/app/actions/suscripcion";
 import { wompiProvider } from "@/lib/wompi";
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
