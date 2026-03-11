@@ -2,6 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // 0. Rutas API no necesitan auth middleware — salir inmediatamente
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    return NextResponse.next()
+  }
+
   // 1. Inicializamos la respuesta base de Next.js
   let supabaseResponse = NextResponse.next({
     request,
