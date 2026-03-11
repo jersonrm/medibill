@@ -1,5 +1,3 @@
-"use server";
-
 import { createClient } from "@/lib/supabase-server";
 import type {
   ResultadoVerificacion,
@@ -266,6 +264,7 @@ export async function suscripcionActiva(orgId: string): Promise<boolean> {
  * Obtiene todos los planes disponibles.
  */
 export async function obtenerPlanes() {
+  "use server";
   const supabase = await createClient();
   const { data } = await supabase
     .from("planes")
@@ -290,6 +289,7 @@ export async function obtenerFeaturesUsuario(): Promise<{
   };
   maxUsuarios: number;
 } | null> {
+  "use server";
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
