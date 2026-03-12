@@ -120,6 +120,7 @@ export interface CrearFacturaInput {
     eps_nombre?: string;
     municipio_residencia_codigo?: string;
     zona_territorial?: string;
+    pais_origen?: string;
     incapacidad?: string;
     telefono?: string;
     email?: string;

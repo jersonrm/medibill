@@ -41,17 +41,19 @@ export async function generarJsonRipsMVP(facturaId: string): Promise<FevRips> {
     throw new Error("La factura no tiene paciente asociado");
   }
 
-  // 3. Datos del prestador
-  let prestador = { nit: "0", cod: "0" };
+  // 3. Datos del prestador (profesional que atiende)
+  let prestador = { nit: "0", cod: "0", tipoDoc: "CC" as string, numDoc: "0" };
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("numero_documento, codigo_habilitacion")
+    .select("numero_documento, codigo_habilitacion, tipo_documento")
     .eq("user_id", ctx.userId)
     .single();
   if (perfil) {
     prestador = {
       nit: perfil.numero_documento || "0",
       cod: perfil.codigo_habilitacion || "0",
+      tipoDoc: perfil.tipo_documento || "CC",
+      numDoc: perfil.numero_documento || "0",
     };
   }
 
@@ -81,10 +83,12 @@ export async function generarJsonRipsMVP(facturaId: string): Promise<FevRips> {
     sexoPaciente: (paciente.sexo || "M") as DatosParaRips["sexoPaciente"],
     tipoUsuarioPaciente: (paciente.tipo_usuario || "01") as DatosParaRips["tipoUsuarioPaciente"],
     codPaisResidencia: "170",
+    codPaisOrigen: (metadata.codPaisOrigen as string) || "170",
     codMunicipioResidencia: paciente.municipio_residencia_codigo || "",
-    codZonaTerritorialResidencia: (paciente.zona_territorial || "U") as DatosParaRips["codZonaTerritorialResidencia"],
+    codZonaTerritorialResidencia: ({ "U": "01", "R": "02", "01": "01", "02": "02" }[paciente.zona_territorial as string] || "01") as DatosParaRips["codZonaTerritorialResidencia"],
     incapacidad: ((metadata.incapacidad as string) || "NO") as DatosParaRips["incapacidad"],
-    codEntidadAdministradora: factura.nit_erp || "",
+    tipoDocumentoProfesional: (prestador.tipoDoc || "CC") as DatosParaRips["tipoDocumentoProfesional"],
+    documentoProfesional: prestador.numDoc || "0",
     diagnosticos: factura.diagnosticos || [],
     procedimientos: factura.procedimientos || [],
     atencionIA: {

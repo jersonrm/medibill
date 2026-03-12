@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS telegram_uso_anonimo (
 -- 5. Feature flag: bot_telegram en planes
 ALTER TABLE planes ADD COLUMN IF NOT EXISTS bot_telegram BOOLEAN DEFAULT false;
 
-UPDATE planes SET bot_telegram = true WHERE id IN ('profesional', 'clinica', 'ips');
+UPDATE planes SET bot_telegram = true WHERE id IN ('profesional', 'clinica');
 
 -- 6. RLS policies
 ALTER TABLE telegram_vinculaciones ENABLE ROW LEVEL SECURITY;

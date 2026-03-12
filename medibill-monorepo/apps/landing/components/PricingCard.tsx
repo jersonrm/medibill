@@ -72,6 +72,10 @@ export function PricingCard({
       >
         {ctaLabel}
       </a>
+      <p className="mt-3 text-center text-xs text-gray-400">
+        Aplican{" "}
+        <a href="/terminos#prueba-gratuita" className="underline hover:text-medi-primary">condiciones de la prueba gratuita</a>
+      </p>
     </div>
   );
 }

@@ -24,6 +24,7 @@ const plans = [
       "100 clasificaciones IA al mes",
       "50 facturas DIAN",
       "RIPS JSON + FEV XML",
+      "Registro clínico por paciente (automático)",
       "Dashboard básico",
       "Validación de facturas",
       "Soporte por email",
@@ -39,6 +40,7 @@ const plans = [
       "500 clasificaciones IA al mes",
       "200 facturas DIAN",
       "Todo lo de Starter",
+      "Registro clínico + exportación PDF del historial",
       "Dashboard completo con KPIs",
       "Gestión de glosas con IA",
       "Bot Telegram (clasificación por audio)",
@@ -59,6 +61,7 @@ const plans = [
       "Facturas ilimitadas",
       "Todo lo de Profesional",
       "Hasta 20 usuarios",
+      "Registro clínico multi-profesional + control de accesos",
       "Bot Telegram (clasificación por audio)",
       "Gestión de equipo y roles",
       "Importación masiva de datos",
@@ -215,7 +218,17 @@ const pricingFaq = [
   {
     question: "¿Cómo funciona el Bot de Telegram?",
     answer:
-      "El Bot de Telegram permite clasificar notas clínicas por audio. Envías una nota de voz y recibes códigos CUPS y CIE-10 en segundos. Desde el chat puedes crear la factura directamente. Disponible en planes Profesional, Clínica e IPS. Los usuarios sin cuenta tienen 3 clasificaciones gratis para probar.",
+      "El Bot de Telegram permite clasificar notas clínicas por audio. Envías una nota de voz y recibes códigos CUPS y CIE-10 en segundos. Desde el chat puedes crear la factura directamente. Disponible en planes Profesional y Clínica. Los usuarios sin cuenta tienen 3 clasificaciones gratis para probar.",
+  },
+  {
+    question: "¿Medibill guarda la historia clínica de mis pacientes?",
+    answer:
+      "Sí. Cada nota clínica que procesas se almacena automáticamente en el expediente del paciente, junto con el diagnóstico, procedimiento, factura y RIPS asociados. Cumple con la Resolución 839 de 2017 que exige conservación mínima de 15 años. No necesitas otro software para mantener tu registro clínico.",
+  },
+  {
+    question: "¿Puedo consultar el historial de un paciente?",
+    answer:
+      "Sí. Puedes buscar cualquier paciente y ver su historial cronológico completo: notas clínicas, diagnósticos, procedimientos, facturas y RIPS asociados. Todo vinculado en un solo expediente.",
   },
 ];
 
@@ -386,6 +399,12 @@ export default function PreciosPage() {
               Contactar Ventas
             </a>
           </div>
+          <p className="mt-4 text-sm text-gray-500">
+            Consulta nuestros{" "}
+            <a href="/terminos" className="underline hover:text-gray-300">Términos y Condiciones</a>{" "}
+            y las{" "}
+            <a href="/terminos#prueba-gratuita" className="underline hover:text-gray-300">condiciones de la Prueba Gratuita</a>.
+          </p>
         </div>
       </section>
     </>

@@ -125,14 +125,17 @@ const esquemaServicios = {
           codPrestador: { type: "string", minLength: 1 },
           numAutorizacion: { type: ["string", "null"] },
           idMIPRES: { type: ["string", "null"] },
-          fechaDispensAdmon: { type: "string" },
-          codMedicamento: { type: "string", minLength: 1 },
+          fechaDispensAdmon: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$" },
+          codDiagnosticoPrincipal: { type: "string", minLength: 3, pattern: "^[A-Z]\\d{2,4}$" },
+          codDiagnosticoRelacionado: { type: ["string", "null"] },
           tipoMedicamento: { type: "string", enum: ["01", "02"] },
-          nombreGenerico: { type: "string", minLength: 1 },
-          formaFarmaceutica: { type: "string" },
-          concentracion: { type: "string" },
-          unidadMedida: { type: "string" },
-          cantidadDispensada: { type: "number", minimum: 1 },
+          codTecnologiaSalud: { type: "string", minLength: 1 },
+          nomTecnologiaSalud: { type: ["string", "null"] },
+          concentracionMedicamento: { type: "number", minimum: 0 },
+          unidadMedida: { type: "number" },
+          formaFarmaceutica: { type: ["string", "null"] },
+          unidadMinDispensa: { type: "number", minimum: 0 },
+          cantidadMedicamento: { type: "number", minimum: 1 },
           diasTratamiento: { type: "number", minimum: 1 },
           tipoDocumentoIdentificacion: { type: "string" },
           numDocumentoIdentificacion: { type: "string" },
@@ -144,8 +147,8 @@ const esquemaServicios = {
           consecutivo: { type: "number", minimum: 1 },
         },
         required: [
-          "codPrestador", "fechaDispensAdmon", "codMedicamento", "tipoMedicamento",
-          "nombreGenerico", "cantidadDispensada", "diasTratamiento",
+          "codPrestador", "fechaDispensAdmon", "codDiagnosticoPrincipal", "tipoMedicamento",
+          "codTecnologiaSalud", "cantidadMedicamento", "diasTratamiento",
           "vrUnitMedicamento", "vrServicio", "conceptoRecaudo", "valorPagoModerador", "consecutivo"
         ]
       }
@@ -199,21 +202,21 @@ const esquemaFevRips2275 = {
         properties: {
           tipoDocumentoIdentificacion: { type: "string", enum: ["CC", "TI", "RC", "CE", "PA", "MS", "AS", "CD", "SC", "PE", "PT", "CN", "DE", "SI", "NI"] },
           numDocumentoIdentificacion: { type: "string", minLength: 1 },
-          tipoUsuario: { type: "string", enum: ["01", "02", "03", "04", "05", "06", "07", "08"] },
+          tipoUsuario: { type: "string" },
           fechaNacimiento: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
           codSexo: { type: "string", enum: ["M", "F", "I"] },
           codPaisResidencia: { type: "string", minLength: 1 },
           codMunicipioResidencia: { type: "string", minLength: 1 },
-          codZonaTerritorialResidencia: { type: "string", enum: ["U", "R"] },
+          codZonaTerritorialResidencia: { type: "string", enum: ["01", "02"] },
           incapacidad: { type: "string", enum: ["SI", "NO"] },
-          codEntidadAdministradora: { type: "string" },
+          codPaisOrigen: { type: "string", minLength: 1 },
           consecutivo: { type: "number", minimum: 1 },
           servicios: esquemaServicios,
         },
         required: [
           "tipoDocumentoIdentificacion", "numDocumentoIdentificacion", "tipoUsuario",
           "fechaNacimiento", "codSexo", "codPaisResidencia", "codMunicipioResidencia",
-          "codZonaTerritorialResidencia", "incapacidad", "codEntidadAdministradora",
+          "codZonaTerritorialResidencia", "incapacidad", "codPaisOrigen",
           "consecutivo", "servicios"
         ]
       }

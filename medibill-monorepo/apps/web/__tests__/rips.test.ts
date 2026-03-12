@@ -329,15 +329,15 @@ describe("construirFevRips", () => {
     it("mapea medicamentos con vrServicio = unit × cantidad", async () => {
       const { construirFevRips } = await import("@/lib/construir-fev-rips");
       const datos = crearDatosParaRips({
-        medicamentos: [crearMedicamentoInput({ vrUnitMedicamento: 500, cantidadDispensada: 21 })],
+        medicamentos: [crearMedicamentoInput({ vrUnitMedicamento: 500, cantidadMedicamento: 21 })],
       });
       const result = construirFevRips(datos, prestador);
       const med = result.usuarios[0]!.servicios.medicamentos[0]!;
 
       expect(med.vrServicio).toBe(500 * 21);
       expect(med.vrUnitMedicamento).toBe(500);
-      expect(med.cantidadDispensada).toBe(21);
-      expect(med.nombreGenerico).toBe("Amoxicilina");
+      expect(med.cantidadMedicamento).toBe(21);
+      expect(med.nomTecnologiaSalud).toBe("Amoxicilina");
     });
   });
 

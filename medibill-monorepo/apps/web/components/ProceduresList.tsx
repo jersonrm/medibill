@@ -14,6 +14,7 @@ interface ProceduresListProps {
   onEliminar: (index: number) => void;
   onAgregar: (procedimiento: ProcedimientoUI) => void;
   onActualizarTarifa: (index: number, valor: number, fuente: FuenteTarifa) => void;
+  readOnly?: boolean;
 }
 
 export default function ProceduresList({
@@ -22,6 +23,7 @@ export default function ProceduresList({
   onEliminar,
   onAgregar,
   onActualizarTarifa,
+  readOnly,
 }: ProceduresListProps) {
   const [mostrarAgregar, setMostrarAgregar] = useState(false);
   const [nuevoCodigo, setNuevoCodigo] = useState("");
@@ -139,6 +141,7 @@ export default function ProceduresList({
                 </div>
               </div>
 
+              {!readOnly && (
               <button
                 onClick={() => abrirModalEditar(idx)}
                 className="bg-blue-50 text-blue-500 hover:bg-blue-100 p-2.5 rounded-xl transition-colors shadow-sm flex-shrink-0"
@@ -148,13 +151,14 @@ export default function ProceduresList({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
+              )}
               <div className="text-sm font-black text-white bg-medi-primary px-4 py-2 rounded-full border border-medi-primary/50 whitespace-nowrap flex-shrink-0">
                 Cant: {proc.cantidad}
               </div>
               {proc.manual && (
                 <span className="text-[9px] font-black uppercase px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">Manual</span>
               )}
-              {proc.valor_unitario != null && proc.valor_unitario > 0 ? (
+              {!readOnly && proc.valor_unitario != null && proc.valor_unitario > 0 ? (
                 <div className="flex flex-col items-end flex-shrink-0">
                   <button
                     onClick={() => {
@@ -176,7 +180,22 @@ export default function ProceduresList({
                     </span>
                   )}
                 </div>
-              ) : (
+              ) : readOnly && proc.valor_unitario != null && proc.valor_unitario > 0 ? (
+                <div className="flex flex-col items-end flex-shrink-0">
+                  <span className="text-sm font-black text-medi-deep">
+                    ${proc.valor_unitario.toLocaleString("es-CO")}
+                  </span>
+                  {proc.fuente_tarifa && (
+                    <span className={`text-[8px] font-bold uppercase ${
+                      proc.fuente_tarifa === "pactada" ? "text-green-600" :
+                      proc.fuente_tarifa === "propia" ? "text-blue-600" : "text-gray-500"
+                    }`}>
+                      {proc.fuente_tarifa === "pactada" ? "Tarifa pactada" :
+                       proc.fuente_tarifa === "propia" ? "Tarifa propia" : "Manual"}
+                    </span>
+                  )}
+                </div>
+              ) : !readOnly ? (
                 <button
                   onClick={() => {
                     setEditandoTarifa(idx);
@@ -186,7 +205,10 @@ export default function ProceduresList({
                 >
                   Sin tarifa — Ingresar
                 </button>
-              )}
+              ) : (
+                <span className="text-[10px] font-bold text-medi-dark/40 flex-shrink-0">Sin tarifa</span>
+              )}}
+              {!readOnly && (
               <button
                 onClick={() => onEliminar(idx)}
                 className="bg-red-50 text-red-500 hover:bg-red-500 hover:text-white p-2.5 rounded-xl transition-colors shadow-sm ml-2 flex-shrink-0"
@@ -201,10 +223,11 @@ export default function ProceduresList({
                   />
                 </svg>
               </button>
+              )}
             </div>
 
             {/* Editor inline de tarifa */}
-            {editandoTarifa === idx && (
+            {!readOnly && editandoTarifa === idx && (
               <div className="border-t border-medi-light/50 bg-blue-50/50 px-5 py-3 flex items-center gap-3 animate-in fade-in">
                 <span className="text-xs font-bold text-medi-dark/70">Tarifa unitaria:</span>
                 <span className="text-medi-dark/50">$</span>
@@ -234,7 +257,7 @@ export default function ProceduresList({
               </div>
             )}
 
-            {proc.alternativas && proc.alternativas.length > 0 && (
+            {!readOnly && proc.alternativas && proc.alternativas.length > 0 && (
               <details className="group/details border-t border-medi-light/50 bg-medi-light/20 cursor-pointer">
                 <summary className="text-xs font-bold text-medi-primary uppercase px-6 py-3 list-none flex items-center gap-2 hover:bg-medi-light/40 transition-colors">
                   <span className="group-open/details:rotate-90 transition-transform">▶</span> Ver alternativas
@@ -263,6 +286,7 @@ export default function ProceduresList({
         ))}
 
         {/* Agregar procedimiento manual */}
+        {!readOnly && (
         <div className="mt-4 border-t border-medi-light/50 pt-4">
           <div className="flex gap-2">
             <button
@@ -300,6 +324,7 @@ export default function ProceduresList({
             </div>
           )}
         </div>
+        )}
       </div>
 
       <ModalBusquedaCodigo

@@ -105,6 +105,7 @@ export default function PanelAprobacion({ resultado, datosPaciente, nota }: Pane
         tipo_usuario: datosPaciente.tipoUsuario || undefined,
         municipio_residencia_codigo: datosPaciente.codMunicipioResidencia || undefined,
         zona_territorial: datosPaciente.codZonaTerritorial || undefined,
+        pais_origen: datosPaciente.codPaisOrigen || undefined,
         eps_nombre: datosPaciente.epsNombre || undefined,
         eps_codigo: datosPaciente.epsCodigo || undefined,
         incapacidad: datosPaciente.incapacidad || "NO",

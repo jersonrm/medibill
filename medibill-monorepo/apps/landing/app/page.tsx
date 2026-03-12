@@ -68,6 +68,14 @@ function IconCurrency() {
   );
 }
 
+function IconClipboard() {
+  return (
+    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+    </svg>
+  );
+}
+
 /* ─────────────────────── Data ─────────────────────── */
 
 const features = [
@@ -113,6 +121,12 @@ const features = [
     description:
       "Envía una nota de voz al Bot de Telegram y recibí los códigos CUPS y CIE-10 en segundos. Creá la factura directamente desde el chat.",
   },
+  {
+    icon: <IconClipboard />,
+    title: "Expediente del Paciente",
+    description:
+      "Cada nota clínica que procesas queda registrada automáticamente en el expediente del paciente — diagnóstico, procedimiento, factura y RIPS vinculados. Cumple Resolución 839/2017 de conservación por 15 años, sin esfuerzo extra.",
+  },
 ];
 
 const whyUs = [
@@ -140,6 +154,12 @@ const whyUs = [
     description:
       "Un equipo que combina experiencia en salud y tecnología. Entendemos el contexto de la facturación médica en Colombia porque lo vivimos.",
   },
+  {
+    icon: <IconClipboard />,
+    title: "Registro Clínico Automático",
+    description:
+      "Cada atención que facturas queda vinculada al expediente del paciente. Cumple Resolución 839/2017 y se alinea con Ley 2015/2020 — sin apps adicionales ni doble trabajo.",
+  },
 ];
 
 const steps = [
@@ -147,7 +167,7 @@ const steps = [
     step: 1,
     title: "Registra tu consulta",
     description:
-      "Escribe o pega la nota clínica del paciente. Medibill acepta texto libre — no necesitas un formato específico.",
+      "Escribe o pega la nota clínica del paciente. Medibill la guarda automáticamente en el expediente del paciente. Acepta texto libre — no necesitas un formato específico.",
   },
   {
     step: 2,
@@ -184,9 +204,10 @@ const plans = [
     features: [
       "100 clasificaciones IA al mes",
       "50 facturas DIAN",
-      "Soporte por email",
+      "Registro clínico por paciente (automático)",
       "Dashboard básico",
       "RIPS JSON + FEV XML",
+      "Soporte por email",
     ],
   },
   {
@@ -197,11 +218,12 @@ const plans = [
     features: [
       "500 clasificaciones IA al mes",
       "200 facturas DIAN",
-      "Soporte email + chat",
+      "Registro clínico + exportación PDF del historial",
       "Dashboard completo",
       "Gestión de glosas con IA",
       "Bot Telegram (audio)",
       "Importación de sábana de pagos",
+      "Soporte email + chat",
     ],
     highlighted: true,
   },
@@ -214,28 +236,13 @@ const plans = [
       "Clasificaciones ilimitadas",
       "Facturas ilimitadas",
       "Hasta 20 usuarios",
-      "Soporte prioritario",
+      "Registro clínico multi-profesional + control de accesos",
       "Todas las funcionalidades",
       "Bot Telegram (audio)",
       "Gestión de equipo y roles",
       "Importación masiva",
+      "Soporte prioritario",
     ],
-  },
-  {
-    name: "IPS",
-    price: "Personalizado",
-    period: "",
-    description: "Para instituciones prestadoras de servicios de salud con necesidades a escala.",
-    features: [
-      "Todo lo de Clínica",
-      "Sedes ilimitadas",
-      "Soporte dedicado 24/7",
-      "Implementación asistida",
-      "SLA garantizado",
-      "Integración personalizada",
-    ],
-    ctaLabel: "Contactar Ventas",
-    ctaHref: "/#contacto",
   },
 ];
 
@@ -282,8 +289,19 @@ const faqItems = [
   },  {
     question: "¿Cómo funciona el Bot de Telegram?",
     answer:
-      "El Bot de Telegram te permite clasificar notas clínicas por audio. Enviás una nota de voz con la atención del paciente y recibís los códigos CUPS y CIE-10 en segundos. Desde el chat podés crear la factura directamente en Medibill con los datos pre-cargados. Disponible en planes Profesional, Clínica e IPS.",
-  },];
+      "El Bot de Telegram te permite clasificar notas clínicas por audio. Enviás una nota de voz con la atención del paciente y recibís los códigos CUPS y CIE-10 en segundos. Desde el chat podés crear la factura directamente en Medibill con los datos pre-cargados. Disponible en planes Profesional y Clínica.",
+  },
+  {
+    question: "¿Medibill guarda la historia clínica de mis pacientes?",
+    answer:
+      "Sí. Cada nota clínica que procesas se almacena automáticamente en el expediente del paciente, junto con el diagnóstico, procedimiento, factura y RIPS asociados. Cumple con la Resolución 839 de 2017 que exige conservación mínima de 15 años. No necesitas otro software para mantener tu registro clínico.",
+  },
+  {
+    question: "¿Puedo consultar el historial de un paciente?",
+    answer:
+      "Sí. Puedes buscar cualquier paciente y ver su historial cronológico completo: notas clínicas, diagnósticos, procedimientos, facturas y RIPS asociados. Todo vinculado en un solo expediente.",
+  },
+];
 
 /* ─────────────────────── Page ─────────────────────── */
 
@@ -317,6 +335,12 @@ export default function HomePage() {
               Ver Funcionalidades
             </a>
           </div>
+          <p className="mt-4 text-sm text-gray-500">
+            Al registrarte aceptas nuestros{" "}
+            <a href="/terminos" className="underline hover:text-medi-primary">Términos y Condiciones</a>.
+            Consulta las{" "}
+            <a href="/terminos#prueba-gratuita" className="underline hover:text-medi-primary">condiciones de la Prueba Gratuita</a>.
+          </p>
           <div className="mx-auto mt-16 grid max-w-xl grid-cols-3 gap-8">
             <StatCounter value="99.2" suffix="%" label="Precisión RIPS" />
             <StatCounter prefix="-" value="80" suffix="%" label="Tiempo facturación" />
@@ -407,7 +431,7 @@ export default function HomePage() {
               subtitle="Elige el plan que se ajuste al volumen de tu práctica. Todos incluyen período de prueba gratuito."
             />
           </div>
-          <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {plans.map((plan) => (
               <PricingCard key={plan.name} {...plan} />
             ))}
@@ -495,6 +519,12 @@ export default function HomePage() {
           >
             Comenzar Prueba Gratuita
           </a>
+          <p className="mt-4 text-sm text-gray-500">
+            Consulta nuestros{" "}
+            <a href="/terminos" className="underline hover:text-gray-300">Términos y Condiciones</a>{" "}
+            y las{" "}
+            <a href="/terminos#prueba-gratuita" className="underline hover:text-gray-300">condiciones de la Prueba Gratuita</a>.
+          </p>
         </div>
       </section>
     </>

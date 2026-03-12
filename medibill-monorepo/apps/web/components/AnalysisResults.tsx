@@ -21,6 +21,7 @@ interface AnalysisResultsProps {
   numFactura: string;
   onResultadoChange: (resultado: ResultadoAnalisis) => void;
   nota?: string;
+  readOnly?: boolean;
 }
 
 export default function AnalysisResults({
@@ -29,6 +30,7 @@ export default function AnalysisResults({
   numFactura,
   onResultadoChange,
   nota = "",
+  readOnly = false,
 }: AnalysisResultsProps) {
   // Cerrar todos los <details> cuando cambia el resultado
   useEffect(() => {
@@ -130,6 +132,7 @@ export default function AnalysisResults({
         onActualizarAtencion={handleActualizarAtencion}
         diagnosticos={resultado.diagnosticos}
         procedimientos={resultado.procedimientos}
+        readOnly={readOnly}
       />
 
       <DiagnosticsList
@@ -138,6 +141,7 @@ export default function AnalysisResults({
         onEliminar={handleEliminarDiagnostico}
         onAgregar={handleAgregarDiagnostico}
         onReordenar={handleReordenarDiagnostico}
+        readOnly={readOnly}
       />
 
       <ProceduresList
@@ -146,13 +150,16 @@ export default function AnalysisResults({
         onEliminar={handleEliminarProcedimiento}
         onAgregar={handleAgregarProcedimiento}
         onActualizarTarifa={handleActualizarTarifa}
+        readOnly={readOnly}
       />
 
-      <PanelAprobacion
-        resultado={resultado}
-        datosPaciente={datosPaciente}
-        nota={nota}
-      />
+      {!readOnly && (
+        <PanelAprobacion
+          resultado={resultado}
+          datosPaciente={datosPaciente}
+          nota={nota}
+        />
+      )}
     </div>
   );
 }

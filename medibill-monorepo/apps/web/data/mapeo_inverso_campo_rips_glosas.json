@@ -1,0 +1,4060 @@
+{
+  "titulo": "MAPEO INVERSO: CAMPO RIPS → GLOSAS ASOCIADAS",
+  "descripcion": "Para cada campo del RIPS, lista todas las glosas que pueden generarse si ese campo presenta inconsistencias, errores o diferencias",
+  "fuente": "Anexo Resolución 2275/2023 - Relacionamiento Glosas vs RIPS (31-mayo-2024)",
+  "uso_en_medibill": "Al validar cada campo RIPS antes de generar la FEV, verificar contra las glosas asociadas para prevención anti-glosa",
+  "estadisticas_por_categoria": {
+    "Datos relativos a la transacción": {
+      "campos": 4,
+      "total_glosas": 0,
+      "campos_sin_glosas": 4
+    },
+    "Datos relativos a los usuarios": {
+      "campos": 11,
+      "total_glosas": 10,
+      "campos_sin_glosas": 1
+    },
+    "Datos de las consultas": {
+      "campos": 21,
+      "total_glosas": 88,
+      "campos_sin_glosas": 0
+    },
+    "Datos de los procedimientos": {
+      "campos": 20,
+      "total_glosas": 112,
+      "campos_sin_glosas": 0
+    },
+    "Datos de la urgencia con observación": {
+      "campos": 12,
+      "total_glosas": 26,
+      "campos_sin_glosas": 0
+    },
+    "Datos de hospitalización": {
+      "campos": 15,
+      "total_glosas": 37,
+      "campos_sin_glosas": 0
+    },
+    "Datos de recién nacido": {
+      "campos": 13,
+      "total_glosas": 26,
+      "campos_sin_glosas": 0
+    },
+    "Registro de datos de medicamentos": {
+      "campos": 23,
+      "total_glosas": 128,
+      "campos_sin_glosas": 0
+    },
+    "Datos de otros servicios": {
+      "campos": 16,
+      "total_glosas": 186,
+      "campos_sin_glosas": 0
+    }
+  },
+  "mapeo_campo_glosas": {
+    "T01": {
+      "nombre_campo": "Número Documento Identificación del Facturador Electrónico",
+      "categoria_rips": "Datos relativos a la transacción",
+      "total_glosas_asociadas": 0,
+      "glosas": []
+    },
+    "T02": {
+      "nombre_campo": "Número de Factura",
+      "categoria_rips": "Datos relativos a la transacción",
+      "total_glosas_asociadas": 0,
+      "glosas": []
+    },
+    "T03": {
+      "nombre_campo": "Tipo Nota",
+      "categoria_rips": "Datos relativos a la transacción",
+      "total_glosas_asociadas": 0,
+      "glosas": []
+    },
+    "T04": {
+      "nombre_campo": "Número de la Nota",
+      "categoria_rips": "Datos relativos a la transacción",
+      "total_glosas_asociadas": 0,
+      "glosas": []
+    },
+    "U01": {
+      "nombre_campo": "Tipo de Documento de Identificación",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U02": {
+      "nombre_campo": "Número Documento Identificación del usuario",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U03": {
+      "nombre_campo": "Tipo usuario",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U04": {
+      "nombre_campo": "Fecha de Nacimiento del Usuario",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U05": {
+      "nombre_campo": "Cod. Sexo",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U06": {
+      "nombre_campo": "Cod. País residencia",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U07": {
+      "nombre_campo": "Cod. Mpio residencia",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U08": {
+      "nombre_campo": "Cod. Zona Territorial residencia",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U09": {
+      "nombre_campo": "Incapacidad",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U10": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 1,
+      "glosas": [
+        {
+          "codigo_glosa": "FA1605",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan una o varias personas que en el momento de la prestación del servicio corresponden a otro responsable de pago"
+        }
+      ]
+    },
+    "U11": {
+      "nombre_campo": "Cód Pais Origen",
+      "categoria_rips": "Datos relativos a los usuarios",
+      "total_glosas_asociadas": 0,
+      "glosas": []
+    },
+    "C01": {
+      "nombre_campo": "Cod prestador",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C02": {
+      "nombre_campo": "Fecha inicio de atención",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C03": {
+      "nombre_campo": "Numero de Autorización",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 7,
+      "glosas": [
+        {
+          "codigo_glosa": "SO2101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización no está incluido en el RIPS."
+        },
+        {
+          "codigo_glosa": "SO2102",
+          "nivel": "Aplicación",
+          "descripcion": "el número de la autorización incluido en el RIPS no corresponde al prestador de servicios de salud"
+        },
+        {
+          "codigo_glosa": "SO2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización de servicios y tecnologías en salud incluido en el RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "SO2104",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización incluido en el RIPS no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        }
+      ]
+    },
+    "C04": {
+      "nombre_campo": "Cód de consulta",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C05": {
+      "nombre_campo": "Modalidad grupo servicio tecnologia de salud",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C06": {
+      "nombre_campo": "grupo servicios",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C07": {
+      "nombre_campo": "cod del servicio",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C08": {
+      "nombre_campo": "Finalidad Tecnologia de salud",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C09": {
+      "nombre_campo": "Causa motivo de atención",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C10": {
+      "nombre_campo": "Cod DX principal",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C11": {
+      "nombre_campo": "Cod DX relacionado 1",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C12": {
+      "nombre_campo": "Cod DX relacionado 2",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C13": {
+      "nombre_campo": "Cod DX relacionado 3",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C14": {
+      "nombre_campo": "Tipo DX principal",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C15": {
+      "nombre_campo": "Tipo Doc identificación de la persona que atendió",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C16": {
+      "nombre_campo": "Numero de Doc de identicación de la persona que atendió",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C17": {
+      "nombre_campo": "Valor del servicio",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 40,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0102",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan consultas, interconsultas o atenciones (visitas) domiciliarias que están incluidas en la estancia u observación de urgencias de acuerdo con lo pactado"
+        },
+        {
+          "codigo_glosa": "FA0201",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por consulta, interconsulta o atención (visita) domiciliaria que viene relacionado o justificado en los soportes de cobro, presenta diferencias con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "FA0202",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran consultas o atenciones (visitas) domiciliarias que se encuentran incluidas en los honorarios profesionales post quirúrgicos"
+        },
+        {
+          "codigo_glosa": "FA0203",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran consultas o atenciones (visitas) domiciliarias que ya se encuentran incluidas en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0205",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran consultas que se encuentran incluidas en los honorarios profesionales del procedimiento, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0206",
+          "nivel": "Aplicación",
+          "descripcion": "En una factura se registra una interconsulta que originó la práctica de un procedimiento quirúrgico o intervencionista que realizó el mismo prestador"
+        },
+        {
+          "codigo_glosa": "FA1305",
+          "nivel": "Aplicación",
+          "descripcion": "Servicio o tecnología corresponde a diferente cobertura"
+        },
+        {
+          "codigo_glosa": "FA1606",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan uno o varios servicios o tecnologías en salud que corresponden a otro responsable de pago"
+        },
+        {
+          "codigo_glosa": "FA2702",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran servicios y tecnologías en salud que se encuentran ya cobrados dentro de la misma u otra factura"
+        },
+        {
+          "codigo_glosa": "FA2805",
+          "nivel": "Aplicación",
+          "descripcion": "se factura un servicio o tecnología de salud ya pagada por la entidad responsable de pago"
+        },
+        {
+          "codigo_glosa": "TA0201",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por consulta, interconsulta o atención (visita) domiciliaria que viene relacionado o justificado en los soportes de cobro, presenta diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "SO0201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian la realización de la consulta, interconsulta o atención (visita) domiciliaria"
+        },
+        {
+          "codigo_glosa": "SO0202",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian la realización de la consulta, interconsulta o atención (visita) domiciliaria no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3401",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis"
+        },
+        {
+          "codigo_glosa": "SO3402",
+          "nivel": "Aplicación",
+          "descripcion": "La epicrisis no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3403",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención de urgencias"
+        },
+        {
+          "codigo_glosa": "SO3404",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3405",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el resumen de atención"
+        },
+        {
+          "codigo_glosa": "SO3406",
+          "nivel": "Aplicación",
+          "descripcion": "El resumen de atención no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3407",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención odontológica"
+        },
+        {
+          "codigo_glosa": "SO3408",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención odontológica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, con sus respectivos detalles, con las que se cumple los topes de cobertura"
+        },
+        {
+          "codigo_glosa": "SO3602",
+          "nivel": "Aplicación",
+          "descripcion": "Las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la orden o prescripción facultativa del profesional tratante"
+        },
+        {
+          "codigo_glosa": "SO3702",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido del usuario"
+        },
+        {
+          "codigo_glosa": "SO3902",
+          "nivel": "Aplicación",
+          "descripcion": "El comprobante de recibido del usuario no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la lista de precios"
+        },
+        {
+          "codigo_glosa": "SO4701",
+          "nivel": "Aplicación",
+          "descripcion": "No se incluye en la factura de venta en salud, los soportes de los servicios y tecnologías en salud para recobros a cargo de la ADRES, accidentes de trabajo o enfermedad profesional a cargo de la ARL, de conformidad con la normativa vigente"
+        },
+        {
+          "codigo_glosa": "SO4801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la evidencia del envío del trámite respectivo"
+        },
+        {
+          "codigo_glosa": "SO4802",
+          "nivel": "Aplicación",
+          "descripcion": "El informe de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU0201",
+          "nivel": "Aplicación",
+          "descripcion": "El número de consultas, interconsultas o atenciones (visitas) domiciliarias que vienen relacionadas en la factura de venta en salud presenta diferencia con las autorizadas"
+        },
+        {
+          "codigo_glosa": "AU0202",
+          "nivel": "Aplicación",
+          "descripcion": "La consulta, interconsulta o atención (visita) domiciliaria relacionada o justificada en los soportes de la factura de venta en salud no corresponde a la autorizada"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "CL0201",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por consulta, interconsulta o atención (visita) domiciliaria que viene relacionado en los soportes de cobro no es pertinente"
+        },
+        {
+          "codigo_glosa": "CL5301",
+          "nivel": "Aplicación",
+          "descripcion": "Los servicios prestados no obedecen a una atención de urgencia de acuerdo con la definición de la normativa vigente"
+        }
+      ]
+    },
+    "C18": {
+      "nombre_campo": " tipo de Pago moderador",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C19": {
+      "nombre_campo": "Valor pago moderador",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 4,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "CL0201",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por consulta, interconsulta o atención (visita) domiciliaria que viene relacionado en los soportes de cobro no es pertinente"
+        }
+      ]
+    },
+    "C20": {
+      "nombre_campo": "Numero FEV pago moderador",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "C21": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos de las consultas",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P01": {
+      "nombre_campo": "Cód Prestador",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P02": {
+      "nombre_campo": "Fecha inicio atención",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P03": {
+      "nombre_campo": "ID MIPRES",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P04": {
+      "nombre_campo": "Número de Autorización",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 7,
+      "glosas": [
+        {
+          "codigo_glosa": "SO2101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización no está incluido en el RIPS."
+        },
+        {
+          "codigo_glosa": "SO2102",
+          "nivel": "Aplicación",
+          "descripcion": "el número de la autorización incluido en el RIPS no corresponde al prestador de servicios de salud"
+        },
+        {
+          "codigo_glosa": "SO2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización de servicios y tecnologías en salud incluido en el RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "SO2104",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización incluido en el RIPS no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        }
+      ]
+    },
+    "P05": {
+      "nombre_campo": "Cod procedimiento",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P06": {
+      "nombre_campo": "Via ingreso servicio salud",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P07": {
+      "nombre_campo": "Modalidad grupo servicio tecnologia de salud",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P08": {
+      "nombre_campo": "Grupo servicios",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P09": {
+      "nombre_campo": "Cod servicio",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P10": {
+      "nombre_campo": "Finalidad Tecnologia de salud",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P11": {
+      "nombre_campo": "Tipo de Doc identificación",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P12": {
+      "nombre_campo": "Numero de doc de identificación",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P13": {
+      "nombre_campo": "Cod Dx principal",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P14": {
+      "nombre_campo": "Cod Dx relacionado",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P15": {
+      "nombre_campo": "Cod complicación",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P16": {
+      "nombre_campo": "Vr Servicios",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 67,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0105",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan servicios o tecnologías en salud que se encuentran incluidos en la estancia u observación de urgencias de acuerdo con lo pactado"
+        },
+        {
+          "codigo_glosa": "FA0801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por apoyo diagnóstico que vienen relacionados o justificados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA0802",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan separadamente apoyos diagnósticos incluidos uno en el otro"
+        },
+        {
+          "codigo_glosa": "FA0803",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran apoyos diagnósticos que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0805",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran apoyos diagnósticos que ya se encuentran incluidos en el procedimiento quirúrgico o intervencionista"
+        },
+        {
+          "codigo_glosa": "FA1305",
+          "nivel": "Aplicación",
+          "descripcion": "Servicio o tecnología corresponde a diferente cobertura"
+        },
+        {
+          "codigo_glosa": "FA1606",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan uno o varios servicios o tecnologías en salud que corresponden a otro responsable de pago"
+        },
+        {
+          "codigo_glosa": "FA2301",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por otros procedimientos no quirúrgicos que vienen relacionados o justificados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA2302",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan separadamente otros procedimientos no quirúrgicos incluidos en otro."
+        },
+        {
+          "codigo_glosa": "FA2303",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran otros procedimientos no quirúrgicos que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA2702",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran servicios y tecnologías en salud que se encuentran ya cobrados dentro de la misma u otra factura"
+        },
+        {
+          "codigo_glosa": "FA2805",
+          "nivel": "Aplicación",
+          "descripcion": "se factura un servicio o tecnología de salud ya pagada por la entidad responsable de pago"
+        },
+        {
+          "codigo_glosa": "FA5701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por apoyo terapéutico que vienen relacionados o justificados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA5702",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan separadamente apoyos terapéuticos incluidos en otro"
+        },
+        {
+          "codigo_glosa": "FA5703",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran apoyos terapéuticos que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA5801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por procedimientos quirúrgicos o intervencionistas que vienen relacionados o justificados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA5802",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan separadamente procedimientos quirúrgicos o intervencionistas incluidos en otro"
+        },
+        {
+          "codigo_glosa": "FA5803",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran procedimientos quirúrgicos o intervencionistas que ya se encuentran incluidos en una atención agrupada"
+        },
+        {
+          "codigo_glosa": "TA0801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por apoyo diagnóstico que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA2301",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por otros procedimientos no quirúrgicos que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA5701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por apoyo terapéutico que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA5801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por procedimientos quirúrgicos o intervencionistas que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "SO0801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian la práctica del apoyo diagnóstico"
+        },
+        {
+          "codigo_glosa": "SO0802",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian el apoyo diagnóstico no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0803",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia en los soportes de cobro de la lectura o interpretación del apoyo diagnóstico por parte del profesional correspondiente"
+        },
+        {
+          "codigo_glosa": "SO3401",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis"
+        },
+        {
+          "codigo_glosa": "SO3402",
+          "nivel": "Aplicación",
+          "descripcion": "La epicrisis no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3403",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención de urgencias"
+        },
+        {
+          "codigo_glosa": "SO3404",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3405",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el resumen de atención"
+        },
+        {
+          "codigo_glosa": "SO3406",
+          "nivel": "Aplicación",
+          "descripcion": "El resumen de atención no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3407",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención odontológica"
+        },
+        {
+          "codigo_glosa": "SO3408",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención odontológica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, con sus respectivos detalles, con las que se cumple los topes de cobertura"
+        },
+        {
+          "codigo_glosa": "SO3602",
+          "nivel": "Aplicación",
+          "descripcion": "Las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la orden o prescripción facultativa del profesional tratante"
+        },
+        {
+          "codigo_glosa": "SO3702",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido del usuario"
+        },
+        {
+          "codigo_glosa": "SO3902",
+          "nivel": "Aplicación",
+          "descripcion": "El comprobante de recibido del usuario no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4001",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la copia del registro de anestesia"
+        },
+        {
+          "codigo_glosa": "SO4002",
+          "nivel": "Aplicación",
+          "descripcion": "El registro de anestesia no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4101",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la copia de la descripción quirúrgica"
+        },
+        {
+          "codigo_glosa": "SO4102",
+          "nivel": "Aplicación",
+          "descripcion": "La descripción quirúrgica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la lista de precios"
+        },
+        {
+          "codigo_glosa": "SO4701",
+          "nivel": "Aplicación",
+          "descripcion": "No se incluye en la factura de venta en salud, los soportes de los servicios y tecnologías en salud para recobros a cargo de la ADRES, accidentes de trabajo o enfermedad profesional a cargo de la ARL, de conformidad con la normativa vigente"
+        },
+        {
+          "codigo_glosa": "SO4801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la evidencia del envío del trámite respectivo"
+        },
+        {
+          "codigo_glosa": "SO4802",
+          "nivel": "Aplicación",
+          "descripcion": "El informe de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO5701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian la práctica del apoyo terapéutico"
+        },
+        {
+          "codigo_glosa": "SO5702",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian el apoyo terapéutico no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO5801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los procedimientos quirúrgicos o intervencionistas"
+        },
+        {
+          "codigo_glosa": "SO5802",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los procedimientos quirúrgicos o intervencionistas no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU0801",
+          "nivel": "Aplicación",
+          "descripcion": "El número de apoyos diagnósticos que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado"
+        },
+        {
+          "codigo_glosa": "AU0802",
+          "nivel": "Aplicación",
+          "descripcion": "Los apoyos diagnósticos relacionados o justificados en los soportes de la factura de venta en salud no corresponden con los autorizados"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "AU2301",
+          "nivel": "Aplicación",
+          "descripcion": "El número de procedimientos no quirúrgicos que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado"
+        },
+        {
+          "codigo_glosa": "AU2302",
+          "nivel": "Aplicación",
+          "descripcion": "El procedimiento no quirúrgico relacionado o justificado en los soportes de la factura de venta en salud no corresponden con el autorizado"
+        },
+        {
+          "codigo_glosa": "AU5702",
+          "nivel": "Aplicación",
+          "descripcion": "Los apoyos terapéuticos relacionados o justificados en los soportes de la factura de venta en salud no corresponden con los autorizados"
+        },
+        {
+          "codigo_glosa": "AU5802",
+          "nivel": "Aplicación",
+          "descripcion": "Los procedimientos quirúrgicos o intervencionistas que vienen relacionados o justificados en los soportes de la factura de venta en salud no corresponden a los autorizados"
+        },
+        {
+          "codigo_glosa": "CL0801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por apoyo diagnóstico que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL2301",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por otros procedimientos no quirúrgicos o actividades que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL5301",
+          "nivel": "Aplicación",
+          "descripcion": "Los servicios prestados no obedecen a una atención de urgencia de acuerdo con la definición de la normativa vigente"
+        },
+        {
+          "codigo_glosa": "CL5701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por apoyo terapéutico que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL5801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por procedimientos quirúrgicos o intervencionistas que vienen relacionados en los soportes de cobro no son pertinentes"
+        }
+      ]
+    },
+    "P17": {
+      "nombre_campo": "Tipo pago moderador",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P18": {
+      "nombre_campo": "Vr pago moderador",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P19": {
+      "nombre_campo": "Número FEV pago moderador",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "P20": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos de los procedimientos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R01": {
+      "nombre_campo": "Cod prestador",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R02": {
+      "nombre_campo": "Fecha inicio atención",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R03": {
+      "nombre_campo": "Causa motivo atención",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R04": {
+      "nombre_campo": "Cod Dx principal de ingreso ",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R05": {
+      "nombre_campo": "Cod Dx principal de Egreso ",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R06": {
+      "nombre_campo": "Cod DX relacionado Egreso 1",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R07": {
+      "nombre_campo": "Cod DX relacionado Egreso 2",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R08": {
+      "nombre_campo": "Cod DX relacionado Egreso 3",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R09": {
+      "nombre_campo": "Condicion destino usuario Egreso",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R10": {
+      "nombre_campo": "Cod Dx causa muerte",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R11": {
+      "nombre_campo": "Fecha Egreso",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "R12": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos de la urgencia con observación",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H01": {
+      "nombre_campo": "Cod prestador",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H02": {
+      "nombre_campo": "Vìa ingreso servicio de salud",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H03": {
+      "nombre_campo": "Fecha inicio atención",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H04": {
+      "nombre_campo": "Número de autorización",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 7,
+      "glosas": [
+        {
+          "codigo_glosa": "SO2101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización no está incluido en el RIPS."
+        },
+        {
+          "codigo_glosa": "SO2102",
+          "nivel": "Aplicación",
+          "descripcion": "el número de la autorización incluido en el RIPS no corresponde al prestador de servicios de salud"
+        },
+        {
+          "codigo_glosa": "SO2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización de servicios y tecnologías en salud incluido en el RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "SO2104",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización incluido en el RIPS no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        }
+      ]
+    },
+    "H05": {
+      "nombre_campo": "Causa motivo atención",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H06": {
+      "nombre_campo": "Cod Dx principal de ingreso",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H07": {
+      "nombre_campo": "Cod Dx principal de Egreso",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H08": {
+      "nombre_campo": "Cod Dx relacionado egreso 1",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H09": {
+      "nombre_campo": "Cod Dx relacionado egreso 2",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H10": {
+      "nombre_campo": "Cod Dx relacionado egreso 3",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H11": {
+      "nombre_campo": "Cod complicación",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H12": {
+      "nombre_campo": "Condición destino usuario egreso",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H13": {
+      "nombre_campo": "Cod DX causa muerte",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H14": {
+      "nombre_campo": "Fecha egreso",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "H15": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos de hospitalización",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N01": {
+      "nombre_campo": "Cod prestador",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N02": {
+      "nombre_campo": "Tipo Doc Identificación",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N03": {
+      "nombre_campo": "Numero Doc Identificación",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N04": {
+      "nombre_campo": "Fecha de Nacimiento",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N05": {
+      "nombre_campo": "Edad Gestacional",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N06": {
+      "nombre_campo": "Numero Consultas control cuidado prenatal",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N07": {
+      "nombre_campo": "Cod sexo biológico",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N08": {
+      "nombre_campo": "Peso",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N09": {
+      "nombre_campo": "Cod DX principal",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N10": {
+      "nombre_campo": "Cod destino usuario egreso",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N11": {
+      "nombre_campo": "Cod DX causa muerte",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N12": {
+      "nombre_campo": "Fecha egreso",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "N13": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos de recién nacido",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M01": {
+      "nombre_campo": "cod prestador",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M02": {
+      "nombre_campo": "Num autorización",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 8,
+      "glosas": [
+        {
+          "codigo_glosa": "SO2101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización no está incluido en el RIPS."
+        },
+        {
+          "codigo_glosa": "SO2102",
+          "nivel": "Aplicación",
+          "descripcion": "el número de la autorización incluido en el RIPS no corresponde al prestador de servicios de salud"
+        },
+        {
+          "codigo_glosa": "SO2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización de servicios y tecnologías en salud incluido en el RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "SO2104",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización incluido en el RIPS no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "AU4304",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa del profesional tratante o el número de la autorización de servicios registrado en los soportes de cobro no corresponde a la autorización, orden o prescripción facultativa reemplazada por vencimiento"
+        }
+      ]
+    },
+    "M03": {
+      "nombre_campo": "ID MIPRES",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M04": {
+      "nombre_campo": "Fecha dispensación",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M05": {
+      "nombre_campo": "Cod Dx principal",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M06": {
+      "nombre_campo": "Cod Dx relacionado",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M07": {
+      "nombre_campo": "Tipo medicamento",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M08": {
+      "nombre_campo": "Cod Tecnologia en salud",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0702",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan separadamente principios activos que fueron dispensados en una presentación combinada"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M09": {
+      "nombre_campo": "Nombre Tecnologia en salud",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0703",
+          "nivel": "Aplicación",
+          "descripcion": "El principio activo que viene relacionado en la factura de venta en salud presenta diferencia con el autorizado"
+        }
+      ]
+    },
+    "M10": {
+      "nombre_campo": "Concentración Medicamento",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0704",
+          "nivel": "Aplicación",
+          "descripcion": "La concentración que viene relacionada en la factura de venta en salud presenta diferencia con la autorizada"
+        }
+      ]
+    },
+    "M11": {
+      "nombre_campo": "Unidad Medida",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M12": {
+      "nombre_campo": "Forma Farmaceútica",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0702",
+          "nivel": "Aplicación",
+          "descripcion": "La forma farmacéutica que vienen relacionada en la factura de venta en salud presenta diferencia con la autorizada"
+        }
+      ]
+    },
+    "M13": {
+      "nombre_campo": "Cod de la Unidad de medida del medicamento",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M14": {
+      "nombre_campo": "Cantidad Medicamento",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 5,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0701",
+          "nivel": "Aplicación",
+          "descripcion": "El número de unidades de la forma farmacéutica que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado"
+        },
+        {
+          "codigo_glosa": "CL0703",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, corresponden a un suministro incompleto de acuerdo a la orden o la prescripción facultativa"
+        }
+      ]
+    },
+    "M15": {
+      "nombre_campo": "Dias Tratamiento",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M16": {
+      "nombre_campo": "Tipo Doc Identificación de quien prescribió",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M17": {
+      "nombre_campo": "Numero Doc de identificación de quien prescribió",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M18": {
+      "nombre_campo": "Vr. Unitario del Medicamento",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 27,
+      "glosas": [
+        {
+          "codigo_glosa": "TA0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "SO0701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de administración de medicamentos"
+        },
+        {
+          "codigo_glosa": "SO0702",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los medicamentos suministrados no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0703",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido de medicamentos de las personas"
+        },
+        {
+          "codigo_glosa": "SO3401",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis"
+        },
+        {
+          "codigo_glosa": "SO3402",
+          "nivel": "Aplicación",
+          "descripcion": "La epicrisis no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3403",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención de urgencias"
+        },
+        {
+          "codigo_glosa": "SO3404",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3405",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el resumen de atención"
+        },
+        {
+          "codigo_glosa": "SO3406",
+          "nivel": "Aplicación",
+          "descripcion": "El resumen de atención no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3407",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención odontológica"
+        },
+        {
+          "codigo_glosa": "SO3408",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención odontológica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, con sus respectivos detalles, con las que se cumple los topes de cobertura"
+        },
+        {
+          "codigo_glosa": "SO3602",
+          "nivel": "Aplicación",
+          "descripcion": "Las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la orden o prescripción facultativa del profesional tratante"
+        },
+        {
+          "codigo_glosa": "SO3702",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido del usuario"
+        },
+        {
+          "codigo_glosa": "SO3902",
+          "nivel": "Aplicación",
+          "descripcion": "El comprobante de recibido del usuario no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la lista de precios"
+        },
+        {
+          "codigo_glosa": "SO4701",
+          "nivel": "Aplicación",
+          "descripcion": "No se incluye en la factura de venta en salud, los soportes de los servicios y tecnologías en salud para recobros a cargo de la ADRES, accidentes de trabajo o enfermedad profesional a cargo de la ARL, de conformidad con la normativa vigente"
+        },
+        {
+          "codigo_glosa": "SO4801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la evidencia del envío del trámite respectivo"
+        },
+        {
+          "codigo_glosa": "SO4802",
+          "nivel": "Aplicación",
+          "descripcion": "El informe de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        }
+      ]
+    },
+    "M19": {
+      "nombre_campo": "Vr. Del servicio",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 44,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0105",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan servicios o tecnologías en salud que se encuentran incluidos en la estancia u observación de urgencias de acuerdo con lo pactado"
+        },
+        {
+          "codigo_glosa": "FA0703",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran medicamentos o APME que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0705",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran medicamentos que ya se encuentran incluidos en el procedimiento quirúrgico."
+        },
+        {
+          "codigo_glosa": "FA1305",
+          "nivel": "Aplicación",
+          "descripcion": "Servicio o tecnología corresponde a diferente cobertura"
+        },
+        {
+          "codigo_glosa": "FA1606",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan uno o varios servicios o tecnologías en salud que corresponden a otro responsable de pago"
+        },
+        {
+          "codigo_glosa": "FA2702",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran servicios y tecnologías en salud que se encuentran ya cobrados dentro de la misma u otra factura"
+        },
+        {
+          "codigo_glosa": "FA2805",
+          "nivel": "Aplicación",
+          "descripcion": "se factura un servicio o tecnología de salud ya pagada por la entidad responsable de pago"
+        },
+        {
+          "codigo_glosa": "TA0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "SO0701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de administración de medicamentos"
+        },
+        {
+          "codigo_glosa": "SO0702",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los medicamentos suministrados no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0703",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido de medicamentos de las personas"
+        },
+        {
+          "codigo_glosa": "SO3401",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis"
+        },
+        {
+          "codigo_glosa": "SO3402",
+          "nivel": "Aplicación",
+          "descripcion": "La epicrisis no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3403",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención de urgencias"
+        },
+        {
+          "codigo_glosa": "SO3404",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3405",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el resumen de atención"
+        },
+        {
+          "codigo_glosa": "SO3406",
+          "nivel": "Aplicación",
+          "descripcion": "El resumen de atención no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3407",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención odontológica"
+        },
+        {
+          "codigo_glosa": "SO3408",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención odontológica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, con sus respectivos detalles, con las que se cumple los topes de cobertura"
+        },
+        {
+          "codigo_glosa": "SO3602",
+          "nivel": "Aplicación",
+          "descripcion": "Las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la orden o prescripción facultativa del profesional tratante"
+        },
+        {
+          "codigo_glosa": "SO3702",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido del usuario"
+        },
+        {
+          "codigo_glosa": "SO3902",
+          "nivel": "Aplicación",
+          "descripcion": "El comprobante de recibido del usuario no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la lista de precios"
+        },
+        {
+          "codigo_glosa": "SO4701",
+          "nivel": "Aplicación",
+          "descripcion": "No se incluye en la factura de venta en salud, los soportes de los servicios y tecnologías en salud para recobros a cargo de la ADRES, accidentes de trabajo o enfermedad profesional a cargo de la ARL, de conformidad con la normativa vigente"
+        },
+        {
+          "codigo_glosa": "SO4801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la evidencia del envío del trámite respectivo"
+        },
+        {
+          "codigo_glosa": "SO4802",
+          "nivel": "Aplicación",
+          "descripcion": "El informe de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU0701",
+          "nivel": "Aplicación",
+          "descripcion": "El número de unidades de la forma farmacéutica que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado"
+        },
+        {
+          "codigo_glosa": "AU0702",
+          "nivel": "Aplicación",
+          "descripcion": "La forma farmacéutica que vienen relacionada en la factura de venta en salud presenta diferencia con la autorizada"
+        },
+        {
+          "codigo_glosa": "AU0703",
+          "nivel": "Aplicación",
+          "descripcion": "El principio activo que viene relacionado en la factura de venta en salud presenta diferencia con el autorizado"
+        },
+        {
+          "codigo_glosa": "AU0704",
+          "nivel": "Aplicación",
+          "descripcion": "La concentración que viene relacionada en la factura de venta en salud presenta diferencia con la autorizada"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "AU4303",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa del profesional tratante o el número de la autorización de servicios registrado en los soportes de cobro ha superado el límite de días de vigencia"
+        },
+        {
+          "codigo_glosa": "AU4304",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa del profesional tratante o el número de la autorización de servicios registrado en los soportes de cobro no corresponde a la autorización, orden o prescripción facultativa reemplazada por vencimiento"
+        },
+        {
+          "codigo_glosa": "CO0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los medicamentos o APME relacionados en los soportes de cobro no están incluidos en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CL0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL0703",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, corresponden a un suministro incompleto de acuerdo a la orden o la prescripción facultativa"
+        },
+        {
+          "codigo_glosa": "CL5301",
+          "nivel": "Aplicación",
+          "descripcion": "Los servicios prestados no obedecen a una atención de urgencia de acuerdo con la definición de la normativa vigente"
+        }
+      ]
+    },
+    "M20": {
+      "nombre_campo": "Tipo pago moderador",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M21": {
+      "nombre_campo": "Vr. Pago moderador",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M22": {
+      "nombre_campo": "Numero FEV pago moderador",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "M23": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Registro de datos de medicamentos",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S01": {
+      "nombre_campo": "Cod prestador",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S02": {
+      "nombre_campo": "Numero Autorización",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 7,
+      "glosas": [
+        {
+          "codigo_glosa": "SO2101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización no está incluido en el RIPS."
+        },
+        {
+          "codigo_glosa": "SO2102",
+          "nivel": "Aplicación",
+          "descripcion": "el número de la autorización incluido en el RIPS no corresponde al prestador de servicios de salud"
+        },
+        {
+          "codigo_glosa": "SO2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización de servicios y tecnologías en salud incluido en el RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "SO2104",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización incluido en el RIPS no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        }
+      ]
+    },
+    "S03": {
+      "nombre_campo": "ID MIPRES",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S04": {
+      "nombre_campo": "Fecha suministro de tecnología",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S05": {
+      "nombre_campo": "Tipo Otros Servicios",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S06": {
+      "nombre_campo": "Cod Tecnología",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S07": {
+      "nombre_campo": "Nombre Tecnología en Salud",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S08": {
+      "nombre_campo": "Cantidad otros servicios",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 11,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "FA0601",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por dispositivos médicos que vienen relacionados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU0601",
+          "nivel": "Aplicación",
+          "descripcion": "El número de dispositivos médicos que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado, sin la debida justificación"
+        },
+        {
+          "codigo_glosa": "CO0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en observación o habitación que vienen relacionados en los soportes de cobro no están incluidos en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CL0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia sea en observación de urgencias o habitación, que viene relacionado en los soportes de la factura de venta en salud no es pertinente"
+        },
+        {
+          "codigo_glosa": "CL0703",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, corresponden a un suministro incompleto de acuerdo a la orden o la prescripción facultativa"
+        }
+      ]
+    },
+    "S09": {
+      "nombre_campo": "Tipo documento identificación de quien ordena otros servicios",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S10": {
+      "nombre_campo": "Numero Doc de identificaciónde quien ordena otros servicios",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S11": {
+      "nombre_campo": "Vr. Unitario otros servicios",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 54,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0103",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobra estancia u observación de urgencias que ya se encuentra incluida en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "TA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancias u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0301",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios profesionales en procedimientos quirúrgicos o intervencionistas, que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0302",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios de anestesia que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0401",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios de otro talento humano que interviene en la atención que vienen relacionados o justificados en soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0501",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por derechos de sala que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0601",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por dispositivos médicos que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA3801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por traslado asistencial de pacientes que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA5901",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por otro transporte no asistencial ambulatorio de personas que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "SO0101",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis que soporta la estancia u observación de urgencias"
+        },
+        {
+          "codigo_glosa": "SO0102",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian la estancia u observación de urgencias no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los dispositivos médicos empleados en procedimientos quirúrgicos o intervencionistas que sean motivo de cobro adicional"
+        },
+        {
+          "codigo_glosa": "SO0602",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los dispositivos médicos empleados no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0603",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los dispositivos médicos empleados en procedimientos no quirúrgicos que sean motivo de cobro adicional"
+        },
+        {
+          "codigo_glosa": "SO0604",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los dispositivos médicos entregados como parte de una acción de protección específica o tratamiento"
+        },
+        {
+          "codigo_glosa": "SO0701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de administración de medicamentos"
+        },
+        {
+          "codigo_glosa": "SO0702",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los medicamentos suministrados no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0703",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido de medicamentos de las personas"
+        },
+        {
+          "codigo_glosa": "SO3401",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis"
+        },
+        {
+          "codigo_glosa": "SO3402",
+          "nivel": "Aplicación",
+          "descripcion": "La epicrisis no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3403",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención de urgencias"
+        },
+        {
+          "codigo_glosa": "SO3404",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3405",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el resumen de atención"
+        },
+        {
+          "codigo_glosa": "SO3406",
+          "nivel": "Aplicación",
+          "descripcion": "El resumen de atención no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3407",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención odontológica"
+        },
+        {
+          "codigo_glosa": "SO3408",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención odontológica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, con sus respectivos detalles, con las que se cumple los topes de cobertura"
+        },
+        {
+          "codigo_glosa": "SO3602",
+          "nivel": "Aplicación",
+          "descripcion": "Las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la orden o prescripción facultativa del profesional tratante"
+        },
+        {
+          "codigo_glosa": "SO3702",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de traslado asistencial"
+        },
+        {
+          "codigo_glosa": "SO3802",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de traslado asistencial no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido del usuario"
+        },
+        {
+          "codigo_glosa": "SO3902",
+          "nivel": "Aplicación",
+          "descripcion": "El comprobante de recibido del usuario no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4001",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la copia del registro de anestesia"
+        },
+        {
+          "codigo_glosa": "SO4002",
+          "nivel": "Aplicación",
+          "descripcion": "El registro de anestesia no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4101",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la copia de la descripción quirúrgica"
+        },
+        {
+          "codigo_glosa": "SO4102",
+          "nivel": "Aplicación",
+          "descripcion": "La descripción quirúrgica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la lista de precios"
+        },
+        {
+          "codigo_glosa": "SO4701",
+          "nivel": "Aplicación",
+          "descripcion": "No se incluye en la factura de venta en salud, los soportes de los servicios y tecnologías en salud para recobros a cargo de la ADRES, accidentes de trabajo o enfermedad profesional a cargo de la ARL, de conformidad con la normativa vigente"
+        },
+        {
+          "codigo_glosa": "SO4801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la evidencia del envío del trámite respectivo"
+        },
+        {
+          "codigo_glosa": "SO4802",
+          "nivel": "Aplicación",
+          "descripcion": "El informe de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO5801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los procedimientos quirúrgicos o intervencionistas"
+        },
+        {
+          "codigo_glosa": "SO5802",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los procedimientos quirúrgicos o intervencionistas no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO5901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el soporte del transporte no asistencial ambulatorio de la persona."
+        },
+        {
+          "codigo_glosa": "SO5902",
+          "nivel": "Aplicación",
+          "descripcion": "El tiquete de transporte no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU0601",
+          "nivel": "Aplicación",
+          "descripcion": "El número de dispositivos médicos que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado, sin la debida justificación"
+        },
+        {
+          "codigo_glosa": "AU0602",
+          "nivel": "Aplicación",
+          "descripcion": "Los dispositivos médicos que vienen relacionados o justificados en los soportes de la factura de venta en salud no corresponden a los autorizados, sin la debida justificación"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        }
+      ]
+    },
+    "S12": {
+      "nombre_campo": "Vr. Total otros servicios",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 88,
+      "glosas": [
+        {
+          "codigo_glosa": "FA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con las cantidades facturadas"
+        },
+        {
+          "codigo_glosa": "FA0103",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobra estancia u observación de urgencias que ya se encuentra incluida en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0105",
+          "nivel": "Aplicación",
+          "descripcion": "Se facturan servicios o tecnologías en salud que se encuentran incluidos en la estancia u observación de urgencias de acuerdo con lo pactado"
+        },
+        {
+          "codigo_glosa": "FA0303",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran honorarios profesionales que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0501",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por derechos de sala que vienen relacionados o justificados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA0502",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran tecnologías en salud que ya se encuentran incluidas en el ítem de derechos de sala o materiales quirúrgicos"
+        },
+        {
+          "codigo_glosa": "FA0503",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran derechos de sala que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA0602",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran dispositivos médicos que ya se encuentran incluidos en el ítem de materiales por grupo quirúrgico"
+        },
+        {
+          "codigo_glosa": "FA0603",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran dispositivos médicos que ya se encuentran incluidos en una atención agrupada"
+        },
+        {
+          "codigo_glosa": "FA0703",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran medicamentos o APME que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA1305",
+          "nivel": "Aplicación",
+          "descripcion": "Servicio o tecnología corresponde a diferente cobertura"
+        },
+        {
+          "codigo_glosa": "FA1606",
+          "nivel": "Aplicación",
+          "descripcion": "En la factura se relacionan uno o varios servicios o tecnologías en salud que corresponden a otro responsable de pago"
+        },
+        {
+          "codigo_glosa": "FA2702",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobran servicios y tecnologías en salud que se encuentran ya cobrados dentro de la misma u otra factura"
+        },
+        {
+          "codigo_glosa": "FA2805",
+          "nivel": "Aplicación",
+          "descripcion": "se factura un servicio o tecnología de salud ya pagada por la entidad responsable de pago"
+        },
+        {
+          "codigo_glosa": "FA3803",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobra traslado asistencial de pacientes que ya se encuentran incluidos en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "FA5901",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por transporte no asistencial ambulatorio de la persona que vienen relacionados o justificados en los soportes de cobro presentan diferencias con las cantidades que fueron facturadas"
+        },
+        {
+          "codigo_glosa": "FA5903",
+          "nivel": "Aplicación",
+          "descripcion": "Se cobra transporte no asistencial ambulatorio de la persona que ya se encuentra incluido en una atención agrupada, de acuerdo con lo pactado por las partes"
+        },
+        {
+          "codigo_glosa": "TA0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancias u observación de urgencias, que viene relacionado o justificado en los soportes de cobro, presenta diferencia con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0301",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios profesionales en procedimientos quirúrgicos o intervencionistas, que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0302",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios de anestesia que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0401",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios de otro talento humano que interviene en la atención que vienen relacionados o justificados en soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0501",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por derechos de sala que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0601",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por dispositivos médicos que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados o justificados en los soportes de cobro, presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA3801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por traslado asistencial de pacientes que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "TA5901",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por otro transporte no asistencial ambulatorio de personas que vienen relacionados o justificados en los soportes de cobro presentan diferencias con los valores pactados o establecidos por la norma"
+        },
+        {
+          "codigo_glosa": "SO0101",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis que soporta la estancia u observación de urgencias"
+        },
+        {
+          "codigo_glosa": "SO0102",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian la estancia u observación de urgencias no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los dispositivos médicos empleados en procedimientos quirúrgicos o intervencionistas que sean motivo de cobro adicional"
+        },
+        {
+          "codigo_glosa": "SO0602",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los dispositivos médicos empleados no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0603",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los dispositivos médicos empleados en procedimientos no quirúrgicos que sean motivo de cobro adicional"
+        },
+        {
+          "codigo_glosa": "SO0604",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los dispositivos médicos entregados como parte de una acción de protección específica o tratamiento"
+        },
+        {
+          "codigo_glosa": "SO0701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de administración de medicamentos"
+        },
+        {
+          "codigo_glosa": "SO0702",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los medicamentos suministrados no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO0703",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido de medicamentos de las personas"
+        },
+        {
+          "codigo_glosa": "SO3401",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la epicrisis"
+        },
+        {
+          "codigo_glosa": "SO3402",
+          "nivel": "Aplicación",
+          "descripcion": "La epicrisis no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3403",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención de urgencias"
+        },
+        {
+          "codigo_glosa": "SO3404",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3405",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el resumen de atención"
+        },
+        {
+          "codigo_glosa": "SO3406",
+          "nivel": "Aplicación",
+          "descripcion": "El resumen de atención no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3407",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de atención odontológica"
+        },
+        {
+          "codigo_glosa": "SO3408",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de atención odontológica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3601",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, con sus respectivos detalles, con las que se cumple los topes de cobertura"
+        },
+        {
+          "codigo_glosa": "SO3602",
+          "nivel": "Aplicación",
+          "descripcion": "Las copias de la factura enviada a la compañía de seguros SOAT, la ADRES o la entidad que haga sus veces, cuando aplica, no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3701",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la orden o prescripción facultativa del profesional tratante"
+        },
+        {
+          "codigo_glosa": "SO3702",
+          "nivel": "Aplicación",
+          "descripcion": "La orden o prescripción facultativa no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la hoja de traslado asistencial"
+        },
+        {
+          "codigo_glosa": "SO3802",
+          "nivel": "Aplicación",
+          "descripcion": "La hoja de traslado asistencial no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO3901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el comprobante de recibido del usuario"
+        },
+        {
+          "codigo_glosa": "SO3902",
+          "nivel": "Aplicación",
+          "descripcion": "El comprobante de recibido del usuario no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4001",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la copia del registro de anestesia"
+        },
+        {
+          "codigo_glosa": "SO4002",
+          "nivel": "Aplicación",
+          "descripcion": "El registro de anestesia no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4101",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la copia de la descripción quirúrgica"
+        },
+        {
+          "codigo_glosa": "SO4102",
+          "nivel": "Aplicación",
+          "descripcion": "La descripción quirúrgica no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO4201",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia de la lista de precios"
+        },
+        {
+          "codigo_glosa": "SO4701",
+          "nivel": "Aplicación",
+          "descripcion": "No se incluye en la factura de venta en salud, los soportes de los servicios y tecnologías en salud para recobros a cargo de la ADRES, accidentes de trabajo o enfermedad profesional a cargo de la ARL, de conformidad con la normativa vigente"
+        },
+        {
+          "codigo_glosa": "SO4801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en la evidencia del envío del trámite respectivo"
+        },
+        {
+          "codigo_glosa": "SO4802",
+          "nivel": "Aplicación",
+          "descripcion": "El informe de atención de urgencias no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO5801",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en los soportes de cobro que evidencian los procedimientos quirúrgicos o intervencionistas"
+        },
+        {
+          "codigo_glosa": "SO5802",
+          "nivel": "Aplicación",
+          "descripcion": "Los soportes de cobro que evidencian los procedimientos quirúrgicos o intervencionistas no corresponden a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO5901",
+          "nivel": "Aplicación",
+          "descripcion": "Existe ausencia total, parcial o inconsistencia en el soporte del transporte no asistencial ambulatorio de la persona."
+        },
+        {
+          "codigo_glosa": "SO5902",
+          "nivel": "Aplicación",
+          "descripcion": "El tiquete de transporte no corresponde a la persona atendida"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        },
+        {
+          "codigo_glosa": "AU0101",
+          "nivel": "Aplicación",
+          "descripcion": "El número de días en habitación que vienen relacionados en la factura de venta en salud presenta diferencia con los días autorizados"
+        },
+        {
+          "codigo_glosa": "AU0102",
+          "nivel": "Aplicación",
+          "descripcion": "El servicio de internación donde se produjo la estancia no corresponde al autorizado"
+        },
+        {
+          "codigo_glosa": "AU0302",
+          "nivel": "Aplicación",
+          "descripcion": "Los honorarios profesionales relacionados o justificados en los soportes de la factura de venta en salud no corresponde a la autorizada"
+        },
+        {
+          "codigo_glosa": "AU0303",
+          "nivel": "Aplicación",
+          "descripcion": "La entidad responsable de pago emitió autorización directamente al profesional para la ejecución del procedimiento y la IPS está facturando a su nombre estos honorarios"
+        },
+        {
+          "codigo_glosa": "AU0601",
+          "nivel": "Aplicación",
+          "descripcion": "El número de dispositivos médicos que vienen relacionados en la factura de venta en salud presenta diferencia con lo autorizado, sin la debida justificación"
+        },
+        {
+          "codigo_glosa": "AU0602",
+          "nivel": "Aplicación",
+          "descripcion": "Los dispositivos médicos que vienen relacionados o justificados en los soportes de la factura de venta en salud no corresponden a los autorizados, sin la debida justificación"
+        },
+        {
+          "codigo_glosa": "AU2103",
+          "nivel": "Aplicación",
+          "descripcion": "El número de la autorización registrado en la factura de venta en salud o RIPS no corresponde al servicio o tecnología prestada o facturada"
+        },
+        {
+          "codigo_glosa": "AU3803",
+          "nivel": "Aplicación",
+          "descripcion": "El traslado asistencial de pacientes no cuenta con la autorización"
+        },
+        {
+          "codigo_glosa": "CO0301",
+          "nivel": "Aplicación",
+          "descripcion": "Los honorarios profesionales relacionados en los soportes de cobro no están incluidos en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CO0401",
+          "nivel": "Aplicación",
+          "descripcion": "Los honorarios de otros profesionales asistenciales relacionados en los soportes de cobro no están incluidos en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CO0601",
+          "nivel": "Aplicación",
+          "descripcion": "Los dispositivos médicos que vienen relacionados o justificados en los soportes de cobro no están incluidos en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CO0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los medicamentos o APME relacionados en los soportes de cobro no están incluidos en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CO3801",
+          "nivel": "Aplicación",
+          "descripcion": "El traslado asistencial de pacientes relacionado en los soportes de cobro no está incluido en la respectiva cobertura"
+        },
+        {
+          "codigo_glosa": "CO5901",
+          "nivel": "Aplicación",
+          "descripcion": "El transporte no asistencial ambulatorio de la persona relacionado en los soportes de cobro no está incluido en la respectiva cobertura o hacen parte integral de un servicio y se están cobrando adicionalmente"
+        },
+        {
+          "codigo_glosa": "CL0101",
+          "nivel": "Aplicación",
+          "descripcion": "El cargo por estancia sea en observación de urgencias o habitación, que viene relacionado en los soportes de la factura de venta en salud no es pertinente"
+        },
+        {
+          "codigo_glosa": "CL0301",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios profesionales en procedimientos quirúrgicos o intervencionistas, de hemodinamia, radiología u otros procedimientos que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL0302",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por honorarios de anestesia que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL0601",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por dispositivos médicos que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL0701",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL0703",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por medicamentos o APME que vienen relacionados en los soportes de cobro, corresponden a un suministro incompleto de acuerdo a la orden o la prescripción facultativa"
+        },
+        {
+          "codigo_glosa": "CL3801",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por traslado asistencial de las pacientes que vienen relacionados en los soportes de cobro no son pertinentes"
+        },
+        {
+          "codigo_glosa": "CL5301",
+          "nivel": "Aplicación",
+          "descripcion": "Los servicios prestados no obedecen a una atención de urgencia de acuerdo con la definición de la normativa vigente"
+        },
+        {
+          "codigo_glosa": "CL5901",
+          "nivel": "Aplicación",
+          "descripcion": "Los cargos por transporte no asistencial ambulatorio de las personas que vienen relacionados en los soportes de cobro no son pertinentes"
+        }
+      ]
+    },
+    "S13": {
+      "nombre_campo": "Tipo pago moderador",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S14": {
+      "nombre_campo": "Vr. Pago moderador",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S15": {
+      "nombre_campo": "Número FEV pago moderador",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 3,
+      "glosas": [
+        {
+          "codigo_glosa": "FA2006",
+          "nivel": "Aplicación",
+          "descripcion": "Los recaudos efectivos de pagos compartidos o copagos y cuotas moderadoras, que por acuerdo de voluntades efectuó el prestador de servicios de salud o proveedor de tecnologías en salud, no corresponden a lo informado por la entidad responsable de pago para la liquidación del pago compartido"
+        },
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    },
+    "S16": {
+      "nombre_campo": "Consecutivo",
+      "categoria_rips": "Datos de otros servicios",
+      "total_glosas_asociadas": 2,
+      "glosas": [
+        {
+          "codigo_glosa": "SO6101",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con la atención prestada"
+        },
+        {
+          "codigo_glosa": "SO6102",
+          "nivel": "Aplicación",
+          "descripcion": "En el caso de que uno o varios campos de RIPS presente inconsistencias con relación al contrato"
+        }
+      ]
+    }
+  }
+}

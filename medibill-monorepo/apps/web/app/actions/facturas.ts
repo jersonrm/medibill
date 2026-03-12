@@ -142,6 +142,7 @@ export async function crearFacturaBorrador(input: CrearFacturaInput) {
             )
           : null,
         incapacidad: input.datos_paciente.incapacidad || "NO",
+        codPaisOrigen: input.datos_paciente.pais_origen || "170",
       },
     })
     .select("id, num_factura")

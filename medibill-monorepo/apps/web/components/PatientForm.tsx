@@ -45,7 +45,11 @@ export default function PatientForm({ datos, onChange, onBuscarPaciente }: Patie
       if (paciente.fecha_nacimiento) onChange("fechaNacimiento", paciente.fecha_nacimiento);
       if (paciente.sexo) onChange("sexoPaciente", paciente.sexo);
       if (paciente.tipo_usuario) onChange("tipoUsuario", paciente.tipo_usuario);
-      if (paciente.zona_territorial) onChange("codZonaTerritorial", paciente.zona_territorial);
+      if (paciente.zona_territorial) {
+        // Backward-compatible: DB may have "U"/"R" (legacy) or "01"/"02" (new)
+        const zona = paciente.zona_territorial === "U" ? "01" : paciente.zona_territorial === "R" ? "02" : paciente.zona_territorial;
+        onChange("codZonaTerritorial", zona);
+      }
       if (paciente.departamento_residencia_codigo) {
         onChange("departamentoSeleccionado", paciente.departamento_residencia_codigo);
       }
@@ -102,6 +106,13 @@ export default function PatientForm({ datos, onChange, onBuscarPaciente }: Patie
             <option value="01">01 - Contributivo</option><option value="02">02 - Subsidiado</option>
             <option value="03">03 - Especial / Excepción</option><option value="04">04 - Particular</option>
             <option value="05">05 - No asegurado</option>
+            <option value="06">06 - Desplazado con afiliación</option>
+            <option value="07">07 - Desplazado sin afiliación</option>
+            <option value="08">08 - Extranjero no residente</option>
+            <option value="09">09 - PEP</option>
+            <option value="10">10 - PPT</option>
+            <option value="11">11 - SISBEN sin afiliación</option>
+            <option value="12">12 - Otros regímenes especiales</option>
           </select>
         </div>
       </div>
@@ -158,7 +169,7 @@ export default function PatientForm({ datos, onChange, onBuscarPaciente }: Patie
         <div className="flex flex-col gap-1">
           <label className={LBL}>Zona</label>
           <select value={datos.codZonaTerritorial} onChange={(e) => onChange("codZonaTerritorial", e.target.value)} className={SEL}>
-            <option value="U">Urbano</option><option value="R">Rural</option>
+            <option value="01">Urbano</option><option value="02">Rural</option>
           </select>
         </div>
         <div className="flex flex-col gap-1">
@@ -168,6 +179,28 @@ export default function PatientForm({ datos, onChange, onBuscarPaciente }: Patie
           </select>
         </div>
       </div>
+
+      {/* País de origen — visible solo para documentos extranjeros */}
+      {["CE", "PE", "PT", "PA"].includes(datos.tipoDocumento) && (
+        <div className="grid grid-cols-4 gap-3 mb-6">
+          <div className="flex flex-col gap-1 col-span-2">
+            <label className={LBL}>País de Origen</label>
+            <select value={datos.codPaisOrigen} onChange={(e) => onChange("codPaisOrigen", e.target.value)} className={`${SEL} text-xs`}>
+              <option value="170">Colombia (170)</option>
+              <option value="862">Venezuela (862)</option>
+              <option value="218">Ecuador (218)</option>
+              <option value="604">Perú (604)</option>
+              <option value="076">Brasil (076)</option>
+              <option value="152">Chile (152)</option>
+              <option value="032">Argentina (032)</option>
+              <option value="068">Bolivia (068)</option>
+              <option value="484">México (484)</option>
+              <option value="840">Estados Unidos (840)</option>
+              <option value="724">España (724)</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="flex flex-col gap-1">

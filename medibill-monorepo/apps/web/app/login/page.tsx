@@ -110,7 +110,7 @@ export default async function LoginPage({
               Crear cuenta gratis
             </button>
             <p className="text-xs text-center text-medi-dark/50">
-              14 días de prueba gratuita · Para profesionales independientes, clínicas e IPS
+              14 días de prueba gratuita · Para profesionales independientes y clínicas
             </p>
           </div>
         </form>

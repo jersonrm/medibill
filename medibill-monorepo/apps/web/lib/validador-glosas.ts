@@ -414,21 +414,21 @@ export class ValidadorPreRadicacion {
     // Medicamentos
     for (let i = 0; i < (servicios.medicamentos?.length ?? 0); i++) {
       const m = servicios.medicamentos![i]!;
-      if (!m.codMedicamento) {
+      if (!m.codTecnologiaSalud) {
         this.emit({
           codigo_causal: "FA0701",
           severidad: "error",
           mensaje: `Medicamento[${i}]: falta código CUM/ATC.`,
-          campo_afectado: `fevRips.servicios.medicamentos[${i}].codMedicamento`,
+          campo_afectado: `fevRips.servicios.medicamentos[${i}].codTecnologiaSalud`,
         });
       }
-      if (m.cantidadDispensada <= 0) {
+      if (m.cantidadMedicamento <= 0) {
         this.emit({
           codigo_causal: "FA0701",
           severidad: "advertencia",
-          mensaje: `Medicamento[${i}] (${m.nombreGenerico || m.codMedicamento}): cantidad dispensada es 0 o negativa.`,
-          campo_afectado: `fevRips.servicios.medicamentos[${i}].cantidadDispensada`,
-          valor_encontrado: String(m.cantidadDispensada),
+          mensaje: `Medicamento[${i}] (${m.nomTecnologiaSalud || m.codTecnologiaSalud}): cantidad dispensada es 0 o negativa.`,
+          campo_afectado: `fevRips.servicios.medicamentos[${i}].cantidadMedicamento`,
+          valor_encontrado: String(m.cantidadMedicamento),
         });
       }
     }
@@ -596,7 +596,7 @@ export class ValidadorPreRadicacion {
     }
     // Buscar en medicamentos
     for (const m of servicios.medicamentos ?? []) {
-      if (m.codMedicamento === cupsCodigo && !(m as unknown as Record<string, unknown>).numAutorizacion) return true;
+      if (m.codTecnologiaSalud === cupsCodigo && !(m as unknown as Record<string, unknown>).numAutorizacion) return true;
     }
     return false;
   }
@@ -1000,7 +1000,7 @@ export class ValidadorPreRadicacion {
     // Medicamentos → TA0701 o TA2901
     for (let i = 0; i < (servicios.medicamentos?.length ?? 0); i++) {
       const m = servicios.medicamentos![i]!;
-      const pactado = tarifas[m.codMedicamento];
+      const pactado = tarifas[m.codTecnologiaSalud];
       if (pactado !== undefined) {
         const valorMed = (m as unknown as Record<string, unknown>).vrServicio as number | undefined;
         if (valorMed !== undefined && valorMed !== pactado) {
@@ -1012,8 +1012,8 @@ export class ValidadorPreRadicacion {
             codigo_causal: esRecargo ? "TA2901" : "TA0701",
             severidad: "advertencia",
             mensaje: esRecargo
-              ? `Medicamento[${i}] ${m.codMedicamento}: posible recargo no pactado. Facturado: $${valorMed.toLocaleString()}, pactado: $${pactado.toLocaleString()}.`
-              : `Medicamento[${i}] ${m.codMedicamento}: valor facturado ($${valorMed.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
+              ? `Medicamento[${i}] ${m.codTecnologiaSalud}: posible recargo no pactado. Facturado: $${valorMed.toLocaleString()}, pactado: $${pactado.toLocaleString()}.`
+              : `Medicamento[${i}] ${m.codTecnologiaSalud}: valor facturado ($${valorMed.toLocaleString()}) difiere del pactado ($${pactado.toLocaleString()}).`,
             campo_afectado: `fevRips.servicios.medicamentos[${i}].vrServicio`,
             valor_encontrado: String(valorMed),
             valor_esperado: String(pactado),

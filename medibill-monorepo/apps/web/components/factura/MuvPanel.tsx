@@ -13,18 +13,21 @@ interface MuvPanelProps {
 
 export default function MuvPanel({ factura, accion, setAccion, onFacturaUpdate }: MuvPanelProps) {
   const [estadoMuvMsg, setEstadoMuvMsg] = useState<string | null>(null);
-  const [erroresMuv, setErroresMuv] = useState<{ codigo: string; mensaje: string; severidad: string }[]>([]);
+  const [erroresMuv, setErroresMuv] = useState<{ codigo: string; mensaje: string; severidad: string; campo?: string }[]>([]);
+  const [fechaRadicacion, setFechaRadicacion] = useState<string | null>(null);
 
   const handleValidarMuv = async () => {
-    if (!confirm("¿Validar RIPS ante el MUV (MinSalud) para obtener el CUV?")) return;
+    if (!confirm("¿Validar RIPS ante el MUV (FEV-RIPS API v4.3) para obtener el CUV?")) return;
     setAccion(true);
     setEstadoMuvMsg(null);
     setErroresMuv([]);
+    setFechaRadicacion(null);
     try {
       const res = await validarRipsYObtenerCuv(factura.id);
       if (res.success) {
         onFacturaUpdate({ cuv: res.cuv, estado_muv: "validado" });
         setEstadoMuvMsg(`CUV obtenido: ${res.cuv}`);
+        setFechaRadicacion(res.fechaRadicacion);
       } else {
         onFacturaUpdate({ estado_muv: "errores" in res && res.errores ? "rechazado" : factura.estado_muv });
         setEstadoMuvMsg(res.error);
@@ -76,6 +79,11 @@ export default function MuvPanel({ factura, accion, setAccion, onFacturaUpdate }
               CUV: {factura.cuv}
             </p>
           )}
+          {fechaRadicacion && (
+            <p className="text-xs text-green-700 mb-2">
+              Fecha radicación: {new Date(fechaRadicacion).toLocaleString("es-CO")}
+            </p>
+          )}
           {estadoMuvMsg && (
             <p className={`text-xs mb-2 ${
               factura.cuv ? "text-green-700" : "text-red-700"
@@ -88,6 +96,7 @@ export default function MuvPanel({ factura, accion, setAccion, onFacturaUpdate }
                   e.severidad === "error" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800"
                 }`}>
                   <span className="font-bold">[{e.codigo}]</span> {e.mensaje}
+                  {e.campo && <span className="block text-[10px] opacity-70 mt-0.5 font-mono">{e.campo}</span>}
                 </div>
               ))}
             </div>

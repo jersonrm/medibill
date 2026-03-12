@@ -17,6 +17,7 @@ interface DiagnosticsListProps {
   onEliminar: (index: number) => void;
   onAgregar: (diagnostico: DiagnosticoUI) => void;
   onReordenar: (fromIndex: number, toIndex: number) => void;
+  readOnly?: boolean;
 }
 
 export default function DiagnosticsList({
@@ -25,6 +26,7 @@ export default function DiagnosticsList({
   onEliminar,
   onAgregar,
   onReordenar,
+  readOnly,
 }: DiagnosticsListProps) {
   const [mostrarAgregar, setMostrarAgregar] = useState(false);
   const [nuevoCodigo, setNuevoCodigo] = useState("");
@@ -114,6 +116,7 @@ export default function DiagnosticsList({
           >
             <div className="flex items-center gap-4 p-5">
               {/* Reorder buttons */}
+              {!readOnly && (
               <div className="flex flex-col gap-1">
                 <button
                   onClick={() => onReordenar(idx, idx - 1)}
@@ -136,6 +139,7 @@ export default function DiagnosticsList({
                   </svg>
                 </button>
               </div>
+              )}
 
               <div className="text-xl font-black text-medi-deep bg-medi-light/40 px-5 py-3 rounded-xl min-w-[100px] text-center flex items-center justify-center">
                 {diag.codigo_cie10}
@@ -165,6 +169,8 @@ export default function DiagnosticsList({
                 </div>
               </div>
 
+              {!readOnly && (
+              <>
               <button
                 onClick={() => abrirModalEditar(idx)}
                 className="bg-blue-50 text-blue-500 hover:bg-blue-100 p-2.5 rounded-xl transition-colors shadow-sm flex-shrink-0"
@@ -188,9 +194,11 @@ export default function DiagnosticsList({
                   />
                 </svg>
               </button>
+              </>
+              )}
             </div>
 
-            {diag.alternativas && diag.alternativas.length > 0 && (
+            {!readOnly && diag.alternativas && diag.alternativas.length > 0 && (
               <details className="group/details border-t border-medi-light/50 bg-medi-light/20 cursor-pointer">
                 <summary className="text-xs font-bold text-medi-primary uppercase px-6 py-3 list-none flex items-center gap-2 hover:bg-medi-light/40 transition-colors">
                   <span className="group-open/details:rotate-90 transition-transform">▶</span> Ver alternativas
@@ -219,6 +227,7 @@ export default function DiagnosticsList({
         ))}
 
         {/* Agregar diagnóstico manual */}
+        {!readOnly && (
         <div className="mt-4 border-t border-medi-light/50 pt-4">
           <div className="flex gap-2">
             <button
@@ -277,6 +286,7 @@ export default function DiagnosticsList({
             </div>
           )}
         </div>
+        )}
       </div>
 
       <ModalBusquedaCodigo

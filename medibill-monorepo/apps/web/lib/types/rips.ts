@@ -14,26 +14,26 @@ import type { DiagnosticoIA, ProcedimientoIA } from "@/lib/types/validacion";
 /** Tipos de documento válidos */
 export type TipoDocumento = "CC" | "TI" | "RC" | "CE" | "PA" | "MS" | "AS" | "CD" | "SC" | "PE" | "PT" | "CN" | "DE" | "SI" | "NI";
 
-/** Tipos de usuario / régimen */
-export type TipoUsuario = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08";
+/** Tipos de usuario / régimen (ampliado FEV-RIPS API v4.3) */
+export type TipoUsuario = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12";
 
 /** Sexo biológico */
 export type CodSexo = "M" | "F" | "I";
 
-/** Zona territorial */
-export type ZonaTerritorial = "U" | "R";
+/** Zona territorial (FEV-RIPS API v4.3: "01"=urbana, "02"=rural) */
+export type ZonaTerritorial = "01" | "02";
 
 /** Incapacidad */
 export type Incapacidad = "SI" | "NO";
 
-/** Modalidad de grupo de servicio / tecnología en salud */
-export type ModalidadGrupoServicio = "01" | "02" | "03" | "04" | "05" | "06" | "07";
+/** Modalidad de grupo de servicio / tecnología en salud (FEV-RIPS API v4.3) */
+export type ModalidadGrupoServicio = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09";
 
-/** Finalidad tecnología en salud */
-export type FinalidadTecnologia = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12" | "13" | "14" | "15";
+/** Finalidad tecnología en salud (FEV-RIPS API v4.3) */
+export type FinalidadTecnologia = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12" | "13" | "14" | "15" | "16" | "44";
 
-/** Causa / motivo de atención */
-export type CausaMotivoAtencion = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12" | "13" | "15";
+/** Causa / motivo de atención (FEV-RIPS API v4.3) */
+export type CausaMotivoAtencion = "01" | "02" | "03" | "04" | "05" | "06" | "07" | "08" | "09" | "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17" | "18" | "19" | "20" | "21" | "22" | "23" | "24" | "25" | "26" | "27" | "28" | "29" | "30" | "31" | "32" | "33" | "34" | "35" | "36" | "37" | "38";
 
 /** Tipo de diagnóstico principal */
 export type TipoDiagnosticoPrincipal = "01" | "02" | "03";
@@ -48,6 +48,7 @@ export type ViaIngresoServicioSalud = "01" | "02";
 // NODO: USUARIOS (US)
 // ==========================================
 export interface UsuarioRips {
+  consecutivo: number;
   tipoDocumentoIdentificacion: TipoDocumento;
   numDocumentoIdentificacion: string;
   tipoUsuario: TipoUsuario;
@@ -57,8 +58,7 @@ export interface UsuarioRips {
   codMunicipioResidencia: string; // DIVIPOLA (ej: "52001" para Pasto)
   codZonaTerritorialResidencia: ZonaTerritorial;
   incapacidad: Incapacidad;
-  codEntidadAdministradora: string; // Código EPS / administradora
-  consecutivo: number;
+  codPaisOrigen: string; // ISO 3166-1 numérico (170 = Colombia) — requerido por FEV-RIPS API v4.3
   servicios: ServiciosRips; // Res. 2275: servicios anidados dentro de cada usuario
 }
 
@@ -152,13 +152,16 @@ export interface MedicamentoRips {
   numAutorizacion: string | null;
   idMIPRES: string | null;
   fechaDispensAdmon: string; // YYYY-MM-DD HH:MM
-  codMedicamento: string; // Código CUM o ATC
-  tipoMedicamento: "01" | "02"; // 01=Pos, 02=No Pos
-  nombreGenerico: string;
-  formaFarmaceutica: string;
-  concentracion: string;
-  unidadMedida: string;
-  cantidadDispensada: number;
+  codDiagnosticoPrincipal: string; // CIE-10 — requerido por FEV-RIPS API v4.3
+  codDiagnosticoRelacionado: string | null;
+  tipoMedicamento: "01" | "02"; // 01=medicamento, 02=insumo
+  codTecnologiaSalud: string; // Código IUM/CUM
+  nomTecnologiaSalud: string | null;
+  concentracionMedicamento: number;
+  unidadMedida: number; // código numérico (ej: 176)
+  formaFarmaceutica: string | null;
+  unidadMinDispensa: number;
+  cantidadMedicamento: number;
   diasTratamiento: number;
   tipoDocumentoIdentificacion: TipoDocumento;
   numDocumentoIdentificacion: string;
@@ -278,15 +281,18 @@ export interface FevRips {
 
 /** Input de medicamento desde el formulario (UI → RIPS) */
 export interface MedicamentoInput {
-  codMedicamento: string;
-  tipoMedicamento: "01" | "02"; // 01=POS, 02=No POS
-  nombreGenerico: string;
-  formaFarmaceutica: string;
-  concentracion: string;
-  unidadMedida: string;
-  cantidadDispensada: number;
+  codTecnologiaSalud: string; // Código IUM/CUM
+  tipoMedicamento: "01" | "02"; // 01=medicamento, 02=insumo
+  nomTecnologiaSalud: string | null;
+  formaFarmaceutica: string | null;
+  concentracionMedicamento: number;
+  unidadMedida: number; // código numérico
+  unidadMinDispensa: number;
+  cantidadMedicamento: number;
   diasTratamiento: number;
   vrUnitMedicamento: number;
+  codDiagnosticoPrincipal?: string;
+  codDiagnosticoRelacionado?: string | null;
   numAutorizacion?: string;
   idMIPRES?: string;
 }
@@ -316,10 +322,14 @@ export interface DatosParaRips {
   sexoPaciente: CodSexo;
   tipoUsuarioPaciente: TipoUsuario;
   codPaisResidencia: string;
+  codPaisOrigen: string; // ISO 3166-1 numérico (170 = Colombia)
   codMunicipioResidencia: string;
   codZonaTerritorialResidencia: ZonaTerritorial;
   incapacidad: Incapacidad;
-  codEntidadAdministradora: string; // Código EPS
+
+  // Datos del profesional que atiende (Res. 2275: numDocumentoIdentificacion en servicios = profesional)
+  tipoDocumentoProfesional: TipoDocumento;
+  documentoProfesional: string;
 
   // Datos clínicos de la IA (ya validados contra DB)
   diagnosticos: DiagnosticoIA[];

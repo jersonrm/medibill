@@ -214,9 +214,9 @@ function crearUsuarioRips(p: Paciente): any {
     codSexo: p.sexo,
     codPaisResidencia: "170",
     codMunicipioResidencia: "52001", // Pasto
-    codZonaTerritorialResidencia: "U",
+    codZonaTerritorialResidencia: "01",
     incapacidad: "NO",
-    codEntidadAdministradora: "",
+    codPaisOrigen: "170",
     consecutivo: 1,
   };
 }

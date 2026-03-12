@@ -7,7 +7,7 @@
 // ORGANIZACIÓN
 // =====================================================================
 
-export type TipoOrganizacion = "independiente" | "clinica" | "ips";
+export type TipoOrganizacion = "independiente" | "clinica";
 
 export interface Organizacion {
   id: string;
@@ -30,7 +30,7 @@ export interface Organizacion {
 // PLANES
 // =====================================================================
 
-export type PlanId = "starter" | "profesional" | "clinica" | "ips";
+export type PlanId = "starter" | "profesional" | "clinica";
 
 export type SoporteNivel = "email" | "email_chat" | "prioritario" | "dedicado";
 

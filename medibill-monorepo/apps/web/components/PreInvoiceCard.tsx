@@ -55,12 +55,14 @@ function CardDropdown({
   onChange,
   className = "",
   align = "left",
+  disabled,
 }: {
   value: string;
   options: Record<string, string>;
   onChange: (val: string) => void;
   className?: string;
   align?: "left" | "right";
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -79,8 +81,8 @@ function CardDropdown({
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wide outline-none focus:ring-2 focus:ring-medi-accent transition-all cursor-pointer w-full justify-center"
+        onClick={() => !disabled && setOpen(!open)}
+        className={`flex items-center gap-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-wide outline-none focus:ring-2 focus:ring-medi-accent transition-all w-full justify-center ${disabled ? "opacity-70 cursor-default" : "cursor-pointer"}`}
       >
         <span className="truncate">{label}</span>
         <svg className={`w-3 h-3 opacity-60 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -117,6 +119,7 @@ interface PreInvoiceCardProps {
   onActualizarAtencion: (campo: keyof AtencionUI, valor: string | number) => void;
   diagnosticos: { codigo_cie10: string; descripcion: string; alternativas: { codigo: string; descripcion: string }[] }[];
   procedimientos: { codigo_cups: string; descripcion: string; cantidad: number; valor_unitario?: number; valor_procedimiento?: number; diagnostico_asociado?: string; numAutorizacion?: string; alternativas: { codigo: string; descripcion: string }[] }[];
+  readOnly?: boolean;
 }
 
 export default function PreInvoiceCard({
@@ -127,6 +130,7 @@ export default function PreInvoiceCard({
   onActualizarAtencion,
   diagnosticos,
   procedimientos,
+  readOnly,
 }: PreInvoiceCardProps) {
   const [modalCupsAbierto, setModalCupsAbierto] = useState(false);
   const [dropdownCupsAbierto, setDropdownCupsAbierto] = useState(false);
@@ -153,7 +157,7 @@ export default function PreInvoiceCard({
       <div className="flex justify-between items-start mb-4">
         <div className="flex flex-col gap-1 w-2/3">
           <h3 className="text-[10px] font-black uppercase tracking-widest opacity-60">
-            Liquidación (Editable)
+            {readOnly ? "Liquidación (Solo lectura)" : "Liquidación (Editable)"}
           </h3>
 
           {/* Valor Consulta */}
@@ -168,7 +172,8 @@ export default function PreInvoiceCard({
                 onActualizarAtencion("valor_consulta", raw === "" ? 0 : parseInt(raw, 10));
               }}
               placeholder="0"
-              className="bg-transparent text-4xl font-black outline-none w-full border-b border-transparent focus:border-white/30 transition-colors"
+              readOnly={readOnly}
+              className={`bg-transparent text-4xl font-black outline-none w-full border-b border-transparent focus:border-white/30 transition-colors ${readOnly ? "opacity-70 cursor-default" : ""}`}
               title="Valor Total Consulta"
             />
           </div>
@@ -185,7 +190,8 @@ export default function PreInvoiceCard({
                 onActualizarAtencion("valor_cuota", raw === "" ? 0 : parseInt(raw, 10));
               }}
               placeholder="0"
-              className="bg-transparent text-[10px] font-bold outline-none border-b border-transparent focus:border-white/30 w-24"
+              readOnly={readOnly}
+              className={`bg-transparent text-[10px] font-bold outline-none border-b border-transparent focus:border-white/30 w-24 ${readOnly ? "opacity-70 cursor-default" : ""}`}
               title="Cuota Moderadora / Copago"
             />
           </div>
@@ -197,8 +203,8 @@ export default function PreInvoiceCard({
           <div ref={dropdownCupsRef} className="relative mt-1.5">
             <button
               type="button"
-              onClick={() => setDropdownCupsAbierto(!dropdownCupsAbierto)}
-              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-[10px] font-bold outline-none focus:ring-2 focus:ring-medi-accent transition-all cursor-pointer"
+              onClick={() => !readOnly && setDropdownCupsAbierto(!dropdownCupsAbierto)}
+              className={`flex items-center gap-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-[10px] font-bold outline-none focus:ring-2 focus:ring-medi-accent transition-all ${readOnly ? "opacity-70 cursor-default" : "cursor-pointer"}`}
             >
               <span className="font-black">{codConsulta}</span>
               <span className="opacity-70 truncate max-w-[140px]">{nombreEspecialidad}</span>
@@ -243,6 +249,7 @@ export default function PreInvoiceCard({
             options={DICCIONARIO_MODALIDAD}
             onChange={(val) => onActualizarAtencion("modalidad", val)}
             align="right"
+            disabled={readOnly}
           />
           {/* Tipo de Servicio */}
           {atencion.tipo_servicio === "urgencias" ? (
@@ -252,6 +259,7 @@ export default function PreInvoiceCard({
               onChange={(val) => onActualizarAtencion("tipo_servicio", val)}
               align="right"
               className="[&>button]:bg-red-500/80 [&>button]:ring-1 [&>button]:ring-red-300 [&>button]:hover:bg-red-500"
+              disabled={readOnly}
             />
           ) : (
             <CardDropdown
@@ -259,6 +267,7 @@ export default function PreInvoiceCard({
               options={DICCIONARIO_TIPO_SERVICIO}
               onChange={(val) => onActualizarAtencion("tipo_servicio", val)}
               align="right"
+              disabled={readOnly}
             />
           )}
         </div>
@@ -273,6 +282,7 @@ export default function PreInvoiceCard({
             options={DICCIONARIO_CAUSAS}
             onChange={(val) => onActualizarAtencion("causa", val)}
             className="[&>button]:bg-white/5 [&>button]:rounded-xl [&>button]:justify-start [&>button]:text-left"
+            disabled={readOnly}
           />
         </div>
 
@@ -285,6 +295,7 @@ export default function PreInvoiceCard({
             onChange={(val) => onActualizarAtencion("tipo_diagnostico", val)}
             align="right"
             className="[&>button]:bg-white/5 [&>button]:rounded-xl"
+            disabled={readOnly}
           />
         </div>
       </div>

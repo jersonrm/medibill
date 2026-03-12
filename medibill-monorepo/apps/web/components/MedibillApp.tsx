@@ -26,6 +26,7 @@ export default function MedibillApp() {
   const [historial, setHistorial] = useState<AuditoriaHistorial[]>([]);
   const [numFactura, setNumFactura] = useState("");
   const [trialMensaje, setTrialMensaje] = useState<string | null>(null);
+  const [modoConsulta, setModoConsulta] = useState(false);
 
   // Protección contra cierre accidental con datos sin guardar
   useBeforeUnload(nota.trim().length > 0 && resultado === null);
@@ -68,6 +69,7 @@ export default function MedibillApp() {
     setDatosPaciente(DATOS_PACIENTE_DEFAULT);
     setResultado(null);
     setNumFactura("");
+    setModoConsulta(false);
     await cargarHistorial();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -112,6 +114,7 @@ export default function MedibillApp() {
     if (!r.procedimientos) r.procedimientos = [];
     setResultado(r);
     setDatosPaciente({ ...DATOS_PACIENTE_DEFAULT, nombrePaciente: a.nombre_paciente || "", cedulaPaciente: a.documento_paciente || "" });
+    setModoConsulta(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -135,7 +138,7 @@ export default function MedibillApp() {
             </div>
             <PatientForm datos={datosPaciente} onChange={handleDatosPacienteChange} onBuscarPaciente={handleBuscarPaciente} />
             <AlertaCoherenciaPaciente alertas={alertasCoherencia} />
-            <ClinicalNoteInput nota={nota} cargando={cargando} onNotaChange={setNota} onEjecutarAnalisis={handleGenerarRIPS} onNuevaConsulta={nuevaConsulta} />
+            <ClinicalNoteInput nota={nota} cargando={cargando} onNotaChange={setNota} onEjecutarAnalisis={handleGenerarRIPS} onNuevaConsulta={nuevaConsulta} readOnly={modoConsulta} />
           </div>
           <PatientHistory historial={historial} cedulaPaciente={datosPaciente.cedulaPaciente} nombrePaciente={datosPaciente.nombrePaciente} onCargarAuditoria={cargarAuditoriaAntigua} />
         </section>
@@ -156,7 +159,21 @@ export default function MedibillApp() {
               </div>
             </div>
           )}
-          <AnalysisResults resultado={resultado} datosPaciente={datosPaciente} numFactura={numFactura} onResultadoChange={setResultado} nota={nota} />
+          {modoConsulta && resultado && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📋</span>
+                <p className="text-sm font-medium text-amber-800">Estás consultando una nota clínica pasada (solo lectura)</p>
+              </div>
+              <button
+                onClick={nuevaConsulta}
+                className="px-4 py-2 bg-medi-primary text-white text-xs font-bold rounded-lg hover:bg-medi-deep transition-colors"
+              >
+                Nueva Consulta
+              </button>
+            </div>
+          )}
+          <AnalysisResults resultado={resultado} datosPaciente={datosPaciente} numFactura={numFactura} onResultadoChange={setResultado} nota={nota} readOnly={modoConsulta} />
         </section>
       </main>
     </div>

@@ -56,11 +56,20 @@ vi.mock("@/lib/providers/matias-client", () => ({
   descargarXml: (...args: unknown[]) => mockDescargarXml(...args),
 }));
 
-const mockHealthCheck = vi.fn();
-const mockValidarEnMuv = vi.fn();
-vi.mock("@/lib/providers/muv-client", () => ({
-  healthCheck: (...args: unknown[]) => mockHealthCheck(...args),
-  validarEnMuv: (...args: unknown[]) => mockValidarEnMuv(...args),
+const mockFevHealthCheck = vi.fn();
+const mockFevGetToken = vi.fn();
+const mockFevCargarFevRips = vi.fn();
+const mockFevClearTokenCache = vi.fn();
+vi.mock("@/lib/providers/fev-rips-client", () => ({
+  healthCheck: (...args: unknown[]) => mockFevHealthCheck(...args),
+  getToken: (...args: unknown[]) => mockFevGetToken(...args),
+  cargarFevRips: (...args: unknown[]) => mockFevCargarFevRips(...args),
+  clearTokenCache: (...args: unknown[]) => mockFevClearTokenCache(...args),
+}));
+
+vi.mock("@/lib/muv-crypto", () => ({
+  encrypt: vi.fn().mockReturnValue("encrypted-test"),
+  decrypt: vi.fn().mockReturnValue("password-test-123"),
 }));
 
 const mockGenerarJsonRipsMVP = vi.fn();
@@ -237,7 +246,11 @@ describe("validarRipsYObtenerCuv", () => {
       data: facturaListaParaMuv(),
       error: null,
     });
-    mockHealthCheck.mockResolvedValue(false);
+    configurarTabla(mockState, "credenciales_muv", "select", {
+      data: { tipo_usuario: "RE", tipo_identificacion: "CC", numero_identificacion: "123", contrasena_encrypted: "enc", nit_prestador: "900" },
+      error: null,
+    });
+    mockFevHealthCheck.mockResolvedValue(false);
 
     const { validarRipsYObtenerCuv } = await import("@/app/actions/muv");
     const result = await validarRipsYObtenerCuv("factura-1");
@@ -251,14 +264,20 @@ describe("validarRipsYObtenerCuv", () => {
       error: null,
     });
     configurarTabla(mockState, "facturas", "update", { data: null, error: null });
+    configurarTabla(mockState, "credenciales_muv", "select", {
+      data: { tipo_usuario: "RE", tipo_identificacion: "CC", numero_identificacion: "123", contrasena_encrypted: "enc", nit_prestador: "900" },
+      error: null,
+    });
 
-    mockHealthCheck.mockResolvedValue(true);
+    mockFevHealthCheck.mockResolvedValue(true);
     mockDescargarXml.mockResolvedValue("<xml>firmado-dian</xml>");
     mockGenerarJsonRipsMVP.mockResolvedValue({ numDocumentoIdObligado: "123", numFactura: "FV-001" });
-    mockValidarEnMuv.mockResolvedValue({
-      valido: true,
-      cuv: "CUV-MINSALUD-777",
-      errores: [],
+    mockFevGetToken.mockResolvedValue("jwt-token-test");
+    mockFevCargarFevRips.mockResolvedValue({
+      ResultState: true,
+      CodigoUnicoValidacion: "CUV-MINSALUD-777",
+      FechaRadicacion: "2024-01-15",
+      ResultadosValidacion: [],
     });
 
     const { validarRipsYObtenerCuv } = await import("@/app/actions/muv");
@@ -274,16 +293,22 @@ describe("validarRipsYObtenerCuv", () => {
       error: null,
     });
     configurarTabla(mockState, "facturas", "update", { data: null, error: null });
+    configurarTabla(mockState, "credenciales_muv", "select", {
+      data: { tipo_usuario: "RE", tipo_identificacion: "CC", numero_identificacion: "123", contrasena_encrypted: "enc", nit_prestador: "900" },
+      error: null,
+    });
 
-    mockHealthCheck.mockResolvedValue(true);
+    mockFevHealthCheck.mockResolvedValue(true);
     mockDescargarXml.mockResolvedValue("<xml/>");
     mockGenerarJsonRipsMVP.mockResolvedValue({});
-    mockValidarEnMuv.mockResolvedValue({
-      valido: false,
-      cuv: null,
-      errores: [
-        { codigo: "RIPS-001", mensaje: "Campo faltante numDocumentoIdObligado", severidad: "error" },
-        { codigo: "RIPS-002", mensaje: "Formato fecha inválido", severidad: "error" },
+    mockFevGetToken.mockResolvedValue("jwt-token-test");
+    mockFevCargarFevRips.mockResolvedValue({
+      ResultState: false,
+      CodigoUnicoValidacion: null,
+      FechaRadicacion: null,
+      ResultadosValidacion: [
+        { Codigo: "RIPS-001", Descripcion: "Campo faltante numDocumentoIdObligado", Observaciones: "Campo faltante numDocumentoIdObligado", Clase: "RECHAZADO", PathFuente: "" },
+        { Codigo: "RIPS-002", Descripcion: "Formato fecha inválido", Observaciones: "Formato fecha inválido", Clase: "RECHAZADO", PathFuente: "" },
       ],
     });
 
@@ -303,11 +328,16 @@ describe("validarRipsYObtenerCuv", () => {
       error: null,
     });
     configurarTabla(mockState, "facturas", "update", { data: null, error: null });
+    configurarTabla(mockState, "credenciales_muv", "select", {
+      data: { tipo_usuario: "RE", tipo_identificacion: "CC", numero_identificacion: "123", contrasena_encrypted: "enc", nit_prestador: "900" },
+      error: null,
+    });
 
-    mockHealthCheck.mockResolvedValue(true);
+    mockFevHealthCheck.mockResolvedValue(true);
     mockDescargarXml.mockResolvedValue("<xml/>");
     mockGenerarJsonRipsMVP.mockResolvedValue({});
-    mockValidarEnMuv.mockRejectedValue(new Error("ECONNRESET"));
+    mockFevGetToken.mockResolvedValue("jwt-token-test");
+    mockFevCargarFevRips.mockRejectedValue(new Error("ECONNRESET"));
 
     const { validarRipsYObtenerCuv } = await import("@/app/actions/muv");
     const result = await validarRipsYObtenerCuv("factura-1");
@@ -321,8 +351,12 @@ describe("validarRipsYObtenerCuv", () => {
       data: facturaListaParaMuv(),
       error: null,
     });
+    configurarTabla(mockState, "credenciales_muv", "select", {
+      data: { tipo_usuario: "RE", tipo_identificacion: "CC", numero_identificacion: "123", contrasena_encrypted: "enc", nit_prestador: "900" },
+      error: null,
+    });
 
-    mockHealthCheck.mockResolvedValue(true);
+    mockFevHealthCheck.mockResolvedValue(true);
     mockDescargarXml.mockRejectedValue(new Error("Matias descargarXml failed (404)"));
 
     const { validarRipsYObtenerCuv } = await import("@/app/actions/muv");

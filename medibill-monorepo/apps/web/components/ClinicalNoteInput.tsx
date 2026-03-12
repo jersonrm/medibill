@@ -8,6 +8,7 @@ interface ClinicalNoteInputProps {
   onNotaChange: (valor: string) => void;
   onEjecutarAnalisis: () => void;
   onNuevaConsulta: () => void;
+  readOnly?: boolean;
 }
 
 export default function ClinicalNoteInput({
@@ -16,16 +17,19 @@ export default function ClinicalNoteInput({
   onNotaChange,
   onEjecutarAnalisis,
   onNuevaConsulta,
+  readOnly = false,
 }: ClinicalNoteInputProps) {
   return (
     <>
       <textarea
         value={nota}
         onChange={(e) => onNotaChange(e.target.value)}
-        className="flex-grow w-full p-6 text-xl border-2 border-medi-light rounded-2xl outline-none focus:border-medi-primary transition-all text-medi-deep leading-relaxed bg-white font-medium shadow-inner min-h-[200px]"
+        readOnly={readOnly}
+        className={`flex-grow w-full p-6 text-xl border-2 border-medi-light rounded-2xl outline-none focus:border-medi-primary transition-all text-medi-deep leading-relaxed bg-white font-medium shadow-inner min-h-[200px] ${readOnly ? "opacity-70 cursor-default" : ""}`}
         placeholder="Describa la atención aquí..."
       />
 
+      {!readOnly && (
       <div className="grid grid-cols-4 gap-4 mt-6">
         <button
           onClick={onEjecutarAnalisis}
@@ -49,6 +53,7 @@ export default function ClinicalNoteInput({
           </svg>
         </button>
       </div>
+      )}
     </>
   );
 }

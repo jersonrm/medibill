@@ -40,14 +40,6 @@ const FEATURES_PLAN: Record<string, string[]> = {
     "Importación masiva",
     "Soporte prioritario",
   ],
-  ips: [
-    "Todo ilimitado",
-    "Usuarios ilimitados",
-    "100 GB almacenamiento",
-    "API personalizada",
-    "SLA 99.9%",
-    "Soporte dedicado + onboarding",
-  ],
 };
 
 export default function SeleccionarPlanPage() {
@@ -73,11 +65,6 @@ export default function SeleccionarPlanPage() {
   };
 
   const handleSeleccionar = async (planId: string) => {
-    if (planId === "ips") {
-      window.open("mailto:ventas@medibill.co?subject=Plan IPS personalizado", "_blank");
-      return;
-    }
-
     setProcesando(planId);
 
     const planActualId = limites?.plan;
@@ -149,7 +136,7 @@ export default function SeleccionarPlanPage() {
       </div>
 
       {/* Grid de planes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {planes.map((plan) => {
           const esActual = planActualId === plan.id;
           const esPopular = plan.id === "profesional";
@@ -184,9 +171,6 @@ export default function SeleccionarPlanPage() {
               </h3>
 
               <div className="mt-4 mb-6">
-                {plan.id === "ips" ? (
-                  <p className="text-2xl font-bold text-gray-900">Personalizado</p>
-                ) : (
                   <>
                     <span className="text-3xl font-bold text-gray-900">
                       {formatCOP(precio)}
@@ -201,7 +185,6 @@ export default function SeleccionarPlanPage() {
                       <p className="text-xs text-emerald-600 mt-1">por asiento</p>
                     )}
                   </>
-                )}
               </div>
 
               <ul className="space-y-2 flex-1 mb-6">
@@ -230,8 +213,6 @@ export default function SeleccionarPlanPage() {
                   ? "Plan actual"
                   : procesando === plan.id
                   ? "Procesando..."
-                  : plan.id === "ips"
-                  ? "Contactar ventas"
                   : "Seleccionar"}
               </button>
             </div>

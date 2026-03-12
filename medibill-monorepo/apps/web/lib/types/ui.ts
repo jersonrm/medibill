@@ -115,6 +115,7 @@ export interface DatosPaciente {
   sexoPaciente: string;
   tipoUsuario: string;
   codPaisResidencia: string;
+  codPaisOrigen: string; // ISO 3166-1 numérico ("170" = Colombia, "862" = Venezuela, etc.)
   departamentoSeleccionado: string;
   codMunicipioResidencia: string;
   codZonaTerritorial: string;
@@ -188,9 +189,10 @@ export const DATOS_PACIENTE_DEFAULT: DatosPaciente = {
   sexoPaciente: "M",
   tipoUsuario: "01",
   codPaisResidencia: "170",
+  codPaisOrigen: "170",
   departamentoSeleccionado: "",
   codMunicipioResidencia: "",
-  codZonaTerritorial: "U",
+  codZonaTerritorial: "01",
   incapacidad: "NO",
   epsNombre: "",
   epsCodigo: "",

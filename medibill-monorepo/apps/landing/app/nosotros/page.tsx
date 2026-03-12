@@ -69,7 +69,7 @@ export default function NosotrosPage() {
                 herramientas inteligentes que transformen la facturación médica
                 de un proceso tedioso y propenso a errores en un flujo ágil,
                 preciso y conforme a la normativa. Queremos que cada médico,
-                clínica e IPS pueda facturar con confianza — sin importar su
+                clínica pueda facturar con confianza — sin importar su
                 tamaño o recursos.
               </p>
             </div>
@@ -171,6 +171,12 @@ export default function NosotrosPage() {
           >
             Comenzar Prueba Gratuita
           </a>
+          <p className="mt-4 text-sm text-gray-500">
+            Consulta nuestros{" "}
+            <a href="/terminos" className="underline hover:text-gray-300">Términos y Condiciones</a>{" "}
+            y las{" "}
+            <a href="/terminos#prueba-gratuita" className="underline hover:text-gray-300">condiciones de la Prueba Gratuita</a>.
+          </p>
         </div>
       </section>
     </>

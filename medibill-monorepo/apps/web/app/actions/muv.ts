@@ -5,34 +5,37 @@ import { devError } from "@/lib/logger";
 import { safeError } from "@/lib/safe-error";
 import { generarJsonRipsMVP } from "@/app/actions/rips";
 import * as matiasClient from "@/lib/providers/matias-client";
-import * as muvClient from "@/lib/providers/muv-client";
+import * as fevRipsClient from "@/lib/providers/fev-rips-client";
 import { getContextoOrg } from "@/lib/organizacion";
 import { verificarPermisoOError } from "@/lib/permisos";
 import type { EstadoMuv, MuvError, CredencialesMuvInput, CredencialesMuv } from "@/lib/types/muv";
+import type { ResultadoValidacion } from "@/lib/types/fev-rips-api";
 import { encrypt, decrypt } from "@/lib/muv-crypto";
 
 // ==========================================
-// MUV — Server Actions (MinSalud Docker)
+// MUV — Server Actions (FEV-RIPS API v4.3)
 // ==========================================
 
 /**
- * Valida los RIPS de una factura ante el MUV (MinSalud) y obtiene el CUV.
+ * Valida los RIPS de una factura ante el MUV (FEV-RIPS API v4.3) y obtiene el CUV.
  *
  * Prerequisitos:
  *   - Factura con estado_dian = "aceptada" (CUFE válido)
- *   - Docker MUV corriendo en MUV_DOCKER_URL
+ *   - Docker FEV-RIPS corriendo en FEV_RIPS_API_URL
+ *   - Credenciales SISPRO del prestador configuradas
  *
- * Flujo:
- *   1. Obtener XML firmado desde Matias API (DIAN)
+ * Flujo FEV-RIPS API v4.3:
+ *   1. Obtener XML firmado (AttachedDocument) desde Matias API (DIAN)
  *   2. Generar JSON RIPS (Resolución 2275)
- *   3. Enviar ambos al Docker MUV
- *   4. Almacenar CUV o errores en la factura
+ *   3. LoginSISPRO → obtener token JWT
+ *   4. CargarFevRips(token, rips, xmlBase64) → CUV o errores
+ *   5. Almacenar CUV o errores en la factura
  */
 export async function validarRipsYObtenerCuv(
   facturaId: string,
 ): Promise<
-  | { success: true; cuv: string }
-  | { success: false; error: string; errores?: MuvError[] }
+  | { success: true; cuv: string; fechaRadicacion: string }
+  | { success: false; error: string; errores?: MuvError[]; resultadosValidacion?: ResultadoValidacion[] }
 > {
   const ctx = await getContextoOrg();
   verificarPermisoOError(ctx.rol, "enviar_dian");
@@ -72,16 +75,39 @@ export async function validarRipsYObtenerCuv(
     };
   }
 
-  // 3. Verificar que el Docker MUV esté disponible
-  const muvDisponible = await muvClient.healthCheck();
-  if (!muvDisponible) {
+  // 3. Verificar credenciales SISPRO del prestador
+  const { data: creds } = await supabase
+    .from("credenciales_muv")
+    .select("tipo_usuario, tipo_identificacion, numero_identificacion, contrasena_encrypted, nit_prestador")
+    .eq("user_id", ctx.userId)
+    .eq("activo", true)
+    .single();
+
+  if (!creds?.contrasena_encrypted) {
     return {
       success: false,
-      error: "El servicio MUV no está disponible. Verifique que el Docker esté corriendo.",
+      error: "No hay credenciales SISPRO configuradas. Configure sus credenciales en Configuración → MUV.",
     };
   }
 
-  // 4. Obtener XML firmado desde DIAN (Matias API)
+  let contrasena: string;
+  try {
+    contrasena = decrypt(creds.contrasena_encrypted);
+  } catch (err) {
+    devError("Error desencriptando credenciales MUV", err);
+    return { success: false, error: "Error al leer las credenciales SISPRO. Reconfigure sus credenciales." };
+  }
+
+  // 4. Verificar que el Docker FEV-RIPS API esté disponible
+  const apiDisponible = await fevRipsClient.healthCheck();
+  if (!apiDisponible) {
+    return {
+      success: false,
+      error: "El servicio FEV-RIPS API no está disponible. Verifique que el Docker esté corriendo.",
+    };
+  }
+
+  // 5. Obtener XML firmado (AttachedDocument) desde DIAN (Matias API)
   let xmlFirmado: string;
   try {
     xmlFirmado = await matiasClient.descargarXml(factura.track_id_dian);
@@ -90,7 +116,7 @@ export async function validarRipsYObtenerCuv(
     return { success: false, error: `No se pudo obtener el XML firmado: ${message}` };
   }
 
-  // 5. Generar JSON RIPS (Resolución 2275) — carga datos desde la factura aprobada
+  // 6. Generar JSON RIPS (Resolución 2275)
   let ripsJson;
   try {
     ripsJson = await generarJsonRipsMVP(facturaId);
@@ -99,7 +125,7 @@ export async function validarRipsYObtenerCuv(
     return { success: false, error: `Error al generar JSON RIPS: ${message}` };
   }
 
-  // 6. Marcar como pendiente
+  // 7. Marcar como pendiente (validando)
   await supabase
     .from("facturas")
     .update({
@@ -110,44 +136,36 @@ export async function validarRipsYObtenerCuv(
     .eq("id", facturaId)
     .eq("organizacion_id", ctx.orgId);
 
-  // 7. Obtener credenciales MUV del prestador (si existen)
-  let muvCredenciales: import("@/lib/types/muv").MuvCredencialesRequest | undefined;
-  const { data: creds } = await supabase
-    .from("credenciales_muv")
-    .select("tipo_usuario, tipo_identificacion, numero_identificacion, contrasena_encrypted, nit_prestador")
-    .eq("user_id", ctx.userId)
-    .eq("activo", true)
-    .single();
-
-  if (creds?.contrasena_encrypted) {
-    try {
-      muvCredenciales = {
-        tipoUsuario: creds.tipo_usuario,
-        tipoIdentificacion: creds.tipo_identificacion,
-        numeroIdentificacion: creds.numero_identificacion,
-        contrasena: decrypt(creds.contrasena_encrypted),
-        nitPrestador: creds.nit_prestador,
-      };
-    } catch (err) {
-      devError("Error desencriptando credenciales MUV", err);
-    }
-  }
-
-  // 8. Enviar al Docker MUV
   try {
-    const resultado = await muvClient.validarEnMuv({
-      xml: xmlFirmado,
-      ripsJson,
-      credenciales: muvCredenciales,
+    // 8. LoginSISPRO → obtener token JWT
+    const token = await fevRipsClient.getToken({
+      persona: {
+        identificacion: {
+          tipo: creds.tipo_identificacion,
+          numero: creds.numero_identificacion,
+        },
+      },
+      clave: contrasena,
+      nit: creds.nit_prestador,
+      tipoUsuario: (creds.tipo_usuario as "RE" | "PIN" | "PINx" | "PIE") || "RE",
     });
 
-    if (resultado.valido && resultado.cuv) {
-      // Éxito — almacenar CUV
+    // 9. Codificar XML en Base64 para el API
+    const xmlBase64 = Buffer.from(xmlFirmado, "utf-8").toString("base64");
+
+    // 10. CargarFevRips → CUV o errores
+    const resultado = await fevRipsClient.cargarFevRips(token, ripsJson, xmlBase64);
+
+    if (resultado.ResultState && resultado.CodigoUnicoValidacion) {
+      // Éxito — CUV obtenido
+      const cuv = resultado.CodigoUnicoValidacion;
+
       const { error: errUpdate } = await supabase
         .from("facturas")
         .update({
-          cuv: resultado.cuv,
+          cuv,
           estado_muv: "validado" as EstadoMuv,
+          fecha_radicacion_muv: resultado.FechaRadicacion,
           respuesta_muv_json: resultado as unknown as Record<string, unknown>,
           updated_at: new Date().toISOString(),
         })
@@ -158,9 +176,12 @@ export async function validarRipsYObtenerCuv(
         devError("Error actualizando factura post-MUV", errUpdate);
       }
 
-      return { success: true, cuv: resultado.cuv };
+      return { success: true, cuv, fechaRadicacion: resultado.FechaRadicacion };
     } else {
       // Rechazado — almacenar errores
+      const rechazos = resultado.ResultadosValidacion.filter(r => r.Clase === "RECHAZADO");
+      const notificaciones = resultado.ResultadosValidacion.filter(r => r.Clase === "NOTIFICACION");
+
       await supabase
         .from("facturas")
         .update({
@@ -171,19 +192,29 @@ export async function validarRipsYObtenerCuv(
         .eq("id", facturaId)
         .eq("organizacion_id", ctx.orgId);
 
-      const resumen = resultado.errores
-        .filter(e => e.severidad === "error")
-        .map(e => `[${e.codigo}] ${e.mensaje}`)
-        .join("; ");
+      // Convertir ResultadosValidacion a MuvError para compatibilidad con la UI
+      const erroresMuv: MuvError[] = resultado.ResultadosValidacion.map(r => ({
+        codigo: r.Codigo,
+        mensaje: r.Observaciones || r.Descripcion,
+        campo: r.PathFuente,
+        severidad: r.Clase === "RECHAZADO" ? "error" as const : "warning" as const,
+      }));
+
+      const resumen = rechazos.length > 0
+        ? rechazos.map(e => `[${e.Codigo}] ${e.Observaciones || e.Descripcion}`).join("; ")
+        : resultado.CodigoUnicoValidacion || "El MUV rechazó la validación";
 
       return {
         success: false,
-        error: resumen || "El MUV rechazó la validación",
-        errores: resultado.errores,
+        error: resumen,
+        errores: erroresMuv,
+        resultadosValidacion: resultado.ResultadosValidacion,
       };
     }
   } catch (err) {
-    // Error de conexión — regresar a estado anterior
+    // Error de conexión/autenticación — regresar a estado anterior
+    fevRipsClient.clearTokenCache();
+
     await supabase
       .from("facturas")
       .update({
@@ -191,9 +222,9 @@ export async function validarRipsYObtenerCuv(
         updated_at: new Date().toISOString(),
       })
       .eq("id", facturaId)
-    .eq("organizacion_id", ctx.orgId);
+      .eq("organizacion_id", ctx.orgId);
 
-    const message = err instanceof Error ? err.message : "Error de conexión con el MUV";
+    const message = err instanceof Error ? err.message : "Error de conexión con el servicio FEV-RIPS";
     return { success: false, error: message };
   }
 }

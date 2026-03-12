@@ -115,7 +115,7 @@ export default function ConfiguracionAyudaPage() {
           <div className="mt-3 space-y-2 text-sm text-gray-600">
             <p>
               En <strong>Configuración {">"} Equipo</strong> (disponible en
-              planes Clínica e IPS) puedes:
+              planes Clínica) puedes:
             </p>
             <ul className="mt-3 space-y-2">
               <li>
