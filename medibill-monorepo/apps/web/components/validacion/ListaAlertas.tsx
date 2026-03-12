@@ -177,6 +177,31 @@ export default function ListaAlertas({ alertas }: ListaAlertasProps) {
                         </div>
                       )}
                     </div>
+                    {/* Campo RIPS y glosas relacionadas */}
+                    {alerta.campo_rips_codigo && (
+                      <div>
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Campo RIPS: </span>
+                        <span className="text-xs text-gray-400 font-mono">{alerta.campo_rips_codigo}</span>
+                        {alerta.glosas_relacionadas_mapeo && alerta.glosas_relacionadas_mapeo.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {alerta.glosas_relacionadas_mapeo.slice(0, 5).map((g) => (
+                              <span
+                                key={g.codigo_glosa}
+                                className="bg-amber-900/30 text-amber-400 text-[10px] font-mono px-1.5 py-0.5 rounded border border-amber-700/20"
+                                title={g.descripcion}
+                              >
+                                {g.codigo_glosa}
+                              </span>
+                            ))}
+                            {alerta.glosas_relacionadas_mapeo.length > 5 && (
+                              <span className="text-[10px] text-gray-500">
+                                +{alerta.glosas_relacionadas_mapeo.length - 5} más
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {/* Categoría */}
                     <div className="flex items-center gap-2">
                       <span className={`${colors.badge} text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase`}>

@@ -8,11 +8,13 @@
  *  Capa 1 — Prevención automática: duplicados, plazos, estructura RIPS
  *  Capa 2 — Alerta/verificación: tarifas, autorizaciones, afiliación
  *  Capa 3 — Respuesta/defensa: pertinencia, coherencia clínica
+ *  Capa 4 — Facturación y aritmética
+ *  Capa 5 — Consistencia campo RIPS vs mapeo normativo (Res. 2275/2023)
  *
  * Fuente legal: Resolución 2284/2023, Circular 007/2025, Resolución 2275/2023
  */
 
-import type { FevRips, ConsultaRips, ProcedimientoRips, ServiciosRips } from "@/lib/types/rips";
+import type { FevRips, ConsultaRips, ProcedimientoRips, ServiciosRips, MedicamentoRips, OtroServicioRips } from "@/lib/types/rips";
 import { esDiaHabil } from "@/lib/dias-habiles";
 import type {
   FacturaDB,
@@ -24,7 +26,14 @@ import type {
   CategoriaAlerta,
   DatosFactura,
   ReglaCoherenciaDB,
+  GlosaRelacionadaMapeo,
 } from "@/lib/types/glosas";
+import {
+  obtenerGlosasPorCampo,
+  obtenerCampoRips,
+  CAMPO_FEVRIPS_A_MAPEO,
+  type GlosaAsociada,
+} from "@/lib/mapeo-rips-glosas";
 
 // =====================================================================
 // TIPOS INTERNOS
@@ -43,6 +52,10 @@ interface HallazgoInterno {
   como_resolver: string;
   servicio_afectado?: string;
   norma_legal: string;
+  /** Código del campo RIPS según mapeo Res. 2275/2023 */
+  campo_rips_codigo?: string;
+  /** Glosas adicionales del mapeo oficial asociadas al campo */
+  glosas_relacionadas_mapeo?: GlosaRelacionadaMapeo[];
 }
 
 /** Configuración del acuerdo de voluntades (contrato IPS ↔ EPS) */
@@ -162,6 +175,10 @@ export class ValidadorPreRadicacion {
     this.validarFormatoNumeroFactura();
     this.validarFrecuenciaProcedimientos();
 
+    // Capa 5: Consistencia campo RIPS vs mapeo normativo
+    this.validarConsistenciaCamposRips();
+    this.validarConsistenciaRipsVsFactura();
+
     // Construir resultado
     const errores = this.hallazgos.filter((h) => h.severidad === "error").length;
     const advertencias = this.hallazgos.filter((h) => h.severidad === "advertencia").length;
@@ -194,6 +211,8 @@ export class ValidadorPreRadicacion {
       como_resolver: h.como_resolver,
       servicio_afectado: h.servicio_afectado,
       norma_legal: h.norma_legal,
+      campo_rips_codigo: h.campo_rips_codigo,
+      glosas_relacionadas_mapeo: h.glosas_relacionadas_mapeo,
     }));
 
     // Códigos únicos de glosa prevenida
@@ -1523,6 +1542,248 @@ export class ValidadorPreRadicacion {
   }
 
   // -------------------------------------------------------------------
+  // CAPA 5 — CONSISTENCIA CAMPO RIPS vs MAPEO NORMATIVO
+  // -------------------------------------------------------------------
+
+  /**
+   * Valida campos del FEV-RIPS contra el mapeo normativo (Res. 2275/2023).
+   * Para cada campo vacío/nulo que tenga glosas asociadas, emite una alerta
+   * informativa indicando el riesgo de glosa por campo incompleto.
+   */
+  private validarConsistenciaCamposRips(): void {
+    const fev = this.ctx.fevRips;
+    if (!fev.usuarios || fev.usuarios.length === 0) return;
+
+    for (let ui = 0; ui < fev.usuarios.length; ui++) {
+      const u = fev.usuarios[ui]!;
+
+      // Campos de usuario
+      this.validarCampoRips(u.codPaisResidencia, "codPaisResidencia",
+        `Usuario[${ui}]`, "U06", "Código país residencia");
+      this.validarCampoRips(u.codMunicipioResidencia, "codMunicipioResidencia",
+        `Usuario[${ui}]`, "U07", "Código municipio residencia");
+      this.validarCampoRips(u.codZonaTerritorialResidencia, "codZonaTerritorialResidencia",
+        `Usuario[${ui}]`, "U08", "Zona territorial residencia");
+
+      const srv = u.servicios;
+      if (!srv) continue;
+
+      // Consultas
+      for (let ci = 0; ci < (srv.consultas?.length ?? 0); ci++) {
+        const c = srv.consultas![ci]!;
+        this.validarCampoRips(c.modalidadGrupoServicioTecSal, "consultas.modalidadGrupoServicioTecSal",
+          `Consulta[${ci}]`, "C05", "Modalidad grupo servicio");
+        this.validarCampoRips(c.grupoServicios, "consultas.grupoServicios",
+          `Consulta[${ci}]`, "C06", "Grupo servicios");
+        this.validarCampoRips(c.finalidadTecnologiaSalud, "consultas.finalidadTecnologiaSalud",
+          `Consulta[${ci}]`, "C08", "Finalidad tecnología salud");
+        this.validarCampoRips(c.causaMotivoAtencion, "consultas.causaMotivoAtencion",
+          `Consulta[${ci}]`, "C09", "Causa motivo atención");
+        this.validarCampoRips(c.tipoDiagnosticoPrincipal, "consultas.tipoDiagnosticoPrincipal",
+          `Consulta[${ci}]`, "C14", "Tipo diagnóstico principal");
+        this.validarCampoRips(c.conceptoRecaudo, "consultas.conceptoRecaudo",
+          `Consulta[${ci}]`, "C18", "Concepto recaudo");
+      }
+
+      // Procedimientos
+      for (let pi = 0; pi < (srv.procedimientos?.length ?? 0); pi++) {
+        const p = srv.procedimientos![pi]!;
+        this.validarCampoRips(p.viaIngresoServicioSalud, "procedimientos.viaIngresoServicioSalud",
+          `Procedimiento[${pi}]`, "P06", "Vía ingreso servicio salud");
+        this.validarCampoRips(p.modalidadGrupoServicioTecSal, "procedimientos.modalidadGrupoServicioTecSal",
+          `Procedimiento[${pi}]`, "P07", "Modalidad grupo servicio");
+        this.validarCampoRips(p.grupoServicios, "procedimientos.grupoServicios",
+          `Procedimiento[${pi}]`, "P08", "Grupo servicios");
+        this.validarCampoRips(p.finalidadTecnologiaSalud, "procedimientos.finalidadTecnologiaSalud",
+          `Procedimiento[${pi}]`, "P10", "Finalidad tecnología salud");
+        this.validarCampoRips(p.codDiagnosticoRelacionado, "procedimientos.codDiagnosticoRelacionado",
+          `Procedimiento[${pi}]`, "P14", "Diagnóstico relacionado");
+        this.validarCampoRips(p.conceptoRecaudo, "procedimientos.conceptoRecaudo",
+          `Procedimiento[${pi}]`, "P17", "Concepto recaudo");
+      }
+
+      // Medicamentos
+      for (let mi = 0; mi < (srv.medicamentos?.length ?? 0); mi++) {
+        const m = srv.medicamentos![mi]!;
+        this.validarCampoRips(m.nomTecnologiaSalud, "medicamentos.nomTecnologiaSalud",
+          `Medicamento[${mi}]`, "M09", "Nombre tecnología salud");
+        this.validarCampoRips(m.formaFarmaceutica, "medicamentos.formaFarmaceutica",
+          `Medicamento[${mi}]`, "M12", "Forma farmacéutica");
+        this.validarCampoRips(m.codDiagnosticoRelacionado, "medicamentos.codDiagnosticoRelacionado",
+          `Medicamento[${mi}]`, "M06", "Diagnóstico relacionado");
+        if (m.diasTratamiento <= 0) {
+          this.validarCampoRips(null, "medicamentos.diasTratamiento",
+            `Medicamento[${mi}]`, "M15", "Días tratamiento");
+        }
+        if (m.concentracionMedicamento <= 0) {
+          this.validarCampoRips(null, "medicamentos.concentracionMedicamento",
+            `Medicamento[${mi}]`, "M10", "Concentración medicamento");
+        }
+      }
+
+      // Otros Servicios
+      for (let si = 0; si < (srv.otrosServicios?.length ?? 0); si++) {
+        const s = srv.otrosServicios![si]!;
+        this.validarCampoRips(s.nomTecnologiaSalud, "otrosServicios.nomTecnologiaSalud",
+          `OtroServicio[${si}]`, "S07", "Nombre tecnología salud");
+        if (s.cantidad <= 0) {
+          this.validarCampoRips(null, "otrosServicios.cantidad",
+            `OtroServicio[${si}]`, "S08", "Cantidad otros servicios");
+        }
+      }
+    }
+  }
+
+  /**
+   * Emite una alerta informativa si un campo RIPS está vacío/nulo
+   * y tiene glosas asociadas en el mapeo normativo.
+   */
+  private validarCampoRips(
+    valor: unknown,
+    pathCampo: string,
+    contexto: string,
+    codigoMapeo: string,
+    nombreLegible: string,
+  ): void {
+    if (valor !== null && valor !== undefined && valor !== "") return;
+
+    const glosas = obtenerGlosasPorCampo(codigoMapeo);
+    if (glosas.length === 0) return;
+
+    const campo = obtenerCampoRips(codigoMapeo);
+    const codigosResumen = glosas.slice(0, 3).map((g) => g.codigo_glosa).join(", ");
+    const masTexto = glosas.length > 3 ? ` y ${glosas.length - 3} más` : "";
+
+    this.emit({
+      codigo_causal: glosas[0]!.codigo_glosa,
+      severidad: "info",
+      mensaje: `${contexto}: campo "${nombreLegible}" (${codigoMapeo}) vacío o no informado. ` +
+        `Puede disparar ${glosas.length} glosa(s): ${codigosResumen}${masTexto}.`,
+      campo_afectado: `fevRips.${pathCampo}`,
+      campo_rips_codigo: codigoMapeo,
+      glosas_relacionadas_mapeo: glosas,
+      como_resolver: `Complete el campo "${nombreLegible}" en el RIPS para prevenir glosas asociadas.`,
+      norma_legal: `Res. 2275/2023, Anexo Técnico 1, campo ${codigoMapeo}. ` +
+        `Categoría: ${campo?.categoria_rips ?? "RIPS"}.`,
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // SO6101/SO6102 — CONSISTENCIA RIPS vs FACTURA
+  // -------------------------------------------------------------------
+
+  /**
+   * SO6101 — RIPS inconsistente con la atención prestada.
+   * SO6102 — RIPS inconsistente con relación al contrato.
+   *
+   * Cruza los datos facturados (DatosFactura) contra los datos del FEV-RIPS
+   * para detectar inconsistencias: CUPS faltantes, fechas distintas,
+   * cantidades que no coinciden.
+   */
+  private validarConsistenciaRipsVsFactura(): void {
+    const df = this.ctx.datosFactura;
+    const servicios = this.serviciosRips;
+    if (!df || !servicios) return;
+
+    // Recopilar CUPS presentes en RIPS
+    const cupsEnRips = new Set<string>();
+    const fechasEnRips = new Map<string, string>();
+
+    for (const c of servicios.consultas ?? []) {
+      cupsEnRips.add(c.codConsulta);
+      fechasEnRips.set(c.codConsulta, c.fechaInicioAtencion?.slice(0, 10) ?? "");
+    }
+    for (const p of servicios.procedimientos ?? []) {
+      cupsEnRips.add(p.codProcedimiento);
+      fechasEnRips.set(p.codProcedimiento, p.fechaInicioAtencion?.slice(0, 10) ?? "");
+    }
+    for (const m of servicios.medicamentos ?? []) {
+      cupsEnRips.add(m.codTecnologiaSalud);
+    }
+    for (const s of servicios.otrosServicios ?? []) {
+      cupsEnRips.add(s.codTecnologiaSalud);
+    }
+
+    for (const srv of df.servicios) {
+      if (!srv.cups_codigo) continue;
+
+      // SO6101: Servicio facturado que no aparece en el RIPS
+      if (!cupsEnRips.has(srv.cups_codigo)) {
+        this.emit({
+          codigo_causal: "SO6101",
+          severidad: "error",
+          mensaje: `Servicio ${srv.cups_codigo} (${srv.descripcion}) está facturado pero NO aparece en el RIPS. ` +
+            `La EPS glosará por inconsistencia RIPS vs atención.`,
+          campo_afectado: "fevRips.servicios",
+          servicio_afectado: srv.cups_codigo,
+          como_resolver: "Incluya este servicio en el JSON RIPS antes de radicar. " +
+            "Cada servicio facturado debe tener su correspondiente registro en el FEV-RIPS.",
+          norma_legal: "Res. 2275/2023, Anexo Técnico 1. Res. 2284/2023, SO6101.",
+        });
+      }
+
+      // SO6101: Fecha de prestación distinta entre factura y RIPS
+      const fechaRips = fechasEnRips.get(srv.cups_codigo);
+      if (fechaRips && srv.fecha_prestacion) {
+        const fechaFactura = srv.fecha_prestacion.slice(0, 10);
+        if (fechaRips !== fechaFactura) {
+          this.emit({
+            codigo_causal: "SO6101",
+            severidad: "advertencia",
+            mensaje: `Servicio ${srv.cups_codigo}: fecha de prestación difiere entre factura (${fechaFactura}) ` +
+              `y RIPS (${fechaRips}). Puede generar glosa por inconsistencia.`,
+            campo_afectado: "fevRips.servicios.*.fechaInicioAtencion",
+            servicio_afectado: srv.cups_codigo,
+            valor_encontrado: fechaRips,
+            valor_esperado: fechaFactura,
+            como_resolver: "Verifique que las fechas de prestación coincidan entre la factura y el RIPS.",
+            norma_legal: "Res. 2275/2023, Anexo Técnico 1. Res. 2284/2023, SO6101.",
+          });
+        }
+      }
+    }
+
+    // SO6101: Servicios en RIPS que no están facturados
+    const cupsEnFactura = new Set(df.servicios.map((s) => s.cups_codigo));
+    for (const cups of cupsEnRips) {
+      if (!cupsEnFactura.has(cups)) {
+        this.emit({
+          codigo_causal: "SO6101",
+          severidad: "advertencia",
+          mensaje: `Código ${cups} aparece en el RIPS pero NO está facturado. ` +
+            `Puede generar inconsistencia en la auditoría.`,
+          campo_afectado: "fevRips.servicios",
+          servicio_afectado: cups,
+          como_resolver: "Retire el servicio del RIPS si no fue prestado, o inclúyalo en la factura si fue prestado.",
+          norma_legal: "Res. 2275/2023, Anexo Técnico 1. Res. 2284/2023, SO6101.",
+        });
+      }
+    }
+
+    // SO6102: Verificar contra acuerdo de voluntades si existe
+    if (this.ctx.acuerdo) {
+      for (const srv of df.servicios) {
+        if (!srv.cups_codigo) continue;
+        const enTarifa = this.ctx.acuerdo.tarifas[srv.cups_codigo] !== undefined;
+        const enPaquete = this.ctx.acuerdo.paquetes.includes(srv.cups_codigo);
+        if (!enTarifa && !enPaquete && cupsEnRips.has(srv.cups_codigo)) {
+          this.emit({
+            codigo_causal: "SO6102",
+            severidad: "info",
+            mensaje: `Servicio ${srv.cups_codigo} está en el RIPS pero no aparece en el tarifario ` +
+              `del acuerdo de voluntades. Verifique consistencia con el contrato.`,
+            campo_afectado: "acuerdo.tarifas",
+            servicio_afectado: srv.cups_codigo,
+            como_resolver: "Confirme que el servicio está cubierto por el acuerdo de voluntades vigente. " +
+              "Si no está pactado, aplica lista de precios del prestador (Circular 007/2025).",
+            norma_legal: "Res. 2284/2023, SO6102. Circular 007/2025 §4.3.",
+          });
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------
   // UTILIDAD INTERNA
   // -------------------------------------------------------------------
 
@@ -1552,14 +1813,67 @@ export class ValidadorPreRadicacion {
     como_resolver?: string;
     norma_legal?: string;
     servicio_afectado?: string;
+    campo_rips_codigo?: string;
+    glosas_relacionadas_mapeo?: GlosaRelacionadaMapeo[];
   }): void {
-    this.agregar({
+    const hallazgo: HallazgoInterno = {
       ...h,
       categoria: h.categoria ?? this.inferirCategoria(h.codigo_causal),
       detalle: h.detalle ?? h.mensaje,
       como_resolver: h.como_resolver ?? "Revise el campo indicado y corrija el valor.",
       norma_legal: h.norma_legal ?? "Res. 2284/2023, Anexo Técnico 3",
-    });
+    };
+
+    // Auto-enriquecer con mapeo RIPS si campo_afectado mapea a un campo conocido
+    if (!hallazgo.campo_rips_codigo && hallazgo.campo_afectado) {
+      const codigoMapeo = this.resolverCampoRipsDesdeAfectado(hallazgo.campo_afectado);
+      if (codigoMapeo) {
+        hallazgo.campo_rips_codigo = codigoMapeo;
+      }
+    }
+
+    if (hallazgo.campo_rips_codigo && !hallazgo.glosas_relacionadas_mapeo) {
+      const glosas = obtenerGlosasPorCampo(hallazgo.campo_rips_codigo);
+      if (glosas.length > 0) {
+        hallazgo.glosas_relacionadas_mapeo = glosas
+          .filter((g) => g.codigo_glosa !== hallazgo.codigo_causal);
+      }
+    }
+
+    this.agregar(hallazgo);
+  }
+
+  /**
+   * Intenta mapear un campo_afectado del validador a un código de campo
+   * del mapeo RIPS (ej: "fevRips.servicios.consultas[0].numAutorizacion" → "C03").
+   */
+  private resolverCampoRipsDesdeAfectado(campoAfectado: string): string | null {
+    // Extraer la parte del campo sin índices ni prefijos
+    const limpio = campoAfectado
+      .replace(/^fevRips\./, "")
+      .replace(/^servicios\./, "")
+      .replace(/^usuarios\[\d+\]\.servicios\./, "")
+      .replace(/^usuarios\[\d+\]\./, "")
+      .replace(/^datosFactura\./, "")
+      .replace(/\[\d+\]/, "");
+
+    // Buscar match directo
+    if (CAMPO_FEVRIPS_A_MAPEO[limpio]) {
+      return CAMPO_FEVRIPS_A_MAPEO[limpio]!;
+    }
+
+    // Buscar match por campo final (ej: "numAutorizacion" en contexto consultas)
+    const partes = limpio.split(".");
+    if (partes.length >= 2) {
+      const seccion = partes[0]!;
+      const campo = partes.slice(1).join(".");
+      const key = `${seccion}.${campo}`;
+      if (CAMPO_FEVRIPS_A_MAPEO[key]) {
+        return CAMPO_FEVRIPS_A_MAPEO[key]!;
+      }
+    }
+
+    return null;
   }
 }
 

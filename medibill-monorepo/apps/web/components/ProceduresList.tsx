@@ -207,7 +207,7 @@ export default function ProceduresList({
                 </button>
               ) : (
                 <span className="text-[10px] font-bold text-medi-dark/40 flex-shrink-0">Sin tarifa</span>
-              )}}
+              )}
               {!readOnly && (
               <button
                 onClick={() => onEliminar(idx)}

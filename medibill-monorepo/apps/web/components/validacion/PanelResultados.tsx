@@ -6,6 +6,7 @@ import ScoreRiesgo from "@/components/validacion/ScoreRiesgo";
 import ContadoresValidacion from "@/components/validacion/ContadoresValidacion";
 import ResumenFactura from "@/components/validacion/ResumenFactura";
 import ListaAlertas from "@/components/validacion/ListaAlertas";
+import PanelRiesgoCampoRips from "@/components/validacion/PanelRiesgoCampoRips";
 import BotonEnvio from "@/components/validacion/BotonEnvio";
 
 interface PanelResultadosProps {
@@ -84,7 +85,17 @@ export default function PanelResultados({ resultado, factura, loading }: PanelRe
         <ListaAlertas alertas={resultado.alertas} />
       </div>
 
-      {/* Fila 4: Botón de envío */}
+      {/* Fila 4: Riesgo por campo RIPS */}
+      {resultado.alertas.some((a) => a.campo_rips_codigo) && (
+        <div className="bg-medi-deep/40 border border-medi-dark/30 rounded-xl p-4">
+          <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wide mb-3">
+            Riesgo por campo RIPS (Res. 2275)
+          </h3>
+          <PanelRiesgoCampoRips alertas={resultado.alertas} />
+        </div>
+      )}
+
+      {/* Fila 5: Botón de envío */}
       <BotonEnvio resultado={resultado} onEnviar={handleEnviar} />
     </div>
   );

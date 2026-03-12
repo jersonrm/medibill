@@ -388,6 +388,16 @@ export type CategoriaAlerta =
   | "seguimiento";
 
 /**
+ * Glosa del mapeo oficial RIPS → Glosas (Res. 2275/2023)
+ * que podría dispararse por un campo RIPS con problemas.
+ */
+export interface GlosaRelacionadaMapeo {
+  codigo_glosa: string;
+  nivel: string;
+  descripcion: string;
+}
+
+/**
  * Alerta individual emitida por el validador pre-radicación.
  * Incluye toda la información necesaria para que el usuario corrija el problema.
  */
@@ -400,6 +410,10 @@ export interface Alerta {
   como_resolver: string;
   servicio_afectado?: string;    // CUPS del servicio
   norma_legal: string;           // referencia normativa
+  /** Código del campo RIPS afectado según Res. 2275/2023 (ej: "C03", "P05") */
+  campo_rips_codigo?: string;
+  /** Glosas adicionales del mapeo oficial que este campo puede disparar */
+  glosas_relacionadas_mapeo?: GlosaRelacionadaMapeo[];
 }
 
 // =====================================================================
